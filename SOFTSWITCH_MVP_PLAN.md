@@ -350,6 +350,32 @@ transactions
 ├── created_at
 ├── INDEX idx_user_date (user_id, created_at)
 
+-- Payments (all recharge/payment events — online + manual)
+payments
+├── id (PK)
+├── user_id (FK→users.id)            -- who is being recharged
+├── -- Payment details
+├── amount DECIMAL(12,4)              -- payment amount
+├── currency VARCHAR(3) DEFAULT 'USD'
+├── payment_method ENUM('online_stripe','online_paypal','online_sslcommerz',
+│                        'bank_transfer','manual_admin','manual_reseller')
+├── -- Online payment gateway fields
+├── gateway_transaction_id VARCHAR(255) NULL  -- Stripe charge ID, PayPal txn, etc.
+├── gateway_response JSON NULL        -- full gateway response for audit
+├── -- Manual recharge fields
+├── recharged_by (FK→users.id) NULL   -- admin or reseller who did manual recharge
+├── notes VARCHAR(500) NULL           -- admin/reseller note (e.g. "Bank TT ref #123")
+├── -- Status
+├── status ENUM('pending','completed','failed','refunded') DEFAULT 'pending'
+├── completed_at TIMESTAMP NULL
+├── -- Links
+├── transaction_id (FK→transactions.id) NULL  -- linked transaction after completion
+├── invoice_id (FK→invoices.id) NULL  -- if paying a specific invoice
+├── created_at, updated_at
+├── INDEX idx_user_date (user_id, created_at)
+├── INDEX idx_status (status)
+├── INDEX idx_gateway_txn (gateway_transaction_id)
+
 -- Invoices (postpaid)
 invoices
 ├── id (PK)
@@ -765,19 +791,24 @@ rSwitch/
 │   │   │   │   ├── TrunkRouteController.php  -- prefix→trunk routing rules
 │   │   │   │   ├── DidController.php
 │   │   │   │   ├── RateGroupController.php
+│   │   │   │   ├── ManualRechargeController.php  -- admin recharges any user
+│   │   │   │   ├── PaymentHistoryController.php  -- view all payments system-wide
 │   │   │   │   └── SystemSettingController.php
 │   │   │   ├── Reseller/
 │   │   │   │   ├── DashboardController.php
 │   │   │   │   ├── ClientController.php
 │   │   │   │   ├── SipAccountController.php
 │   │   │   │   ├── DidController.php
-│   │   │   │   └── RateGroupController.php
+│   │   │   │   ├── RateGroupController.php
+│   │   │   │   └── ClientRechargeController.php  -- reseller recharges own clients
 │   │   │   ├── Client/
 │   │   │   │   ├── DashboardController.php
 │   │   │   │   ├── SipAccountController.php
 │   │   │   │   └── CdrController.php
 │   │   │   ├── Common/
 │   │   │   │   ├── KycProfileController.php   -- submit/update KYC form + upload docs
+│   │   │   │   ├── OnlineRechargeController.php -- self-service online payment (Stripe/PayPal)
+│   │   │   │   ├── PaymentHistoryController.php -- view own payment history
 │   │   │   │   ├── CdrController.php
 │   │   │   │   ├── InvoiceController.php
 │   │   │   │   ├── TransactionController.php
@@ -800,6 +831,7 @@ rSwitch/
 │   │   ├── Rate.php
 │   │   ├── Cdr.php
 │   │   ├── RatedCdr.php
+│   │   ├── Payment.php
 │   │   ├── Transaction.php
 │   │   ├── Invoice.php
 │   │   └── Asterisk/                  -- Asterisk realtime models
@@ -818,7 +850,13 @@ rSwitch/
 │   │   │   ├── RatingEngine.php       -- Longest prefix match, cost calculation
 │   │   │   ├── BalanceService.php     -- Credit/debit operations (atomic)
 │   │   │   ├── CdrProcessor.php       -- Process raw CDR → rated_cdr
-│   │   │   └── InvoiceGenerator.php   -- Monthly invoice creation
+│   │   │   ├── InvoiceGenerator.php   -- Monthly invoice creation
+│   │   │   └── PaymentService.php     -- Online payment + manual recharge logic
+│   │   ├── PaymentGateway/
+│   │   │   ├── PaymentGatewayInterface.php  -- common interface
+│   │   │   ├── StripeGateway.php      -- Stripe Checkout / Payment Intent
+│   │   │   ├── PaypalGateway.php      -- PayPal integration
+│   │   │   └── SslcommerzGateway.php  -- SSLCommerz (BD local gateway)
 │   │   ├── Kyc/
 │   │   │   └── KycService.php         -- submit, validate docs, approve/reject
 │   │   └── Did/
@@ -826,7 +864,10 @@ rSwitch/
 │   ├── Notifications/
 │   │   ├── KycSubmittedNotification.php   -- notify admin when KYC submitted
 │   │   ├── KycApprovedNotification.php    -- notify user when KYC approved
-│   │   └── KycRejectedNotification.php    -- notify user when KYC rejected (with reason)
+│   │   ├── KycRejectedNotification.php    -- notify user when KYC rejected (with reason)
+│   │   ├── PaymentReceivedNotification.php   -- notify user on successful recharge
+│   │   ├── PaymentFailedNotification.php     -- notify user on failed payment
+│   │   └── LowBalanceNotification.php        -- notify when balance below threshold
 │   ├── Jobs/
 │   │   ├── ProcessCdrJob.php          -- Runs every 30s via scheduler
 │   │   ├── GenerateInvoicesJob.php    -- Monthly
@@ -861,6 +902,7 @@ rSwitch/
 │       ├── 0007_create_cdr_table.php
 │       ├── 0008_create_rated_cdr_table.php
 │       ├── 0009_create_transactions_table.php
+│       ├── 0009b_create_payments_table.php
 │       ├── 0010_create_invoices_table.php
 │       └── 0011_create_asterisk_realtime_tables.php
 ├── routes/
@@ -901,6 +943,75 @@ DB::transaction(function () {
     Transaction::create([...]);
 });
 ```
+
+#### Payment & Recharge Flows
+
+**3 ways to recharge an account:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     RECHARGE METHODS                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. ONLINE SELF-RECHARGE (Reseller or Client)                   │
+│     User → selects amount → chooses gateway (Stripe/PayPal/     │
+│     SSLCommerz) → redirected to payment page → gateway callback │
+│     → payment verified → balance credited → receipt emailed     │
+│                                                                 │
+│  2. ADMIN MANUAL RECHARGE                                       │
+│     Admin → selects any user → enters amount + note →           │
+│     balance credited instantly → transaction logged              │
+│                                                                 │
+│  3. RESELLER RECHARGES OWN CLIENT                               │
+│     Reseller → selects own client → enters amount →             │
+│     deducted from reseller balance → credited to client →       │
+│     both transactions logged                                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Online payment flow (Stripe example):**
+```php
+// 1. User submits recharge form
+PaymentService::initiateOnlinePayment($user, $amount, 'stripe');
+  → Creates Payment record (status = 'pending')
+  → Creates Stripe Checkout Session / Payment Intent
+  → Returns redirect URL to Stripe
+
+// 2. User completes payment on Stripe
+// 3. Stripe webhook hits /api/webhooks/stripe
+PaymentService::handleGatewayCallback($gatewayTxnId, $response);
+  → Verifies payment with gateway
+  → Updates Payment record (status = 'completed')
+  → BalanceService::credit($user, $amount)
+    → Atomic: updates user.balance + creates Transaction
+  → Links Payment → Transaction
+  → Sends PaymentReceivedNotification
+
+// 4. If payment fails
+  → Updates Payment record (status = 'failed')
+  → Sends PaymentFailedNotification
+```
+
+**Reseller → Client recharge flow:**
+```php
+RechargeService::resellerRechargeClient($reseller, $client, $amount);
+  → Validates: client.parent_id == reseller.id
+  → Validates: reseller.balance >= amount
+  → DB::transaction {
+      BalanceService::debit($reseller, $amount)   // deduct from reseller
+      BalanceService::credit($client, $amount)     // add to client
+      Payment::create(method='manual_reseller', recharged_by=reseller.id)
+    }
+```
+
+**Payment history — what each role sees:**
+
+| Role | Sees |
+|---|---|
+| Admin | All payments system-wide, filter by user/method/status/date |
+| Reseller | Own payments + own clients' payments |
+| Client | Own payments only |
 
 #### SipAccount Observer — Asterisk Sync
 When a SipAccount is created/updated/deleted, the observer writes to `ps_endpoints`, `ps_auths`, and `ps_aors` tables, then optionally reloads PJSIP via AMI.
