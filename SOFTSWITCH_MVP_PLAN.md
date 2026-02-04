@@ -282,59 +282,235 @@ rates
 ├── INDEX idx_prefix (rate_group_id, prefix)
 ```
 
-### CDR & Billing
+### CDR & Billing (High Volume — 10M rows/day)
+
+**Architecture change**: The old plan had two tables (`cdr` + `rated_cdr`). At 10M rows/day
+that's 20M inserts/day and 3.65 billion rated rows/year. Instead we use a **single unified
+`call_records` table** with **monthly partitioning** + **summary tables** for fast reporting.
+
+**Why single table?**
+- Eliminates double-write overhead (no raw cdr + rated_cdr)
+- No JOIN between cdr↔rated_cdr for queries
+- AGI writes call_start record, hangup handler UPDATEs with duration + cost
+- One table to partition, index, and archive
+
+**Billing flow (real-time, not batch):**
+```
+┌─ CALL START ──────────────────────────────────────────────┐
+│ AGI runs → checks balance → finds rate → selects trunk    │
+│ AGI INSERTs call_records row (status='in_progress')       │
+│ AGI caches call_id + rate info in Redis (key: channel_id) │
+│ Call proceeds...                                          │
+├─ CALL END ────────────────────────────────────────────────┤
+│ Asterisk hangup handler → triggers AGI or AMI event       │
+│ Laravel reads Redis cache → gets rate, call_record_id     │
+│ Calculates actual cost from billsec                       │
+│ UPDATEs call_records row (duration, cost, status='rated') │
+│ BalanceService::debit() → atomic balance deduction        │
+│ Deletes Redis cache key                                   │
+└───────────────────────────────────────────────────────────┘
+```
+**No batch CDR processor needed** — billing happens in real-time at call end.
 
 ```sql
--- Raw CDR from Asterisk (written by cdr_adaptive_odbc)
-cdr
+-- Single unified CDR + billing table (replaces both cdr and rated_cdr)
+call_records
 ├── id (PK, BIGINT AUTO_INCREMENT)
-├── calldate DATETIME
-├── clid VARCHAR(80)
-├── src VARCHAR(80)
-├── dst VARCHAR(80)
-├── dcontext VARCHAR(80)
-├── channel VARCHAR(80)
-├── dstchannel VARCHAR(80)
-├── lastapp VARCHAR(80)
-├── lastdata VARCHAR(80)
-├── duration INT
-├── billsec INT
-├── disposition VARCHAR(45)
-├── amaflags INT
-├── accountcode VARCHAR(20)         -- maps to sip_account.username
-├── uniqueid VARCHAR(150)
-├── userfield VARCHAR(255)
-├── INDEX idx_calldate (calldate)
-├── INDEX idx_accountcode (accountcode)
-
--- Processed/rated CDR (created by Laravel billing worker)
-rated_cdr
-├── id (PK, BIGINT)
-├── cdr_id (FK→cdr.id)
-├── sip_account_id (FK→sip_accounts.id) NULL  -- NULL for Flow 4 (trunk→trunk)
-├── user_id (FK→users.id)           -- billed client (or DID owner for Flow 4)
-├── reseller_id (FK→users.id) NULL  -- reseller (for commission tracking)
+├── uuid VARCHAR(36) UNIQUE          -- Asterisk uniqueid for dedup
+├── -- Call identification
+├── sip_account_id INT UNSIGNED NULL -- NULL for Flow 4 (trunk→trunk)
+├── user_id INT UNSIGNED             -- billed client (or DID owner for Flow 4)
+├── reseller_id INT UNSIGNED NULL    -- reseller (for commission tracking)
 ├── call_flow ENUM('sip_to_trunk','sip_to_sip','trunk_to_sip','trunk_to_trunk')
-│                                    -- maps to Flow 1, 2, 3, 4
-├── caller VARCHAR(40)
-├── callee VARCHAR(40)
-├── destination VARCHAR(100)        -- matched destination name
+├── -- Call details
+├── caller VARCHAR(40)               -- calling number
+├── callee VARCHAR(40)               -- called number
+├── caller_id VARCHAR(80) NULL       -- CLID display
+├── -- Routing info
+├── incoming_trunk_id INT UNSIGNED NULL
+├── outgoing_trunk_id INT UNSIGNED NULL
+├── did_id INT UNSIGNED NULL
+├── -- Rating info (set at call start by AGI)
+├── destination VARCHAR(100)         -- matched destination name
 ├── matched_prefix VARCHAR(20)
-├── incoming_trunk_id (FK→trunks.id) NULL  -- trunk call arrived on (Flow 3 & 4)
-├── outgoing_trunk_id (FK→trunks.id) NULL  -- trunk call went out on (Flow 1 & 4)
-├── did_id (FK→dids.id) NULL        -- DID involved (Flow 3 & 4)
-├── duration INT                    -- total seconds
-├── billable_duration INT           -- after min_duration & increment rounding
 ├── rate_per_minute DECIMAL(10,6)
-├── total_cost DECIMAL(10,4)        -- what it costs client
-├── reseller_cost DECIMAL(10,4)     -- what reseller pays admin
-├── call_start DATETIME
-├── call_end DATETIME
-├── hangup_cause VARCHAR(50)
-├── processed_at TIMESTAMP
+├── connection_fee DECIMAL(10,6) DEFAULT 0
+├── rate_group_id INT UNSIGNED NULL
+├── -- Duration & cost (updated at call end)
+├── call_start DATETIME NOT NULL     -- partition key
+├── call_end DATETIME NULL
+├── duration INT UNSIGNED DEFAULT 0  -- total seconds
+├── billsec INT UNSIGNED DEFAULT 0   -- billable seconds
+├── billable_duration INT UNSIGNED DEFAULT 0  -- after increment rounding
+├── total_cost DECIMAL(10,4) DEFAULT 0
+├── reseller_cost DECIMAL(10,4) DEFAULT 0
+├── -- Status
+├── disposition ENUM('ANSWERED','NO ANSWER','BUSY','FAILED','CANCEL') NULL
+├── hangup_cause VARCHAR(50) NULL
+├── status ENUM('in_progress','rated','failed','unbillable') DEFAULT 'in_progress'
+├── -- Asterisk raw fields (for debugging/audit)
+├── ast_channel VARCHAR(80) NULL
+├── ast_dstchannel VARCHAR(80) NULL
+├── ast_context VARCHAR(40) NULL
+├── -- Timestamps
+├── rated_at TIMESTAMP NULL
+├── created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+├──
+├── -- PARTITIONED BY RANGE on call_start (monthly)
+├── PRIMARY KEY (id, call_start)     -- partition key must be in PK
+├── INDEX idx_uuid (uuid)
 ├── INDEX idx_user_date (user_id, call_start)
 ├── INDEX idx_reseller_date (reseller_id, call_start)
-├── INDEX idx_call_flow (call_flow, call_start)
+├── INDEX idx_status (status, call_start)
+├── INDEX idx_sip_account (sip_account_id, call_start)
+├── INDEX idx_caller (caller, call_start)
+├── INDEX idx_callee (callee, call_start)
+)
+PARTITION BY RANGE (TO_DAYS(call_start)) (
+  PARTITION p2026_01 VALUES LESS THAN (TO_DAYS('2026-02-01')),
+  PARTITION p2026_02 VALUES LESS THAN (TO_DAYS('2026-03-01')),
+  PARTITION p2026_03 VALUES LESS THAN (TO_DAYS('2026-04-01')),
+  ...  -- auto-created by scheduled Laravel command
+  PARTITION p_future VALUES LESS THAN MAXVALUE
+);
+```
+
+### CDR Summary Tables (Pre-aggregated for Dashboards)
+
+Dashboards should **never** query `call_records` directly for stats.
+Summary tables are updated every 5 minutes by a scheduled job.
+
+```sql
+-- Hourly summary per user (for dashboards, reports)
+cdr_summary_hourly
+├── id (PK, BIGINT)
+├── user_id INT UNSIGNED
+├── reseller_id INT UNSIGNED NULL
+├── hour_start DATETIME              -- e.g. '2026-02-04 14:00:00'
+├── call_flow ENUM('sip_to_trunk','sip_to_sip','trunk_to_sip','trunk_to_trunk')
+├── total_calls INT UNSIGNED DEFAULT 0
+├── answered_calls INT UNSIGNED DEFAULT 0
+├── failed_calls INT UNSIGNED DEFAULT 0
+├── total_duration INT UNSIGNED DEFAULT 0     -- seconds
+├── total_billable INT UNSIGNED DEFAULT 0
+├── total_cost DECIMAL(12,4) DEFAULT 0
+├── total_reseller_cost DECIMAL(12,4) DEFAULT 0
+├── asr DECIMAL(5,2) NULL            -- Answer Seizure Ratio %
+├── acd DECIMAL(8,2) NULL            -- Average Call Duration (seconds)
+├── updated_at TIMESTAMP
+├── UNIQUE idx_user_hour_flow (user_id, hour_start, call_flow)
+├── INDEX idx_reseller_hour (reseller_id, hour_start)
+├── PARTITION BY RANGE (TO_DAYS(hour_start)) -- same monthly partitioning
+
+-- Daily summary per user (for invoicing, monthly reports)
+cdr_summary_daily
+├── id (PK, BIGINT)
+├── user_id INT UNSIGNED
+├── reseller_id INT UNSIGNED NULL
+├── date DATE
+├── call_flow ENUM('sip_to_trunk','sip_to_sip','trunk_to_sip','trunk_to_trunk')
+├── total_calls INT UNSIGNED DEFAULT 0
+├── answered_calls INT UNSIGNED DEFAULT 0
+├── total_duration INT UNSIGNED DEFAULT 0
+├── total_billable INT UNSIGNED DEFAULT 0
+├── total_cost DECIMAL(12,4) DEFAULT 0
+├── total_reseller_cost DECIMAL(12,4) DEFAULT 0
+├── asr DECIMAL(5,2) NULL
+├── acd DECIMAL(8,2) NULL
+├── updated_at TIMESTAMP
+├── UNIQUE idx_user_date_flow (user_id, date, call_flow)
+├── INDEX idx_reseller_date (reseller_id, date)
+
+-- Daily summary per destination prefix (for rate analysis)
+cdr_summary_destination
+├── id (PK, BIGINT)
+├── date DATE
+├── matched_prefix VARCHAR(20)
+├── destination VARCHAR(100)
+├── outgoing_trunk_id INT UNSIGNED NULL
+├── total_calls INT UNSIGNED DEFAULT 0
+├── answered_calls INT UNSIGNED DEFAULT 0
+├── total_duration INT UNSIGNED DEFAULT 0
+├── total_cost DECIMAL(12,4) DEFAULT 0
+├── asr DECIMAL(5,2) NULL
+├── acd DECIMAL(8,2) NULL
+├── updated_at TIMESTAMP
+├── UNIQUE idx_date_prefix_trunk (date, matched_prefix, outgoing_trunk_id)
+```
+
+### CDR Archival & Retention Strategy
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                   DATA LIFECYCLE (12 months)                  │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  0-3 months:   HOT — MySQL (SSD), full indexes, fast queries│
+│  3-6 months:   WARM — MySQL, reduce indexes (drop caller/   │
+│                callee indexes on old partitions)             │
+│  6-12 months:  COOL — MySQL, read-mostly, compressed tables │
+│  12+ months:   COLD — Export partition to CSV/Parquet,       │
+│                DROP partition from MySQL, store in S3/disk   │
+│                Summary tables retained forever               │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+Automated by Laravel scheduled commands:
+- CreateCdrPartitionCommand  — runs monthly, creates next 2 months partitions
+- ArchiveCdrPartitionCommand — runs monthly, exports & drops partitions > 12 months
+- CompressCdrPartitionCommand — runs monthly, compresses partitions 6-12 months old
+- UpdateCdrSummaryCommand    — runs every 5 minutes, updates hourly/daily summaries
+```
+
+### Volume Calculations
+
+```
+10M rows/day assumptions:
+├── Row size: ~400 bytes (optimized, no VARCHAR waste)
+├── Daily data: 10M × 400B = ~3.8 GB/day
+├── Monthly data: ~114 GB/month (1 partition)
+├── Yearly data: ~1.37 TB (call_records only)
+├── With indexes: ~2.5-3 TB/year total
+├── Summary tables: ~5 GB/year (negligible)
+│
+├── Write throughput:
+│   ├── Average: 10M/86400 = ~116 inserts/sec
+│   ├── Peak (3x): ~350 inserts/sec + ~350 updates/sec
+│   └── MySQL InnoDB handles this comfortably with partitioning
+│
+├── Query patterns:
+│   ├── Dashboard stats → cdr_summary_hourly/daily (milliseconds)
+│   ├── User CDR list → call_records with user_id + date range (fast, partition pruning)
+│   ├── CDR export → call_records with date range (partition scan, async)
+│   └── Invoice generation → cdr_summary_daily (instant)
+│
+└── Server recommendation for this volume:
+    ├── CPU: 8+ cores
+    ├── RAM: 32 GB (InnoDB buffer pool = 24 GB)
+    ├── Storage: 4 TB NVMe SSD
+    └── Separate MySQL server from Asterisk (recommended)
+```
+
+### Redis for Active Call State
+
+```
+During a call, Redis holds:
+  Key:   call:{asterisk_channel_id}
+  Value: {
+    call_record_id: 12345678,
+    user_id: 100,
+    rate_per_minute: 0.015,
+    connection_fee: 0,
+    billing_increment: 6,
+    min_duration: 0,
+    rate_group_id: 5,
+    call_start: "2026-02-04T14:30:00Z"
+  }
+  TTL: 7200 (2 hours, safety net)
+
+On hangup → read this key → calculate cost → update call_records → debit balance → delete key
+If Redis key missing on hangup → fallback: query call_records WHERE status='in_progress'
+```
 
 -- Transactions (all money movements)
 transactions
@@ -583,6 +759,10 @@ exten => _X.,1,NoOp(== SIP call from ${CHANNEL(endpoint)} to ${EXTEN} ==)
  same => n(done),Hangup()
  same => n(hangup),Hangup()
 
+; --- Hangup handler: real-time billing at call end ---
+exten => h,1,NoOp(== Hangup handler: billing for ${CHANNEL(endpoint)} ==)
+ same => n,AGI(agi://127.0.0.1:4573,handle_hangup,${CHANNEL(uniqueid)},${CDR(billsec)},${DIALSTATUS})
+
 
 ; =============================================================
 ; CONTEXT: from-trunk
@@ -629,6 +809,10 @@ exten => _X.,1,NoOp(== Inbound from trunk ${CHANNEL(endpoint)} DID ${EXTEN} ==)
  same => n,Playback(ss-noservice)
 
  same => n(hangup),Hangup()
+
+; --- Hangup handler: real-time billing for inbound calls ---
+exten => h,1,NoOp(== Hangup handler: billing for trunk inbound ==)
+ same => n,AGI(agi://127.0.0.1:4573,handle_hangup,${CHANNEL(uniqueid)},${CDR(billsec)},${DIALSTATUS})
 ```
 
 ### AGI Billing & Routing Script (PHP FastAGI)
@@ -703,13 +887,20 @@ Step 5 — External call: select outgoing trunk (prefix + time-based)
   → Pick TRUNK_2 (failover, next priority or NULL-time fallback route)
   → If NO trunk found → DENIED
 
-Step 6 — Return variables
+Step 6 — Create call_record + cache in Redis
+  → INSERT call_records (status='in_progress', call_start=NOW(),
+      user_id, sip_account_id, caller, callee, rate_per_minute,
+      matched_prefix, destination, outgoing_trunk_id, call_flow='sip_to_trunk')
+  → Cache in Redis: call:{channel_id} = {call_record_id, rate_per_minute,
+      billing_increment, min_duration, connection_fee, user_id}
+  → TTL = 7200 seconds (2hr safety net)
+
+Step 7 — Return variables
   → ROUTE_TYPE  = "trunk"
   → TRUNK_1     = trunk endpoint name (e.g. "trunk-outgoing-1")
   → TRUNK_2     = failover trunk endpoint name (or empty)
   → TRUNK_PREFIX= trunk's tech prefix
   → TRUNK_STRIP = trunk's strip_digits
-  → RATE_ID     = matched rate ID
   → MAX_DURATION= max call duration in seconds
 
 
@@ -761,15 +952,66 @@ Step 4 — Route by destination type
     → Set MAX_DURATION = based on DID owner's balance
     → Set RATE_ID = matched rate
     → RETURN
+
+
+═══════════════════════════════════════════════════════════════
+AGI HANDLER 3: handle_hangup(channel_id, billsec, disposition)
+Called from: hangup handler (h extension) in both contexts
+Handles:     Real-time billing at call end for ALL flows
+═══════════════════════════════════════════════════════════════
+
+Step 1 — Read cached call state from Redis
+  → GET call:{channel_id}
+  → If NOT found → query call_records WHERE status='in_progress'
+    AND ast_channel LIKE '%{channel_id}%' (fallback)
+  → If still not found → log warning, RETURN (unbillable)
+
+Step 2 — Calculate actual cost
+  → billable_duration = apply min_duration + billing_increment rounding
+    Example: billsec=37s, increment=6 → ceil(37/6)*6 = 42s billable
+  → total_cost = (billable_duration / 60) * rate_per_minute + connection_fee
+  → reseller_cost = same calc with reseller's rate (if applicable)
+
+Step 3 — Update call_records
+  → UPDATE call_records SET
+      call_end = NOW(),
+      duration = actual_duration,
+      billsec = billsec,
+      billable_duration = calculated,
+      total_cost = calculated,
+      reseller_cost = calculated,
+      disposition = disposition,
+      status = 'rated',
+      rated_at = NOW()
+    WHERE id = call_record_id
+
+Step 4 — Debit balance (atomic)
+  → BalanceService::debit(user_id, total_cost)
+  → Creates Transaction record
+  → If reseller: BalanceService::debit(reseller_id, reseller_cost)
+
+Step 5 — Cleanup
+  → DEL call:{channel_id} from Redis
+  → If balance after debit < low_threshold → queue LowBalanceNotification
 ```
 
-### CDR Collection (`cdr_adaptive_odbc.conf`)
+### CDR Collection — Real-Time (No cdr_adaptive_odbc)
+
+**We do NOT use `cdr_adaptive_odbc`** for high-volume operation. Instead:
+
+1. **Call start**: AGI `route_outbound`/`route_inbound` INSERTs `call_records` row directly
+2. **During call**: Rate info cached in Redis (key: `call:{channel_id}`)
+3. **Call end**: Hangup handler AGI reads Redis → calculates cost → UPDATEs `call_records` → debits balance
+4. **Stalled calls**: `RecoverStalledCallsCommand` runs hourly, finds `in_progress` records > 2 hours old, marks as `failed`
+
+This eliminates the need for batch CDR processing entirely. Billing is real-time.
 
 ```ini
-[adaptive_odbc]
-connection = asterisk
-table = cdr
-alias start => calldate
+; Disable cdr_adaptive_odbc in modules.conf to avoid double-writing
+; /etc/asterisk/modules.conf
+[modules]
+noload => cdr_adaptive_odbc.so
+; We handle CDR in application layer via AGI
 ```
 
 ---
@@ -829,8 +1071,9 @@ rSwitch/
 │   │   ├── Did.php
 │   │   ├── RateGroup.php
 │   │   ├── Rate.php
-│   │   ├── Cdr.php
-│   │   ├── RatedCdr.php
+│   │   ├── CallRecord.php
+│   │   ├── CdrSummaryHourly.php
+│   │   ├── CdrSummaryDaily.php
 │   │   ├── Payment.php
 │   │   ├── Transaction.php
 │   │   ├── Invoice.php
@@ -849,7 +1092,7 @@ rSwitch/
 │   │   ├── Billing/
 │   │   │   ├── RatingEngine.php       -- Longest prefix match, cost calculation
 │   │   │   ├── BalanceService.php     -- Credit/debit operations (atomic)
-│   │   │   ├── CdrProcessor.php       -- Process raw CDR → rated_cdr
+│   │   │   ├── CallRecordService.php   -- Insert at call start, update at call end
 │   │   │   ├── InvoiceGenerator.php   -- Monthly invoice creation
 │   │   │   └── PaymentService.php     -- Online payment + manual recharge logic
 │   │   ├── PaymentGateway/
@@ -869,7 +1112,8 @@ rSwitch/
 │   │   ├── PaymentFailedNotification.php     -- notify user on failed payment
 │   │   └── LowBalanceNotification.php        -- notify when balance below threshold
 │   ├── Jobs/
-│   │   ├── ProcessCdrJob.php          -- Runs every 30s via scheduler
+│   │   ├── UpdateCdrSummaryJob.php    -- Runs every 5 min, updates hourly/daily summaries
+│   │   ├── RateHangupJob.php          -- Queued: rate + debit on call end (async fallback)
 │   │   ├── GenerateInvoicesJob.php    -- Monthly
 │   │   ├── SuspendOverdueJob.php      -- Check postpaid limits
 │   │   └── ProvisionEndpointJob.php
@@ -879,14 +1123,19 @@ rSwitch/
 │   │   └── SipAccountObserver.php    -- Sync to Asterisk realtime on create/update/delete
 │   └── Console/
 │       └── Commands/
-│           ├── ProcessCdrCommand.php
+│           ├── UpdateCdrSummaryCommand.php     -- every 5 min
+│           ├── CreateCdrPartitionCommand.php   -- monthly: create next 2 partitions
+│           ├── ArchiveCdrPartitionCommand.php  -- monthly: export + drop > 12 months
+│           ├── CompressCdrPartitionCommand.php -- monthly: compress 6-12 month partitions
+│           ├── RecoverStalledCallsCommand.php  -- hourly: find in_progress > 2hrs, mark failed
 │           ├── GenerateInvoicesCommand.php
 │           └── AsteriskHealthCheckCommand.php
 ├── agi/
 │   ├── server.php                     -- FastAGI daemon entry point
 │   ├── handlers/
 │   │   ├── RouteOutboundHandler.php   -- Flow 1 & 2: SIP→Trunk or SIP→SIP
-│   │   └── RouteInboundHandler.php    -- Flow 3 & 4: Trunk→SIP or Trunk→Trunk
+│   │   ├── RouteInboundHandler.php    -- Flow 3 & 4: Trunk→SIP or Trunk→Trunk
+│   │   └── HangupHandler.php         -- Real-time billing at call end (all flows)
 │   └── bootstrap.php                  -- Laravel app bootstrap for AGI context
 ├── database/
 │   └── migrations/
@@ -899,8 +1148,8 @@ rSwitch/
 │       ├── 0004_create_dids_table.php
 │       ├── 0005_create_rate_groups_table.php
 │       ├── 0006_create_rates_table.php
-│       ├── 0007_create_cdr_table.php
-│       ├── 0008_create_rated_cdr_table.php
+│       ├── 0007_create_call_records_table.php  -- partitioned by month
+│       ├── 0008_create_cdr_summary_tables.php -- hourly, daily, destination
 │       ├── 0009_create_transactions_table.php
 │       ├── 0009b_create_payments_table.php
 │       ├── 0010_create_invoices_table.php
@@ -1076,20 +1325,25 @@ Using **Spatie Laravel Permission** or custom middleware:
   - Internal: SIP-to-SIP direct calls
 - DID management and assignment (linked to incoming/both trunks)
 - SIP registration monitoring via AMI (both SIP accounts and trunk registrations)
-- CDR collection via `cdr_adaptive_odbc` into MySQL
-- Basic CDR viewer (raw, unrated)
+- `call_records` table with monthly partitioning + partition auto-creation command
+- Redis caching for active call state
+- Basic CDR viewer (call_records, paginated with partition pruning)
 - **Deliverable**: Working calls — SIP accounts register, outbound via trunks, inbound via DIDs
 
 ### Phase 3: Billing Engine
 - Rate group and rate management (prefix-based)
 - Rating engine (longest prefix match)
-- CDR processor job (raw CDR → rated CDR with costs)
-- Balance service (atomic credit/debit)
+- **Real-time billing via hangup handler AGI** (no batch CDR processor):
+  - AGI inserts `call_records` at call start, caches rate in Redis
+  - Hangup handler AGI calculates cost, updates record, debits balance
+  - `RecoverStalledCallsCommand` — hourly cleanup for orphaned in_progress records
+- Balance service (atomic credit/debit with row locking)
 - Prepaid: AGI balance check before call, max duration enforcement
 - Postpaid: credit limit enforcement
 - Transaction log
 - Top-up functionality (admin/reseller adds credit to accounts)
-- **Deliverable**: Calls are rated, balances deducted, prepaid cutoff works
+- **CDR summary tables** (hourly + daily) with 5-minute update job
+- **Deliverable**: Calls are rated in real-time, balances deducted instantly, prepaid cutoff works
 
 ### Phase 4: Business Features
 - Reseller rate groups (reseller creates own rates with markup over admin base rate)
@@ -1102,13 +1356,18 @@ Using **Spatie Laravel Permission** or custom middleware:
 
 ### Phase 5: Dashboards & Monitoring
 - Admin dashboard (total calls, revenue, active channels, system health)
+  - Stats from `cdr_summary_hourly`/`cdr_summary_daily` (millisecond queries)
 - Reseller dashboard (own clients stats, revenue, balance)
 - Client dashboard (call stats, balance, recent calls)
-- Live channel monitor (active calls via AMI)
-- CDR export (CSV/Excel)
-- Call quality metrics (ASR, ACD)
+- Live channel monitor (active calls via Redis `call:*` keys + AMI)
+- CDR export (CSV/Excel — async job, queries partitioned `call_records`)
+- Call quality metrics (ASR, ACD from summary tables)
+- **CDR data lifecycle management**:
+  - Partition auto-creation (monthly)
+  - Partition archival > 12 months (export to CSV/Parquet + DROP)
+  - Partition compression for 6-12 month data
 - Asterisk health check command
-- **Deliverable**: Production-ready MVP with monitoring
+- **Deliverable**: Production-ready MVP with monitoring, scales to 10M+ calls/day
 
 ---
 
@@ -1119,9 +1378,12 @@ Using **Spatie Laravel Permission** or custom middleware:
 | SIP driver | PJSIP (not chan_sip) | chan_sip is deprecated in Asterisk 21 |
 | SIP provisioning | Asterisk Realtime (ARA) via MySQL | No config file rewrites; instant provisioning |
 | Billing gate | FastAGI (PHP) | Direct access to Laravel's DB/services; low latency |
-| CDR collection | cdr_adaptive_odbc | Native Asterisk module; writes directly to MySQL |
-| CDR processing | Laravel Queue Job (every 30s) | Async; doesn't block calls; scalable |
-| Balance tracking | MySQL with row-level locking + Redis cache | Atomic operations; Redis for fast AGI reads |
+| CDR storage | Single `call_records` table (no cdr + rated_cdr split) | Eliminates double-write; one table to partition/query |
+| CDR write method | AGI writes at call start + hangup handler updates | Real-time billing, no batch processing lag |
+| CDR partitioning | Monthly RANGE partitioning on `call_start` | Partition pruning for fast queries; easy archival by dropping old partitions |
+| CDR reporting | Pre-aggregated summary tables (hourly/daily) | Dashboards never query 3.6B row table; millisecond stats |
+| Active call state | Redis (TTL 2hr) | Sub-millisecond reads for hangup handler; no DB query during billing |
+| Balance tracking | MySQL row-level locking + Redis cache | Atomic operations; Redis for fast AGI reads |
 | Auth/permissions | Spatie Laravel Permission | Battle-tested; supports role hierarchy |
 | Frontend | Blade + Livewire (or Inertia + Vue) | Rapid development for MVP |
 | Trunk direction | Single table with direction ENUM | Avoids duplicate schemas; one trunk can handle both directions |
@@ -1131,11 +1393,27 @@ Using **Spatie Laravel Permission** or custom middleware:
 
 ---
 
-## 6. Server Requirements (MVP)
+## 6. Server Requirements (10M calls/day)
 
+**Recommended: Split into 2 servers (Asterisk + Web/DB)**
+
+### Server 1 — Asterisk (Voice)
 - **OS**: Ubuntu 22.04/24.04 LTS or AlmaLinux 9
-- **CPU**: 4 cores minimum
-- **RAM**: 8 GB minimum
-- **Storage**: 50GB+ SSD (CDR data grows)
-- **Ports**: 5060/UDP (SIP), 10000-20000/UDP (RTP), 80/443 (Web)
-- **Software**: PHP 8.3, Composer, Node.js 20, MySQL 8, Redis, Supervisor, Asterisk 21
+- **CPU**: 8 cores (transcoding is CPU-heavy)
+- **RAM**: 16 GB
+- **Storage**: 100 GB SSD
+- **Network**: Low latency, dedicated IP
+- **Ports**: 5060/UDP (SIP), 10000-20000/UDP (RTP)
+- **Software**: Asterisk 21, Redis client
+
+### Server 2 — Web + Database
+- **OS**: Ubuntu 22.04/24.04 LTS or AlmaLinux 9
+- **CPU**: 8+ cores
+- **RAM**: 32 GB (InnoDB buffer pool = 24 GB)
+- **Storage**: 4 TB NVMe SSD (call_records ~2.5-3 TB/year with indexes)
+- **Ports**: 80/443 (Web), 3306 (MySQL), 6379 (Redis), 4573 (FastAGI)
+- **Software**: PHP 8.3, Composer, Node.js 20, MySQL 8, Redis, Supervisor, Nginx
+
+### Single Server (MVP/testing only)
+- **CPU**: 8 cores, **RAM**: 32 GB, **Storage**: 4 TB NVMe SSD
+- All services on one box — works for development and low-volume testing
