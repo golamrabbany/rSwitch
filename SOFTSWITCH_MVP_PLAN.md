@@ -326,6 +326,9 @@ call_records
 ├── caller VARCHAR(40)               -- calling number
 ├── callee VARCHAR(40)               -- called number
 ├── caller_id VARCHAR(80) NULL       -- CLID display
+├── -- Network info
+├── src_ip VARCHAR(45) NULL           -- source IP of the caller (SIP account or trunk)
+├── dst_ip VARCHAR(45) NULL           -- destination IP (trunk or SIP account)
 ├── -- Routing info
 ├── incoming_trunk_id INT UNSIGNED NULL
 ├── outgoing_trunk_id INT UNSIGNED NULL
