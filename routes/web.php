@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin;
+use App\Http\Controllers\Reseller;
 use App\Http\Controllers\KycSubmissionController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,7 +55,19 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
 // Reseller routes
 Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller'])->group(function () {
-    Route::get('dashboard', \App\Http\Controllers\Reseller\DashboardController::class)->name('dashboard');
+    Route::get('dashboard', Reseller\DashboardController::class)->name('dashboard');
+
+    Route::middleware('kyc.approved')->group(function () {
+        Route::resource('clients', Reseller\ClientController::class)->except(['destroy']);
+        Route::post('clients/{client}/toggle-status', [Reseller\ClientController::class, 'toggleStatus'])->name('clients.toggle-status');
+
+        Route::resource('sip-accounts', Reseller\SipAccountController::class)->except(['destroy']);
+        Route::post('sip-accounts/{sip_account}/reprovision', [Reseller\SipAccountController::class, 'reprovision'])->name('sip-accounts.reprovision');
+
+        Route::get('cdr', [Reseller\CdrController::class, 'index'])->name('cdr.index');
+        Route::get('cdr/export', [Reseller\CdrController::class, 'export'])->name('cdr.export');
+        Route::get('cdr/{uuid}', [Reseller\CdrController::class, 'show'])->name('cdr.show');
+    });
 });
 
 // Client routes
