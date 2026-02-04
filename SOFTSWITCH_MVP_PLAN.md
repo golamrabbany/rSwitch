@@ -179,25 +179,61 @@ trunks
 - `outgoing` — sends calls to PSTN provider (used for outbound dialing)
 - `both` — single trunk handles both directions (common with SIP trunk providers)
 
-**Trunk routing table** for outgoing — maps destination prefixes to specific outgoing trunks:
+**Trunk routing table** for outgoing — maps destination prefixes + time windows to specific outgoing trunks:
 
 ```sql
 trunk_routes
 ├── id (PK)
 ├── trunk_id (FK→trunks.id)          -- must be 'outgoing' or 'both' direction
-├── prefix VARCHAR(20)               -- destination prefix to match (e.g. '1', '44', '880')
+├── prefix VARCHAR(20)               -- destination prefix to match (e.g. '1', '44', '88017')
+├── -- Time-based routing (NULL = always active, no time restriction)
+├── time_start TIME NULL             -- e.g. '00:00:00' (inclusive)
+├── time_end TIME NULL               -- e.g. '06:00:00' (exclusive)
+├── days_of_week VARCHAR(20) NULL    -- e.g. 'mon,tue,wed,thu,fri' (NULL = all days)
+├── timezone VARCHAR(50) DEFAULT 'UTC'  -- timezone for time evaluation
+├── -- Priority & balancing
 ├── priority INT DEFAULT 1           -- lower = higher priority (for failover)
 ├── weight INT DEFAULT 100           -- load balancing weight among same-priority trunks
 ├── status ENUM('active','disabled')
 ├── created_at, updated_at
 ├── INDEX idx_prefix_priority (prefix, priority)
-├── UNIQUE idx_trunk_prefix (trunk_id, prefix)
+├── INDEX idx_prefix_time (prefix, time_start, time_end)
 ```
 
-This allows **prefix-based outgoing trunk selection** with failover:
-- Call to `1212...` → matches prefix `1` → routes to Trunk A (priority 1), failover to Trunk B (priority 2)
-- Call to `44...` → matches prefix `44` → routes to Trunk C
-- Multiple trunks with same prefix + priority → load-balanced by weight
+**Routing logic** — prefix match + time window + priority + failover:
+
+1. Match longest prefix first
+2. Filter by current time (if `time_start`/`time_end` are set)
+3. Order by priority ASC (lower = preferred)
+4. Pick primary + failover trunk
+
+**Time-based routing examples:**
+
+```
+┌──────────┬────────────────────┬────────────────┬──────────┐
+│ prefix   │ time window        │ trunk          │ priority │
+├──────────┼────────────────────┼────────────────┼──────────┤
+│ 88017    │ 00:00 AM → 06:00 AM│ Trunk 1 (cheap)│ 1        │
+│ 88017    │ 06:00 AM → 12:00 PM│ Trunk 2 (mid)  │ 1        │
+│ 88017    │ 12:00 PM → 06:00 PM│ Trunk 3 (peak) │ 1        │
+│ 88017    │ 06:00 PM → 12:00 AM│ Trunk 1 (cheap)│ 1        │
+│ 88017    │ NULL (any time)    │ Trunk 4 (backup)│ 2       │ ← failover
+│ 44       │ NULL (any time)    │ Trunk 5        │ 1        │
+│ 1        │ NULL (any time)    │ Trunk 6        │ 1        │
+└──────────┴────────────────────┴────────────────┴──────────┘
+```
+
+**How it works for prefix `88017` at 3:00 AM:**
+- Matches prefix `88017`
+- Current time 3:00 AM falls in `00:00–06:00` window → Trunk 1 (priority 1)
+- Failover: Trunk 4 has `NULL` time (always active) + priority 2 → backup
+- AGI returns: TRUNK_1 = Trunk 1, TRUNK_2 = Trunk 4
+
+**Rules:**
+- `time_start = NULL` AND `time_end = NULL` → route is always active (no time restriction)
+- Time windows are **non-overlapping** per prefix+priority (enforced by validation in Laravel)
+- `days_of_week` allows weekday/weekend differentiation (e.g. cheaper weekend routes)
+- A `NULL`-time route at a higher priority number serves as a universal failover
 
 ### DIDs (Inbound Numbers)
 
@@ -604,17 +640,41 @@ Step 4 — External call: balance check
               If remaining <= 0 → DENIED
   → Set MAX_DURATION (seconds)
 
-Step 5 — External call: select outgoing trunk
-  → Longest prefix match on trunk_routes table:
-    SELECT t.*, tr.prefix, tr.priority, tr.weight
+Step 5 — External call: select outgoing trunk (prefix + time-based)
+  → Get current time in route's timezone
+  → Longest prefix match + time window filter on trunk_routes table:
+    SELECT t.*, tr.prefix, tr.priority, tr.weight,
+           tr.time_start, tr.time_end
     FROM trunk_routes tr
     JOIN trunks t ON t.id = tr.trunk_id
     WHERE ${destination} LIKE CONCAT(tr.prefix, '%')
+      AND tr.status = 'active'
       AND t.status = 'active'
       AND t.direction IN ('outgoing','both')
-    ORDER BY LENGTH(tr.prefix) DESC, tr.priority ASC
+      AND (
+        -- No time restriction (always active)
+        (tr.time_start IS NULL AND tr.time_end IS NULL)
+        OR
+        -- Current time falls within the time window
+        (CONVERT_TZ(NOW(), 'UTC', tr.timezone) BETWEEN tr.time_start AND tr.time_end)
+        OR
+        -- Overnight window (e.g. 22:00 → 06:00)
+        (tr.time_start > tr.time_end
+         AND (CONVERT_TZ(NOW(), 'UTC', tr.timezone) >= tr.time_start
+              OR CONVERT_TZ(NOW(), 'UTC', tr.timezone) < tr.time_end))
+      )
+      AND (
+        -- No day restriction
+        tr.days_of_week IS NULL
+        OR
+        -- Current day matches
+        FIND_IN_SET(LOWER(DAYNAME(CONVERT_TZ(NOW(), 'UTC', tr.timezone))),
+                    tr.days_of_week)
+      )
+    ORDER BY LENGTH(tr.prefix) DESC, tr.priority ASC, tr.weight DESC
   → Check trunk capacity (active channels < max_channels via AMI)
-  → Pick TRUNK_1 (primary) and TRUNK_2 (failover)
+  → Pick TRUNK_1 (primary, lowest priority number in time window)
+  → Pick TRUNK_2 (failover, next priority or NULL-time fallback route)
   → If NO trunk found → DENIED
 
 Step 6 — Return variables
@@ -954,7 +1014,7 @@ Using **Spatie Laravel Permission** or custom middleware:
 | Auth/permissions | Spatie Laravel Permission | Battle-tested; supports role hierarchy |
 | Frontend | Blade + Livewire (or Inertia + Vue) | Rapid development for MVP |
 | Trunk direction | Single table with direction ENUM | Avoids duplicate schemas; one trunk can handle both directions |
-| Outgoing trunk selection | Prefix-based routing with priority + failover | Longest prefix match on trunk_routes; AGI returns primary + backup trunk |
+| Outgoing trunk selection | Prefix + time-based routing with priority + failover | Longest prefix match + time window filter; AGI returns primary + backup trunk |
 | Incoming trunk auth | IP-based (identify) or registration | Flexible per provider; most ITSP use IP-based |
 | Trunk provisioning | Laravel generates pjsip_trunks.conf + AMI reload | Keeps trunk config in sync; no manual Asterisk editing |
 
