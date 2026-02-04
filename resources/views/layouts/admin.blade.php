@@ -67,16 +67,17 @@
                         SIP Accounts
                     </a>
 
-                    <div class="pt-4">
-                        <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Coming Soon</p>
-                    </div>
-
-                    <span class="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-500 cursor-not-allowed">
+                    <a href="{{ route('admin.trunks.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('admin.trunks.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
                         Trunks
-                    </span>
+                    </a>
+
+                    <div class="pt-4">
+                        <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Coming Soon</p>
+                    </div>
 
                     <span class="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-500 cursor-not-allowed">
                         <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -33,6 +33,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::resource('sip-accounts', Admin\SipAccountController::class);
     Route::post('sip-accounts/{sip_account}/reprovision', [Admin\SipAccountController::class, 'reprovision'])->name('sip-accounts.reprovision');
+
+    Route::resource('trunks', Admin\TrunkController::class);
+    Route::post('trunks/{trunk}/reprovision', [Admin\TrunkController::class, 'reprovision'])->name('trunks.reprovision');
 });
 
 // Reseller routes (placeholder)

@@ -88,6 +88,7 @@ services:
             - './docker/asterisk/conf/extconfig.conf:/etc/asterisk/extconfig.conf'
             - './docker/asterisk/conf/res_odbc.conf:/etc/asterisk/res_odbc.conf'
             - './docker/asterisk/conf/logger.conf:/etc/asterisk/logger.conf'
+            - './docker/asterisk/conf/manager.conf:/etc/asterisk/manager.conf'
         networks:
             - sail
         depends_on:
