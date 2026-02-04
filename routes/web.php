@@ -47,14 +47,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('cdr/{uuid}', [Admin\CdrController::class, 'show'])->name('cdr.show');
 });
 
-// Reseller routes (placeholder)
+// Reseller routes
 Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller'])->group(function () {
-    Route::view('dashboard', 'reseller.dashboard')->name('dashboard');
+    Route::get('dashboard', \App\Http\Controllers\Reseller\DashboardController::class)->name('dashboard');
 });
 
-// Client routes (placeholder)
+// Client routes
 Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->group(function () {
-    Route::view('dashboard', 'client.dashboard')->name('dashboard');
+    Route::get('dashboard', \App\Http\Controllers\Client\DashboardController::class)->name('dashboard');
 });
 
 // KYC submission (reseller and client)

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Services\DashboardStatsService;
@@ -13,11 +13,11 @@ class DashboardController extends Controller
         $service = new DashboardStatsService();
 
         $entityCounts = $service->getEntityCounts($user);
-        $weekStats = $service->getCallStats(null, 7);
-        $todayStats = $service->getTodayCallStats(null);
-        $recentCalls = $service->getRecentCalls(null, 10);
+        $weekStats = $service->getCallStats([$user->id], 7);
+        $todayStats = $service->getTodayCallStats([$user->id]);
+        $recentCalls = $service->getRecentCalls([$user->id], 10);
 
-        return view('admin.dashboard', compact(
+        return view('client.dashboard', compact(
             'entityCounts', 'weekStats', 'todayStats', 'recentCalls'
         ));
     }
