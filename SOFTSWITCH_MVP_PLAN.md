@@ -1150,6 +1150,8 @@ rSwitch/
 │   │   │   │   ├── TrunkRouteController.php  -- prefix→trunk routing rules
 │   │   │   │   ├── DidController.php
 │   │   │   │   ├── RateGroupController.php
+│   │   │   │   ├── TransferController.php         -- transfer SIP accounts & clients
+│   │   │   │   ├── TransferLogController.php     -- view transfer audit history
 │   │   │   │   ├── ManualRechargeController.php  -- admin recharges any user
 │   │   │   │   ├── PaymentHistoryController.php  -- view all payments system-wide
 │   │   │   │   └── SystemSettingController.php
@@ -1194,6 +1196,7 @@ rSwitch/
 │   │   ├── Payment.php
 │   │   ├── Transaction.php
 │   │   ├── Invoice.php
+│   │   ├── TransferLog.php
 │   │   └── Asterisk/                  -- Asterisk realtime models
 │   │       ├── PsEndpoint.php
 │   │       ├── PsAuth.php
@@ -1219,6 +1222,8 @@ rSwitch/
 │   │   │   └── SslcommerzGateway.php  -- SSLCommerz (BD local gateway)
 │   │   ├── Kyc/
 │   │   │   └── KycService.php         -- submit, validate docs, approve/reject
+│   │   ├── Transfer/
+│   │   │   └── TransferService.php    -- transfer SIP accounts & clients between owners
 │   │   └── Did/
 │   │       └── DidService.php
 │   ├── Notifications/
@@ -1270,7 +1275,8 @@ rSwitch/
 │       ├── 0009_create_transactions_table.php
 │       ├── 0009b_create_payments_table.php
 │       ├── 0010_create_invoices_table.php
-│       └── 0011_create_asterisk_realtime_tables.php
+│       ├── 0011_create_asterisk_realtime_tables.php
+│       └── 0012_create_transfer_logs_table.php
 ├── routes/
 │   ├── web.php
 │   └── api.php
@@ -1379,6 +1385,78 @@ RechargeService::resellerRechargeClient($reseller, $client, $amount);
 | Reseller | Own payments + own clients' payments |
 | Client | Own payments only |
 
+#### Admin Transfer Operations
+
+Admin can transfer SIP accounts between clients, and transfer clients between resellers.
+
+**Two transfer types:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     ADMIN TRANSFERS                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. TRANSFER SIP ACCOUNT → Another Client                       │
+│     Admin picks SIP account → selects target client →            │
+│     sip_accounts.user_id updated → Asterisk realtime reloaded   │
+│     CDR history stays linked to original user (audit trail)      │
+│                                                                  │
+│  2. TRANSFER CLIENT → Another Reseller                          │
+│     Admin picks client → selects target reseller →               │
+│     users.parent_id updated → all client's SIP accounts,        │
+│     DIDs, and billing stay intact                               │
+│     Future CDR/billing goes through new reseller                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Transfer logic:**
+```php
+// 1. Transfer SIP account to another client
+TransferService::transferSipAccount($sipAccount, $targetClient, $admin);
+  → Validates: target client is active + KYC approved
+  → Validates: SIP account is not in active call (check Redis call:* keys)
+  → DB::transaction {
+      $sipAccount->user_id = $targetClient->id;
+      $sipAccount->save();
+      // Asterisk realtime: endpoint stays the same, no PJSIP change needed
+      TransferLog::create(type='sip_account', ...);
+    }
+
+// 2. Transfer client to another reseller
+TransferService::transferClient($client, $targetReseller, $admin);
+  → Validates: target reseller is active + KYC approved
+  → Validates: no circular reference
+  → DB::transaction {
+      $client->parent_id = $targetReseller->id;
+      $client->save();
+      // Client's SIP accounts, DIDs, balance — all stay intact
+      // Rate group optionally reassigned (admin chooses)
+      TransferLog::create(type='client', ...);
+    }
+```
+
+**Transfer audit log:**
+```sql
+transfer_logs
+├── id (PK)
+├── transfer_type ENUM('sip_account','client')
+├── -- What was transferred
+├── transferred_item_id INT UNSIGNED   -- sip_account.id or user.id (client)
+├── transferred_item_type VARCHAR(30)  -- 'sip_account' or 'user'
+├── -- From / To
+├── from_parent_id INT UNSIGNED        -- old owner (client or reseller)
+├── to_parent_id INT UNSIGNED          -- new owner (client or reseller)
+├── -- Who did it
+├── performed_by INT UNSIGNED          -- admin user.id
+├── reason VARCHAR(500) NULL           -- admin's note for why
+├── -- Snapshot at transfer time (for audit)
+├── metadata JSON NULL                 -- balance, rate_group, active SIP accounts count, etc.
+├── created_at TIMESTAMP
+├── INDEX idx_item (transferred_item_type, transferred_item_id)
+├── INDEX idx_date (created_at)
+```
+
 #### SipAccount Observer — Asterisk Sync
 When a SipAccount is created/updated/deleted, the observer writes to `ps_endpoints`, `ps_auths`, and `ps_aors` tables, then optionally reloads PJSIP via AMI.
 
@@ -1404,6 +1482,9 @@ Using **Spatie Laravel Permission** or custom middleware:
 | View CDR | All | Own tree | Own |
 | Manage rates | All groups | Own groups | No |
 | View invoices | All | Own tree | Own |
+| Transfer SIP accounts | Yes | No | No |
+| Transfer clients | Yes | No | No |
+| View transfer logs | Yes | No | No |
 | System settings | Yes | No | No |
 
 **KYC gate**: The `KycApprovedMiddleware` is applied to all routes that require KYC. Until `kyc_status = 'approved'`, resellers and clients are redirected to the KYC form page. They can view their dashboard (with a KYC banner) and submit/edit KYC, but cannot access SIP accounts, billing, or CDR features.
@@ -1471,7 +1552,12 @@ Using **Spatie Laravel Permission** or custom middleware:
 - Invoice PDF export
 - DID monthly billing (recurring charges)
 - Account suspension on zero balance (prepaid) or over credit limit (postpaid)
-- **Deliverable**: Full reseller workflow, invoicing, automated suspension
+- **Admin transfer operations**:
+  - Transfer SIP accounts between clients (update ownership, reload Asterisk if needed)
+  - Transfer clients between resellers (update parent_id, billing continues under new reseller)
+  - Transfer audit log (`transfer_logs` table with metadata snapshots)
+  - Active call check before SIP account transfer (via Redis `call:*` keys)
+- **Deliverable**: Full reseller workflow, invoicing, automated suspension, admin transfers
 
 ### Phase 5: Dashboards & Monitoring
 - Admin dashboard — **real-time from Redis**:
