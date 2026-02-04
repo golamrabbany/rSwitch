@@ -381,16 +381,123 @@ PARTITION BY RANGE (TO_DAYS(call_start)) (
 ### CDR Summary Tables (Pre-aggregated for Dashboards)
 
 Dashboards should **never** query `call_records` directly for stats.
-Summary tables are updated every 5 minutes by a scheduled job.
+
+### Real-Time Stats Architecture (Redis + MySQL)
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                    TWO-LAYER SUMMARY SYSTEM                       │
+├───────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  LAYER 1: Redis (REAL-TIME) ← dashboards read from here          │
+│  ├── Updated atomically by hangup handler AGI on every call end   │
+│  ├── INCRBY/INCRBYFLOAT — near-zero overhead (sub-ms)             │
+│  ├── Dashboards get instant stats (no delay)                      │
+│  └── Keys auto-expire after 48 hours (Redis manages memory)       │
+│                                                                   │
+│  LAYER 2: MySQL (PERSISTENT) ← for reports, invoicing, archival  │
+│  ├── Synced from Redis every 5 minutes by scheduled job           │
+│  ├── Used for: invoice generation, CSV export, historical reports │
+│  └── Retained forever (summary tables are small)                  │
+│                                                                   │
+│  Flow:                                                            │
+│  Call ends → Hangup AGI → Redis INCRBY (real-time)                │
+│                         → MySQL summary sync every 5 min          │
+│  Dashboard → reads Redis → instant stats                          │
+│  Invoice   → reads MySQL summary → accurate historical data       │
+│                                                                   │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 1: Redis Real-Time Counters
+
+Updated atomically by the hangup handler AGI on **every call end** using Redis pipeline:
+
+```
+On each call end, hangup handler runs these Redis commands (pipelined, ~0.1ms):
+
+// Per-user hourly counters
+HINCRBY  stats:user:{user_id}:2026020414  total_calls 1
+HINCRBY  stats:user:{user_id}:2026020414  answered_calls 1
+HINCRBY  stats:user:{user_id}:2026020414  total_duration {duration}
+HINCRBY  stats:user:{user_id}:2026020414  total_billable {billable}
+HINCRBYFLOAT stats:user:{user_id}:2026020414  total_cost {cost}
+EXPIRE   stats:user:{user_id}:2026020414  172800   // 48hr TTL
+
+// Per-reseller hourly counters (if reseller exists)
+HINCRBY  stats:reseller:{reseller_id}:2026020414  total_calls 1
+...
+
+// Per-trunk hourly counters
+HINCRBY  stats:trunk:{trunk_id}:2026020414  total_calls 1
+HINCRBY  stats:trunk:{trunk_id}:2026020414  answered_calls 1
+HINCRBY  stats:trunk:{trunk_id}:2026020414  total_duration {duration}
+EXPIRE   stats:trunk:{trunk_id}:2026020414  172800
+
+// Per-destination daily counters
+HINCRBY  stats:dest:{prefix}:20260204  total_calls 1
+HINCRBY  stats:dest:{prefix}:20260204  answered_calls 1
+HINCRBY  stats:dest:{prefix}:20260204  total_duration {duration}
+HINCRBYFLOAT stats:dest:{prefix}:20260204  total_cost {cost}
+EXPIRE   stats:dest:{prefix}:20260204  172800
+
+// System-wide live counter (for admin dashboard "today" widget)
+HINCRBY  stats:system:20260204  total_calls 1
+HINCRBY  stats:system:20260204  answered_calls 1
+HINCRBY  stats:system:20260204  total_duration {duration}
+HINCRBYFLOAT stats:system:20260204  total_cost {cost}
+HINCRBYFLOAT stats:system:20260204  total_revenue {cost}
+EXPIRE   stats:system:20260204  172800
+
+// Active channels gauge (INCR on call start, DECR on call end)
+INCR  stats:active_channels              // on call start
+DECR  stats:active_channels              // on call end (hangup)
+INCR  stats:active_channels:{trunk_id}   // per-trunk
+DECR  stats:active_channels:{trunk_id}
+```
+
+**Key format**: `stats:{scope}:{id}:{time_bucket}`
+- User hourly: `stats:user:100:2026020414` (user 100, hour 14 of Feb 4)
+- Trunk hourly: `stats:trunk:5:2026020414`
+- Destination daily: `stats:dest:88017:20260204`
+- System daily: `stats:system:20260204`
+
+**Dashboard reads** (all sub-millisecond):
+```
+// Admin dashboard "Today" widget
+HGETALL stats:system:20260204
+GET stats:active_channels
+
+// Client "Today" stats
+HGETALL stats:user:100:2026020414   // current hour
+HGETALL stats:user:100:2026020413   // previous hour
+... aggregate last 24 hours for "today" view
+
+// Reseller "Today" stats — aggregate all client keys
+HGETALL stats:reseller:50:2026020414
+
+// Trunk utilization
+GET stats:active_channels:5
+HGETALL stats:trunk:5:2026020414
+
+// ASR calculation
+asr = (answered_calls / total_calls) * 100  // computed client-side
+acd = total_duration / answered_calls        // computed client-side
+```
+
+**Memory usage**: ~200 bytes per Redis hash × 24 hours × (users + trunks + prefixes) ≈ **< 500 MB** for entire system.
+
+### Layer 2: MySQL Summary Tables (Persistent)
+
+Synced from Redis every 5 minutes by `SyncCdrSummaryCommand`. Also used for historical queries beyond 48 hours.
 
 ```sql
--- Hourly summary per user (for dashboards, reports)
+-- Hourly summary per user (synced from Redis, used for reports/invoicing)
 cdr_summary_hourly
 ├── id (PK, BIGINT)
 ├── user_id INT UNSIGNED
 ├── reseller_id INT UNSIGNED NULL
 ├── hour_start DATETIME              -- e.g. '2026-02-04 14:00:00'
-├── call_flow ENUM('sip_to_trunk','sip_to_sip','trunk_to_sip','trunk_to_trunk')
 ├── total_calls INT UNSIGNED DEFAULT 0
 ├── answered_calls INT UNSIGNED DEFAULT 0
 ├── failed_calls INT UNSIGNED DEFAULT 0
@@ -401,9 +508,8 @@ cdr_summary_hourly
 ├── asr DECIMAL(5,2) NULL            -- Answer Seizure Ratio %
 ├── acd DECIMAL(8,2) NULL            -- Average Call Duration (seconds)
 ├── updated_at TIMESTAMP
-├── UNIQUE idx_user_hour_flow (user_id, hour_start, call_flow)
+├── UNIQUE idx_user_hour (user_id, hour_start)
 ├── INDEX idx_reseller_hour (reseller_id, hour_start)
-├── PARTITION BY RANGE (TO_DAYS(hour_start)) -- same monthly partitioning
 
 -- Daily summary per user (for invoicing, monthly reports)
 cdr_summary_daily
@@ -411,7 +517,6 @@ cdr_summary_daily
 ├── user_id INT UNSIGNED
 ├── reseller_id INT UNSIGNED NULL
 ├── date DATE
-├── call_flow ENUM('sip_to_trunk','sip_to_sip','trunk_to_sip','trunk_to_trunk')
 ├── total_calls INT UNSIGNED DEFAULT 0
 ├── answered_calls INT UNSIGNED DEFAULT 0
 ├── total_duration INT UNSIGNED DEFAULT 0
@@ -421,10 +526,10 @@ cdr_summary_daily
 ├── asr DECIMAL(5,2) NULL
 ├── acd DECIMAL(8,2) NULL
 ├── updated_at TIMESTAMP
-├── UNIQUE idx_user_date_flow (user_id, date, call_flow)
+├── UNIQUE idx_user_date (user_id, date)
 ├── INDEX idx_reseller_date (reseller_id, date)
 
--- Daily summary per destination prefix (for rate analysis)
+-- Daily summary per destination prefix (for rate/trunk analysis)
 cdr_summary_destination
 ├── id (PK, BIGINT)
 ├── date DATE
@@ -439,6 +544,15 @@ cdr_summary_destination
 ├── acd DECIMAL(8,2) NULL
 ├── updated_at TIMESTAMP
 ├── UNIQUE idx_date_prefix_trunk (date, matched_prefix, outgoing_trunk_id)
+```
+
+**Sync job** (`SyncCdrSummaryCommand`, every 5 min):
+```
+1. SCAN Redis for stats:user:*:{current_hour} keys
+2. For each key: HGETALL → UPSERT into cdr_summary_hourly
+3. SCAN Redis for stats:dest:*:{today} keys
+4. For each key: HGETALL → UPSERT into cdr_summary_destination
+5. Roll up hourly → daily in cdr_summary_daily
 ```
 
 ### CDR Archival & Retention Strategy
@@ -1115,7 +1229,7 @@ rSwitch/
 │   │   ├── PaymentFailedNotification.php     -- notify user on failed payment
 │   │   └── LowBalanceNotification.php        -- notify when balance below threshold
 │   ├── Jobs/
-│   │   ├── UpdateCdrSummaryJob.php    -- Runs every 5 min, updates hourly/daily summaries
+│   │   ├── SyncCdrSummaryJob.php      -- Every 5 min: Redis counters → MySQL summary tables
 │   │   ├── RateHangupJob.php          -- Queued: rate + debit on call end (async fallback)
 │   │   ├── GenerateInvoicesJob.php    -- Monthly
 │   │   ├── SuspendOverdueJob.php      -- Check postpaid limits
@@ -1126,7 +1240,7 @@ rSwitch/
 │   │   └── SipAccountObserver.php    -- Sync to Asterisk realtime on create/update/delete
 │   └── Console/
 │       └── Commands/
-│           ├── UpdateCdrSummaryCommand.php     -- every 5 min
+│           ├── SyncCdrSummaryCommand.php       -- every 5 min: Redis → MySQL summaries
 │           ├── CreateCdrPartitionCommand.php   -- monthly: create next 2 partitions
 │           ├── ArchiveCdrPartitionCommand.php  -- monthly: export + drop > 12 months
 │           ├── CompressCdrPartitionCommand.php -- monthly: compress 6-12 month partitions
@@ -1345,8 +1459,10 @@ Using **Spatie Laravel Permission** or custom middleware:
 - Postpaid: credit limit enforcement
 - Transaction log
 - Top-up functionality (admin/reseller adds credit to accounts)
-- **CDR summary tables** (hourly + daily) with 5-minute update job
-- **Deliverable**: Calls are rated in real-time, balances deducted instantly, prepaid cutoff works
+- **Real-time Redis counters** — hangup handler INCRBY on every call end (per-user, per-trunk, per-destination, system-wide)
+- **MySQL summary sync** — `SyncCdrSummaryCommand` every 5 min (Redis → MySQL for persistence)
+- Active channel counters in Redis (INCR on start, DECR on end)
+- **Deliverable**: Calls are rated in real-time, balances deducted instantly, dashboard stats are live
 
 ### Phase 4: Business Features
 - Reseller rate groups (reseller creates own rates with markup over admin base rate)
@@ -1358,10 +1474,13 @@ Using **Spatie Laravel Permission** or custom middleware:
 - **Deliverable**: Full reseller workflow, invoicing, automated suspension
 
 ### Phase 5: Dashboards & Monitoring
-- Admin dashboard (total calls, revenue, active channels, system health)
-  - Stats from `cdr_summary_hourly`/`cdr_summary_daily` (millisecond queries)
-- Reseller dashboard (own clients stats, revenue, balance)
-- Client dashboard (call stats, balance, recent calls)
+- Admin dashboard — **real-time from Redis**:
+  - Today's calls/revenue/duration from `stats:system:{today}`
+  - Active channels from `stats:active_channels`
+  - Per-trunk utilization from `stats:trunk:{id}:{hour}`
+  - All sub-millisecond reads, zero MySQL load
+- Reseller dashboard — reads `stats:reseller:{id}:{hour}` from Redis
+- Client dashboard — reads `stats:user:{id}:{hour}` from Redis
 - Live channel monitor (active calls via Redis `call:*` keys + AMI)
 - CDR export (CSV/Excel — async job, queries partitioned `call_records`)
 - Call quality metrics (ASR, ACD from summary tables)
@@ -1384,7 +1503,7 @@ Using **Spatie Laravel Permission** or custom middleware:
 | CDR storage | Single `call_records` table (no cdr + rated_cdr split) | Eliminates double-write; one table to partition/query |
 | CDR write method | AGI writes at call start + hangup handler updates | Real-time billing, no batch processing lag |
 | CDR partitioning | Monthly RANGE partitioning on `call_start` | Partition pruning for fast queries; easy archival by dropping old partitions |
-| CDR reporting | Pre-aggregated summary tables (hourly/daily) | Dashboards never query 3.6B row table; millisecond stats |
+| CDR reporting | Redis real-time counters + MySQL summary sync | Dashboards read Redis (instant); MySQL persists for invoicing/history |
 | Active call state | Redis (TTL 2hr) | Sub-millisecond reads for hangup handler; no DB query during billing |
 | Balance tracking | MySQL row-level locking + Redis cache | Atomic operations; Redis for fast AGI reads |
 | Auth/permissions | Spatie Laravel Permission | Battle-tested; supports role hierarchy |
