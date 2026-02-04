@@ -64,6 +64,8 @@ class TrunkController extends Controller
 
     public function show(Trunk $trunk)
     {
+        $trunk->load('routes');
+
         $configFile = base_path('docker/asterisk/conf/pjsip_trunks.conf');
         $provisioned = file_exists($configFile)
             && str_contains(file_get_contents($configFile), "[trunk-{$trunk->direction}-{$trunk->id}]");

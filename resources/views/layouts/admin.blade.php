@@ -75,6 +75,14 @@
                         Trunks
                     </a>
 
+                    <a href="{{ route('admin.trunk-routes.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('admin.trunk-routes.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                        Routing Rules
+                    </a>
+
                     <div class="pt-4">
                         <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Coming Soon</p>
                     </div>
@@ -149,6 +157,20 @@
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
                                 </svg>
                                 <p class="ml-3 text-sm font-medium text-green-800">{{ session('success') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                @if (session('warning'))
+                    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 8000)"
+                         class="mx-4 mt-4 sm:mx-6 lg:mx-8">
+                        <div class="rounded-md bg-yellow-50 p-4">
+                            <div class="flex">
+                                <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                                </svg>
+                                <p class="ml-3 text-sm font-medium text-yellow-800">{{ session('warning') }}</p>
                             </div>
                         </div>
                     </div>

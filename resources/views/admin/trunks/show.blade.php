@@ -294,6 +294,67 @@
             </div>
         </div>
         @endif
+
+        {{-- Routing Rules (outgoing/both only) --}}
+        @if(in_array($trunk->direction, ['outgoing', 'both']))
+        <div class="bg-white shadow sm:rounded-lg">
+            <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex items-center justify-between">
+                <h3 class="text-base font-semibold text-gray-900">Routing Rules</h3>
+                <a href="{{ route('admin.trunk-routes.create', ['trunk_id' => $trunk->id]) }}"
+                   class="text-sm font-medium text-indigo-600 hover:text-indigo-900">+ Add Route</a>
+            </div>
+            @if($trunk->routes->isEmpty())
+                <div class="p-6">
+                    <p class="text-sm text-gray-500">No routing rules configured for this trunk.</p>
+                    <a href="{{ route('admin.trunk-routes.create', ['trunk_id' => $trunk->id]) }}"
+                       class="mt-2 inline-block text-sm text-indigo-600 hover:text-indigo-900">
+                        Create the first routing rule
+                    </a>
+                </div>
+            @else
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prefix</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time Window</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weight</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        @foreach($trunk->routes->sortBy(['prefix', 'priority']) as $route)
+                        <tr>
+                            <td class="px-4 py-2 text-sm font-mono">{{ $route->prefix }}</td>
+                            <td class="px-4 py-2 text-sm">
+                                @if($route->time_start)
+                                    <span class="font-mono">{{ substr($route->time_start, 0, 5) }} - {{ substr($route->time_end, 0, 5) }}</span>
+                                    <span class="text-xs text-gray-500">({{ $route->timezone }})</span>
+                                @else
+                                    <span class="text-gray-400 italic">Always</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-2 text-sm">{{ $route->priority }}</td>
+                            <td class="px-4 py-2 text-sm">{{ $route->weight }}</td>
+                            <td class="px-4 py-2">
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+                                    {{ $route->status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                    {{ ucfirst($route->status) }}
+                                </span>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                <div class="px-4 py-3 border-t border-gray-200">
+                    <a href="{{ route('admin.trunk-routes.index', ['trunk_id' => $trunk->id]) }}"
+                       class="text-sm text-indigo-600 hover:text-indigo-900">
+                        View all routing rules for this trunk &rarr;
+                    </a>
+                </div>
+            @endif
+        </div>
+        @endif
     </div>
 
     <div class="mt-6">
