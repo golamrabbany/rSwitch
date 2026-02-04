@@ -30,12 +30,13 @@ Designed a complete MVP plan for a Softswitch with billing system.
 | `cc5afed` | CDR redesign — single `call_records` table with monthly partitioning for 10M rows/day |
 | `e99531a` | Added src_ip and dst_ip to call_records |
 | `7f20ed4` | Real-time Redis counters for dashboard stats (replaced 5-min polling) |
+| `6f4bb8b` | Admin transfer operations (SIP accounts & clients between owners) |
 
 ---
 
 ## What's in the Plan
 
-### Database Tables (15 total + summary tables)
+### Database Tables (20 total + summary tables)
 1. `users` — with role, hierarchy, KYC status, balance, billing type
 2. `kyc_profiles` — personal/company info, ID details
 3. `kyc_documents` — multi-file uploads per KYC profile
@@ -53,6 +54,9 @@ Designed a complete MVP plan for a Softswitch with billing system.
 15. `payments` — recharge events (online + manual)
 16. `invoices` — postpaid monthly invoices
 17. `transfer_logs` — audit trail for admin SIP/client transfers
+18. `audit_logs` — all admin action audit trail
+19. `destination_blacklist` — toll fraud prefix blocking
+20. `destination_whitelist` — per-user prefix restriction
 + Asterisk realtime tables: `ps_endpoints`, `ps_auths`, `ps_aors`, `ps_contacts`
 
 ### 4 Call Flows
@@ -77,9 +81,15 @@ Designed a complete MVP plan for a Softswitch with billing system.
 - 3 AGI handlers: route_outbound, route_inbound, handle_hangup
 - Role-based access with Spatie Laravel Permission
 - src_ip and dst_ip tracking on all call records
+- **Security architecture** (Section 7):
+  - SIP: Fail2ban, NAT traversal, TLS transport, strong passwords, IP ACLs, module hardening
+  - Toll fraud: destination blacklist/whitelist, daily spend limits, concurrent call limits, fraud alerts
+  - Web: 2FA (mandatory admin), login rate limiting, account lockout, CSRF, security headers
+  - Infra: network segmentation, minimal DB privileges, Redis auth, audit logging
+  - AGI: Supervisor auto-restart, AGISTATUS dialplan fallback, health checks
 
 ### 5 Implementation Phases
-1. **Foundation** — Auth, users, KYC, Asterisk base setup
+1. **Foundation** — Auth, users, KYC, Asterisk base setup, security hardening (P0)
 2. **Core Switching** — SIP accounts, trunks, dialplan, DIDs, CDR
 3. **Billing Engine** — Rates, real-time rating via hangup AGI, Redis counters, balance
 4. **Business Features** — Reseller workflow, invoicing, auto-suspension, admin transfers
@@ -97,6 +107,10 @@ Designed a complete MVP plan for a Softswitch with billing system.
 | Redis real-time counters (Layer 1) | Dashboards read Redis (sub-ms), not MySQL. Zero DB load for stats |
 | MySQL summary sync (Layer 2) | Persistence for invoicing/history, synced from Redis every 5 min |
 | Disabled `cdr_adaptive_odbc` | AGI handles all CDR writes directly, avoids duplicate records |
+| Security section added (Section 7) | Softswitches are high-value fraud targets; multi-layer protection required |
+| NAT mandatory on all endpoints | direct_media=no ensures billing accuracy + fixes one-way audio |
+| AGI failure fallback (AGISTATUS check) | Prevents silent call drops when AGI daemon is down |
+| Toll fraud prevention (blacklist + spend limits) | Blocks premium-rate fraud; auto-suspend on anomaly |
 
 ---
 
