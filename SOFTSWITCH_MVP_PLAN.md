@@ -28,6 +28,9 @@ users
 ├── role ENUM('admin','reseller','client')
 ├── parent_id (FK→users.id, NULL for admin)
 ├── status ENUM('active','suspended','disabled')
+├── kyc_status ENUM('not_submitted','pending','approved','rejected') DEFAULT 'not_submitted'
+├── kyc_verified_at TIMESTAMP NULL
+├── kyc_rejected_reason VARCHAR(255) NULL
 ├── billing_type ENUM('prepaid','postpaid')
 ├── credit_limit DECIMAL(12,4) DEFAULT 0  -- for postpaid
 ├── balance DECIMAL(12,4) DEFAULT 0       -- current balance
@@ -37,6 +40,79 @@ users
 ```
 
 **Hierarchy enforcement**: `parent_id` links Client→Reseller→Admin. Admin has `parent_id = NULL`. Reseller's `parent_id` = Admin. Client's `parent_id` = Reseller.
+
+**KYC enforcement**: Resellers and clients must complete KYC before they can create SIP accounts, make calls, or access billing features. Admin can override.
+
+### KYC (Know Your Customer)
+
+```sql
+-- KYC profile (one per reseller/client)
+kyc_profiles
+├── id (PK)
+├── user_id (FK→users.id, UNIQUE)    -- reseller or client
+├── -- Personal / Company Info
+├── account_type ENUM('individual','company')
+├── full_name VARCHAR(150)            -- or company name
+├── contact_person VARCHAR(150) NULL  -- for company accounts
+├── phone VARCHAR(20)
+├── alt_phone VARCHAR(20) NULL
+├── address_line1 VARCHAR(255)
+├── address_line2 VARCHAR(255) NULL
+├── city VARCHAR(100)
+├── state VARCHAR(100) NULL
+├── postal_code VARCHAR(20)
+├── country VARCHAR(2)                -- ISO 3166-1 alpha-2
+├── -- Identity Info
+├── id_type ENUM('national_id','passport','driving_license','business_license')
+├── id_number VARCHAR(50)
+├── id_expiry_date DATE NULL
+├── -- Submitted/Review timestamps
+├── submitted_at TIMESTAMP NULL
+├── reviewed_at TIMESTAMP NULL
+├── reviewed_by (FK→users.id) NULL   -- admin who reviewed
+├── created_at, updated_at
+
+-- KYC documents (multiple files per KYC profile)
+kyc_documents
+├── id (PK)
+├── kyc_profile_id (FK→kyc_profiles.id)
+├── document_type ENUM('id_front','id_back','selfie','proof_of_address',
+│                       'business_registration','tax_certificate','other')
+├── file_path VARCHAR(500)            -- stored in storage/app/kyc/{user_id}/
+├── original_name VARCHAR(255)
+├── mime_type VARCHAR(50)
+├── file_size INT                     -- bytes
+├── status ENUM('uploaded','accepted','rejected') DEFAULT 'uploaded'
+├── rejection_reason VARCHAR(255) NULL
+├── created_at, updated_at
+├── INDEX idx_kyc_profile (kyc_profile_id)
+```
+
+**Required documents by account type:**
+
+| Document | Individual | Company |
+|---|---|---|
+| ID front (national_id / passport / license) | Required | Required |
+| ID back | Required (if national_id) | Required (if national_id) |
+| Selfie (holding ID) | Required | Required |
+| Proof of address (utility bill / bank statement) | Required | Required |
+| Business registration certificate | -- | Required |
+| Tax certificate | -- | Optional |
+
+**KYC Workflow:**
+```
+User registers → kyc_status = 'not_submitted'
+    │
+    ▼
+User fills KYC form + uploads documents → kyc_status = 'pending'
+    │
+    ▼
+Admin reviews ──→ Approve → kyc_status = 'approved', kyc_verified_at = now()
+    │                         Account fully unlocked
+    │
+    └──→ Reject → kyc_status = 'rejected', kyc_rejected_reason = "..."
+                   User can re-submit with corrections
+```
 
 ### SIP Accounts (Asterisk Realtime - PJSIP)
 
@@ -623,6 +699,7 @@ rSwitch/
 │   │   ├── Controllers/
 │   │   │   ├── Admin/
 │   │   │   │   ├── DashboardController.php
+│   │   │   │   ├── KycController.php          -- review, approve, reject KYC
 │   │   │   │   ├── ResellerController.php
 │   │   │   │   ├── TrunkController.php       -- incoming, outgoing, both
 │   │   │   │   ├── TrunkRouteController.php  -- prefix→trunk routing rules
@@ -640,6 +717,7 @@ rSwitch/
 │   │   │   │   ├── SipAccountController.php
 │   │   │   │   └── CdrController.php
 │   │   │   ├── Common/
+│   │   │   │   ├── KycProfileController.php   -- submit/update KYC form + upload docs
 │   │   │   │   ├── CdrController.php
 │   │   │   │   ├── InvoiceController.php
 │   │   │   │   ├── TransactionController.php
@@ -647,10 +725,13 @@ rSwitch/
 │   │   │   └── Auth/
 │   │   ├── Middleware/
 │   │   │   ├── RoleMiddleware.php
+│   │   │   ├── KycApprovedMiddleware.php  -- blocks access if KYC not approved
 │   │   │   └── TenantScope.php       -- auto-filter by parent hierarchy
 │   │   └── Requests/
 │   ├── Models/
 │   │   ├── User.php
+│   │   ├── KycProfile.php
+│   │   ├── KycDocument.php
 │   │   ├── SipAccount.php
 │   │   ├── Trunk.php
 │   │   ├── TrunkRoute.php
@@ -678,8 +759,14 @@ rSwitch/
 │   │   │   ├── BalanceService.php     -- Credit/debit operations (atomic)
 │   │   │   ├── CdrProcessor.php       -- Process raw CDR → rated_cdr
 │   │   │   └── InvoiceGenerator.php   -- Monthly invoice creation
+│   │   ├── Kyc/
+│   │   │   └── KycService.php         -- submit, validate docs, approve/reject
 │   │   └── Did/
 │   │       └── DidService.php
+│   ├── Notifications/
+│   │   ├── KycSubmittedNotification.php   -- notify admin when KYC submitted
+│   │   ├── KycApprovedNotification.php    -- notify user when KYC approved
+│   │   └── KycRejectedNotification.php    -- notify user when KYC rejected (with reason)
 │   ├── Jobs/
 │   │   ├── ProcessCdrJob.php          -- Runs every 30s via scheduler
 │   │   ├── GenerateInvoicesJob.php    -- Monthly
@@ -703,6 +790,8 @@ rSwitch/
 ├── database/
 │   └── migrations/
 │       ├── 0001_create_users_table.php
+│       ├── 0001b_create_kyc_profiles_table.php
+│       ├── 0001c_create_kyc_documents_table.php
 │       ├── 0002_create_sip_accounts_table.php
 │       ├── 0003_create_trunks_table.php
 │       ├── 0003b_create_trunk_routes_table.php
@@ -762,17 +851,25 @@ Using **Spatie Laravel Permission** or custom middleware:
 
 | Feature | Admin | Reseller | Client |
 |---|---|---|---|
+| **KYC** | | | |
+| Submit KYC form | -- | Yes | Yes |
+| Review/approve/reject KYC | Yes | No | No |
+| **Requires KYC approved** | | | |
+| Create clients | Yes | Yes (own) | No |
+| Create SIP accounts | Yes | Yes (own clients) | Limited |
+| Make calls / use balance | -- | -- | KYC required |
+| Top-up balance | Any user | Own clients | No |
+| **General** | | | |
 | Manage resellers | Yes | No | No |
 | Manage trunks (in/out/both) | Yes | No | No |
 | Manage trunk routes | Yes | No | No |
 | Manage all DIDs | Yes | No | No |
-| Create clients | Yes | Yes (own) | No |
-| Create SIP accounts | Yes | Yes (own clients) | Limited |
 | View CDR | All | Own tree | Own |
 | Manage rates | All groups | Own groups | No |
-| Top-up balance | Any user | Own clients | No |
 | View invoices | All | Own tree | Own |
 | System settings | Yes | No | No |
+
+**KYC gate**: The `KycApprovedMiddleware` is applied to all routes that require KYC. Until `kyc_status = 'approved'`, resellers and clients are redirected to the KYC form page. They can view their dashboard (with a KYC banner) and submit/edit KYC, but cannot access SIP accounts, billing, or CDR features.
 
 ---
 
@@ -783,10 +880,17 @@ Using **Spatie Laravel Permission** or custom middleware:
 - Database migrations (all tables)
 - User CRUD with hierarchy (Admin creates Resellers, Resellers create Clients)
 - Tenant scoping (users only see their own subtree)
+- **KYC module**:
+  - KYC form (personal/company info + document uploads)
+  - File storage in `storage/app/kyc/{user_id}/` (private, not public)
+  - KYC submission by resellers and clients
+  - Admin KYC review panel (list pending, view documents, approve/reject with reason)
+  - `KycApprovedMiddleware` — blocks feature access until KYC approved
+  - Dashboard shows KYC status banner for non-approved users
 - Basic UI layout with role-based navigation
 - Asterisk installation and base configuration
 - MySQL ODBC connector setup for Asterisk Realtime
-- **Deliverable**: Login, user management with hierarchy, Asterisk running
+- **Deliverable**: Login, user management with hierarchy, KYC workflow, Asterisk running
 
 ### Phase 2: Core Switching
 - SIP Account CRUD → auto-provision to Asterisk realtime tables (ps_endpoints/ps_auths/ps_aors)
