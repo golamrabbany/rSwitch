@@ -11,6 +11,9 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // Seed roles and permissions first
+        $this->call(RolePermissionSeeder::class);
+
         // Create admin user
         $admin = User::create([
             'name' => 'Admin',
@@ -21,6 +24,7 @@ class DatabaseSeeder extends Seeder
             'kyc_status' => 'approved',
             'billing_type' => 'postpaid',
         ]);
+        $admin->assignRole('admin');
 
         // Create default rate group
         $rateGroup = RateGroup::create([
@@ -43,9 +47,10 @@ class DatabaseSeeder extends Seeder
             'balance' => 1000.0000,
             'rate_group_id' => $rateGroup->id,
         ]);
+        $reseller->assignRole('reseller');
 
         // Create demo client under reseller
-        User::create([
+        $client = User::create([
             'name' => 'Demo Client',
             'email' => 'client@rswitch.local',
             'password' => Hash::make('password'),
@@ -57,5 +62,6 @@ class DatabaseSeeder extends Seeder
             'balance' => 100.0000,
             'rate_group_id' => $rateGroup->id,
         ]);
+        $client->assignRole('client');
     }
 }

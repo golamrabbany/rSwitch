@@ -1,0 +1,70 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\KycDocument;
+use App\Models\KycProfile;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+class KycController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = KycProfile::with('user', 'documents');
+
+        if ($request->filled('status')) {
+            $query->whereHas('user', fn ($q) => $q->where('kyc_status', $request->status));
+        }
+
+        $profiles = $query->orderByDesc('submitted_at')->paginate(20);
+
+        return view('admin.kyc.index', compact('profiles'));
+    }
+
+    public function show(KycProfile $kycProfile)
+    {
+        $kycProfile->load('user', 'documents', 'reviewer');
+
+        return view('admin.kyc.show', compact('kycProfile'));
+    }
+
+    public function approve(KycProfile $kycProfile)
+    {
+        $user = $kycProfile->user;
+        $user->update([
+            'kyc_status' => 'approved',
+            'kyc_verified_at' => now(),
+            'kyc_rejected_reason' => null,
+        ]);
+
+        $kycProfile->update([
+            'reviewed_at' => now(),
+            'reviewed_by' => auth()->id(),
+        ]);
+
+        return back()->with('success', 'KYC approved for ' . $user->name);
+    }
+
+    public function reject(Request $request, KycProfile $kycProfile)
+    {
+        $request->validate([
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $user = $kycProfile->user;
+        $user->update([
+            'kyc_status' => 'rejected',
+            'kyc_rejected_reason' => $request->reason,
+        ]);
+
+        $kycProfile->update([
+            'reviewed_at' => now(),
+            'reviewed_by' => auth()->id(),
+        ]);
+
+        return back()->with('success', 'KYC rejected for ' . $user->name);
+    }
+}
