@@ -31,12 +31,13 @@ Designed a complete MVP plan for a Softswitch with billing system.
 | `e99531a` | Added src_ip and dst_ip to call_records |
 | `7f20ed4` | Real-time Redis counters for dashboard stats (replaced 5-min polling) |
 | `6f4bb8b` | Admin transfer operations (SIP accounts & clients between owners) |
+| `8b9c9c8` | Comprehensive security architecture (Section 7) |
 
 ---
 
 ## What's in the Plan
 
-### Database Tables (20 total + summary tables)
+### Database Tables (21 total + summary tables)
 1. `users` — with role, hierarchy, KYC status, balance, billing type
 2. `kyc_profiles` — personal/company info, ID details
 3. `kyc_documents` — multi-file uploads per KYC profile
@@ -57,7 +58,8 @@ Designed a complete MVP plan for a Softswitch with billing system.
 18. `audit_logs` — all admin action audit trail
 19. `destination_blacklist` — toll fraud prefix blocking
 20. `destination_whitelist` — per-user prefix restriction
-+ Asterisk realtime tables: `ps_endpoints`, `ps_auths`, `ps_aors`, `ps_contacts`
+21. `rate_imports` — CSV rate import audit trail with error logs
++ Asterisk realtime tables: `ps_endpoints`, `ps_auths`, `ps_aors`, `ps_contacts`, `ps_endpoint_id_ips`
 
 ### 4 Call Flows
 1. SIP Account → Outbound Trunk (PSTN)
@@ -87,12 +89,22 @@ Designed a complete MVP plan for a Softswitch with billing system.
   - Web: 2FA (mandatory admin), login rate limiting, account lockout, CSRF, security headers
   - Infra: network segmentation, minimal DB privileges, Redis auth, audit logging
   - AGI: Supervisor auto-restart, AGISTATUS dialplan fallback, health checks
+- **Production features** (9 additions from live system review):
+  - Rate CSV import/export (upload, preview, validate, MERGE/REPLACE/ADD_ONLY modes)
+  - Rate effective dates (schedule future rates, auto-activate)
+  - Reseller rate markup model (linked rate groups, minimum margin enforcement)
+  - Caller ID / CLI manipulation per trunk (passthrough/override/strip/translate/hide)
+  - Dial string manipulation per trunk (pattern match/replace, prefix, strip, tech prefix)
+  - SIP account IP authentication (password, IP-based, or both)
+  - SIP account IP restriction (allowed_ips per account)
+  - Trunk health monitoring (SIP OPTIONS ping, ASR threshold alerts, auto-disable)
+  - Minimum balance threshold for calls (min_balance_for_calls per user)
 
 ### 5 Implementation Phases
 1. **Foundation** — Auth, users, KYC, Asterisk base setup, security hardening (P0)
-2. **Core Switching** — SIP accounts, trunks, dialplan, DIDs, CDR
-3. **Billing Engine** — Rates, real-time rating via hangup AGI, Redis counters, balance
-4. **Business Features** — Reseller workflow, invoicing, auto-suspension, admin transfers
+2. **Core Switching** — SIP accounts (3 auth modes), trunks (CLI + dial manipulation + health monitoring), dialplan, DIDs, CDR
+3. **Billing Engine** — Rates (CSV import/export, effective dates), real-time rating, Redis counters, min balance threshold
+4. **Business Features** — Reseller markup model, invoicing, auto-suspension, admin transfers
 5. **Dashboards & Monitoring** — Per-role dashboards (Redis-powered), live monitor, CDR lifecycle
 
 ---
@@ -111,6 +123,14 @@ Designed a complete MVP plan for a Softswitch with billing system.
 | NAT mandatory on all endpoints | direct_media=no ensures billing accuracy + fixes one-way audio |
 | AGI failure fallback (AGISTATUS check) | Prevents silent call drops when AGI daemon is down |
 | Toll fraud prevention (blacklist + spend limits) | Blocks premium-rate fraud; auto-suspend on anomaly |
+| Rate effective dates + end dates | Schedule future rate changes; old rates auto-expire |
+| CSV rate import with 3 modes (MERGE/REPLACE/ADD_ONLY) | Can't manually add 5000+ destination rates |
+| Reseller rate markup model (parent_rate_group_id) | Enforces minimum margin; reseller can't sell below admin rate |
+| Per-trunk CLI manipulation (5 modes) | Different providers require different CallerID formats |
+| Per-trunk dial string manipulation pipeline | Different trunks expect different number formats |
+| SIP account 3 auth modes (password/IP/both) | PBX trunking needs IP auth; high-security needs both |
+| Trunk SIP OPTIONS health monitoring + ASR alerts | Auto-disable dead trunks; flag degraded ASR |
+| Minimum balance threshold per user | Prevents micro-balance abuse; ensures meaningful calls |
 
 ---
 

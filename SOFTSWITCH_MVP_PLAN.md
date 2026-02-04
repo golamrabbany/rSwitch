@@ -36,6 +36,10 @@ users
 ├── balance DECIMAL(12,4) DEFAULT 0       -- current balance
 ├── currency VARCHAR(3) DEFAULT 'USD'
 ├── rate_group_id (FK→rate_groups.id)
+├── -- Balance & call limits
+├── min_balance_for_calls DECIMAL(10,4) DEFAULT 0.00  -- minimum balance required to place a call
+├──   -- e.g. 1.00 = user needs at least $1.00 to dial (prevents micro-balance abuse)
+├── low_balance_threshold DECIMAL(10,4) DEFAULT 5.00  -- trigger LowBalanceNotification below this
 ├── -- Security & fraud prevention
 ├── max_channels INT UNSIGNED DEFAULT 10     -- max concurrent calls (all SIP accounts combined)
 ├── daily_spend_limit DECIMAL(10,4) NULL     -- auto-suspend if exceeded (NULL = no limit)
@@ -133,10 +137,20 @@ sip_accounts
 ├── user_id (FK→users.id, the client who owns this)
 ├── username VARCHAR(40) UNIQUE     -- SIP username / endpoint name
 ├── password VARCHAR(80)            -- SIP auth password
+├── -- Authentication mode
+├── auth_type ENUM('password','ip','both') DEFAULT 'password'
+├──   -- password: standard SIP digest auth (username + password)
+├──   -- ip: IP-based authentication (no password needed, identified by source IP)
+├──   -- both: require password AND source IP match
+├── allowed_ips VARCHAR(500) NULL   -- comma-separated IPs/CIDRs for ip/both auth
+├──   -- e.g. '192.168.1.100,10.0.0.0/24' (NULL = any IP, only for password auth)
+├── -- Caller ID
 ├── caller_id_name VARCHAR(80)
 ├── caller_id_number VARCHAR(20)
+├── -- Limits & codecs
 ├── max_channels INT DEFAULT 2
 ├── codec_allow VARCHAR(100) DEFAULT 'ulaw,alaw,g729'
+├── -- Status & registration
 ├── status ENUM('active','suspended','disabled')
 ├── last_registered_at TIMESTAMP NULL
 ├── last_registered_ip VARCHAR(45) NULL
@@ -144,9 +158,50 @@ sip_accounts
 
 -- Asterisk PJSIP Realtime Tables (managed by Asterisk Alembic migrations)
 ps_endpoints       -- populated by Laravel when SIP account is created
-ps_auths           -- auth credentials
+ps_auths           -- auth credentials (only created if auth_type = 'password' or 'both')
 ps_aors            -- address of record
 ps_contacts        -- registered contacts (written by Asterisk)
+ps_endpoint_id_ips -- IP-based identification (created if auth_type = 'ip' or 'both')
+```
+
+**SIP Account Authentication Modes:**
+```
+┌───────────────┬──────────────────────────────────────────────────┐
+│ auth_type     │ How it works in Asterisk PJSIP                   │
+├───────────────┼──────────────────────────────────────────────────┤
+│ password      │ Standard digest auth via ps_auths table.         │
+│               │ Any IP can register with correct username/pass.  │
+│               │ If allowed_ips is set → ALSO restrict source IP  │
+│               │ via ps_endpoint_id_ips (double protection).      │
+│               │                                                  │
+│ ip            │ No password needed. Endpoint identified by       │
+│               │ source IP via ps_endpoint_id_ips (identify).     │
+│               │ allowed_ips is REQUIRED.                         │
+│               │ Typical for PBX trunking (office IP known).      │
+│               │ No ps_auths entry created.                       │
+│               │                                                  │
+│ both          │ Require password auth AND source IP match.       │
+│               │ Both ps_auths and ps_endpoint_id_ips created.    │
+│               │ Highest security — used for high-value accounts. │
+└───────────────┴──────────────────────────────────────────────────┘
+
+PJSIP provisioning by EndpointService:
+
+  auth_type = 'password':
+    → INSERT ps_auths (username, password)
+    → INSERT ps_endpoints (auth = <endpoint>-auth)
+    → IF allowed_ips SET:
+        INSERT ps_endpoint_id_ips (endpoint, match = <each_ip>)
+
+  auth_type = 'ip':
+    → INSERT ps_endpoint_id_ips (endpoint, match = <each_ip>)
+    → INSERT ps_endpoints (NO auth reference)
+    → NO ps_auths entry
+
+  auth_type = 'both':
+    → INSERT ps_auths (username, password)
+    → INSERT ps_endpoint_id_ips (endpoint, match = <each_ip>)
+    → INSERT ps_endpoints (auth = <endpoint>-auth)
 ```
 
 ### Trunks (Incoming & Outgoing)
@@ -169,25 +224,136 @@ trunks
 ├── codec_allow VARCHAR(100) DEFAULT 'ulaw,alaw,g729'
 ├── max_channels INT DEFAULT 30
 ├── -- Outgoing-specific fields
-├── prefix VARCHAR(10) NULL          -- tech prefix to prepend on outgoing
-├── strip_digits INT DEFAULT 0       -- digits to strip from dialed number
 ├── outgoing_priority INT DEFAULT 1  -- failover ordering for outgoing
+├── -- Dial string manipulation (per-trunk number format rules)
+├── dial_pattern_match VARCHAR(50) NULL     -- regex pattern to match dialed number (NULL = match all)
+├── dial_pattern_replace VARCHAR(50) NULL   -- replacement pattern for matched number
+├── dial_prefix VARCHAR(20) NULL            -- prefix to prepend AFTER pattern replacement
+├── dial_strip_digits INT DEFAULT 0         -- digits to strip from LEFT of dialed number
+├── tech_prefix VARCHAR(20) NULL            -- tech prefix for provider identification
+├── -- Caller ID / CLI manipulation (per-trunk outgoing rules)
+├── cli_mode ENUM('passthrough','override','prefix_strip','translate','hide') DEFAULT 'passthrough'
+├── cli_override_number VARCHAR(40) NULL    -- fixed CLI when cli_mode='override'
+├── cli_prefix_strip INT DEFAULT 0          -- strip N digits from caller ID left
+├── cli_prefix_add VARCHAR(20) NULL         -- prepend to caller ID after stripping
 ├── -- Incoming-specific fields
 ├── incoming_context VARCHAR(80) DEFAULT 'from-trunk'  -- Asterisk dialplan context
 ├── incoming_auth_type ENUM('ip','registration','both') DEFAULT 'ip'
 ├── incoming_ip_acl VARCHAR(255) NULL  -- allowed source IPs (comma-separated CIDRs)
+├── -- Health monitoring
+├── health_check BOOLEAN DEFAULT TRUE        -- enable SIP OPTIONS ping
+├── health_check_interval INT DEFAULT 60     -- seconds between OPTIONS pings
+├── health_status ENUM('up','down','degraded','unknown') DEFAULT 'unknown'
+├── health_last_checked_at TIMESTAMP NULL
+├── health_last_up_at TIMESTAMP NULL
+├── health_fail_count INT DEFAULT 0          -- consecutive failures
+├── health_auto_disable_threshold INT DEFAULT 5  -- auto-disable after N failures
+├── health_asr_threshold DECIMAL(5,2) NULL   -- auto-flag if ASR drops below (e.g. 30.00%)
 ├── -- Common fields
-├── status ENUM('active','disabled')
+├── status ENUM('active','disabled','auto_disabled')
 ├── notes TEXT NULL
 ├── created_at, updated_at
 ├── INDEX idx_direction (direction, status)
 ├── INDEX idx_outgoing_priority (outgoing_priority)
+├── INDEX idx_health (health_status)
 ```
 
 **Direction logic:**
 - `incoming` — receives calls from PSTN provider (DIDs routed through this trunk)
 - `outgoing` — sends calls to PSTN provider (used for outbound dialing)
 - `both` — single trunk handles both directions (common with SIP trunk providers)
+
+**Dial String Manipulation (per-trunk number formatting):**
+
+Different trunks expect different number formats. The manipulation pipeline runs in order:
+```
+Original dialed number
+  │
+  ├─ 1. dial_strip_digits — strip N digits from left
+  ├─ 2. dial_pattern_match/replace — regex transform (if set)
+  ├─ 3. dial_prefix — prepend prefix
+  └─ 4. tech_prefix — prepend tech prefix (provider identification)
+  │
+  Final DIAL_NUM sent to trunk
+```
+
+**Examples:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  User dials: 8801712345678                                       │
+├──────────────┬──────────────────────┬───────────────────────────┤
+│ Trunk        │ Manipulation Config  │ Final DIAL_NUM            │
+├──────────────┼──────────────────────┼───────────────────────────┤
+│ Provider A   │ strip=0, prefix=+    │ +8801712345678 (E.164)   │
+│ Provider B   │ strip=2, prefix=00   │ 008801712345678 (intl)   │
+│ Provider C   │ strip=3, prefix=""   │ 01712345678 (national)   │
+│ Provider D   │ pattern: ^880(.*)    │ $1 → 1712345678 (local)  │
+│              │ replace: $1          │                           │
+│ Provider E   │ strip=0, tech=9999#  │ 9999#8801712345678       │
+└──────────────┴──────────────────────┴───────────────────────────┘
+```
+
+**Caller ID / CLI Manipulation (per-trunk outgoing rules):**
+
+Controls what Caller ID is sent to the trunk provider on outgoing calls.
+
+```
+┌───────────────┬────────────────────────────────────────────────┐
+│ cli_mode      │ Behavior                                       │
+├───────────────┼────────────────────────────────────────────────┤
+│ passthrough   │ Pass original caller ID unchanged (default)    │
+│ override      │ Replace with cli_override_number for all calls │
+│ prefix_strip  │ Strip cli_prefix_strip digits from left,       │
+│               │ then prepend cli_prefix_add                    │
+│ translate     │ Apply strip + add (e.g. +880→00880)            │
+│ hide          │ Send anonymous / no caller ID (CLIR)           │
+└───────────────┴────────────────────────────────────────────────┘
+
+Examples:
+  SIP account caller_id = "8801712345678"
+
+  passthrough:   → 8801712345678 (sent as-is)
+  override:      → 18005551234 (cli_override_number)
+  prefix_strip:  → strip 3 digits "01712345678", add "+880" → +88001712345678
+  translate:     → strip 0, add "+" → +8801712345678
+  hide:          → Anonymous (Privacy: id header set)
+```
+
+**Trunk Health Monitoring (SIP OPTIONS):**
+```
+┌──────────────────────────────────────────────────────────────┐
+│                   TRUNK HEALTH MONITORING                      │
+├──────────────────────────────────────────────────────────────┤
+│                                                                │
+│  TrunkHealthCheckCommand (runs every 60 seconds):             │
+│  ├── For each trunk WHERE health_check = true:                │
+│  │   1. Send SIP OPTIONS to trunk host:port via AMI           │
+│  │   2. Wait for response (timeout 5 seconds)                 │
+│  │   3. If 200 OK → health_status = 'up', reset fail_count   │
+│  │   4. If timeout/error → increment health_fail_count        │
+│  │   5. If fail_count >= health_auto_disable_threshold:       │
+│  │      → Set status = 'auto_disabled'                        │
+│  │      → Remove from trunk_routes selection                  │
+│  │      → Send TrunkDownNotification to admin                 │
+│  │   6. If trunk recovers (was down, now up):                 │
+│  │      → Set status = 'active', health_status = 'up'        │
+│  │      → Send TrunkRecoveredNotification to admin            │
+│  │                                                            │
+│  ASR-based degradation monitoring:                             │
+│  ├── Every 5 min: check trunk's ASR from Redis counters       │
+│  │   asr = stats:trunk:{id}:{hour}.answered_calls /           │
+│  │         stats:trunk:{id}:{hour}.total_calls * 100          │
+│  ├── If asr < health_asr_threshold:                           │
+│  │   → Set health_status = 'degraded'                         │
+│  │   → Send TrunkDegradedNotification (ASR alert)             │
+│  │   → Trunk still active but flagged for admin review        │
+│  │                                                            │
+│  Redis keys for trunk health:                                  │
+│  ├── trunk_health:{trunk_id} = {status, last_check, fail_count}│
+│  └── Dashboards show trunk health status in real-time          │
+│                                                                │
+└──────────────────────────────────────────────────────────────┘
+```
 
 **Trunk routing table** for outgoing — maps destination prefixes + time windows to specific outgoing trunks:
 
@@ -275,6 +441,8 @@ rate_groups
 ├── id (PK)
 ├── name VARCHAR(100)
 ├── description TEXT NULL
+├── type ENUM('admin','reseller') DEFAULT 'admin'   -- who owns this rate group
+├── parent_rate_group_id INT UNSIGNED NULL  -- for reseller: reference to admin's base rate group
 ├── created_by (FK→users.id)        -- admin or reseller
 ├── created_at, updated_at
 
@@ -287,9 +455,119 @@ rates
 ├── connection_fee DECIMAL(10,6) DEFAULT 0
 ├── min_duration INT DEFAULT 0      -- minimum billable seconds
 ├── billing_increment INT DEFAULT 6 -- billing block in seconds (6/6, 1/1, etc.)
+├── effective_date DATE NOT NULL DEFAULT CURRENT_DATE  -- rate becomes active on this date
+├── end_date DATE NULL              -- rate expires on this date (NULL = no expiry)
 ├── status ENUM('active','disabled')
 ├── created_at, updated_at
-├── INDEX idx_prefix (rate_group_id, prefix)
+├── INDEX idx_prefix_date (rate_group_id, prefix, effective_date)
+├── INDEX idx_effective (effective_date, end_date)
+
+-- Rate import history (tracks every CSV import)
+rate_imports
+├── id (PK)
+├── rate_group_id (FK→rate_groups.id)
+├── uploaded_by (FK→users.id)       -- admin or reseller who uploaded
+├── file_name VARCHAR(255)          -- original CSV filename
+├── file_path VARCHAR(500)          -- stored CSV for audit
+├── total_rows INT UNSIGNED DEFAULT 0
+├── imported_rows INT UNSIGNED DEFAULT 0
+├── skipped_rows INT UNSIGNED DEFAULT 0
+├── error_rows INT UNSIGNED DEFAULT 0
+├── error_log JSON NULL             -- [{row: 5, error: "invalid prefix"}, ...]
+├── effective_date DATE NULL        -- apply rates from this date (bulk override)
+├── status ENUM('pending','processing','completed','failed') DEFAULT 'pending'
+├── completed_at TIMESTAMP NULL
+├── created_at, updated_at
+```
+
+**Rate Effective Date logic:**
+- Each rate has `effective_date` (when it becomes active) and `end_date` (when it expires)
+- Rating engine picks the rate valid at call time: `effective_date <= call_date AND (end_date IS NULL OR end_date > call_date)`
+- Upload future rates today (e.g., `effective_date = '2026-03-01'`) — they auto-activate on that date
+- Old rates with `end_date` set auto-expire, no manual cleanup needed
+
+**Rate Import/Export (CSV):**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     RATE IMPORT/EXPORT                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  IMPORT (CSV upload):                                             │
+│  1. Admin/Reseller uploads CSV file                               │
+│  2. Column mapping: prefix, destination, rate_per_minute,         │
+│     connection_fee, min_duration, billing_increment, effective_date│
+│  3. Preview first 20 rows with validation results                 │
+│  4. Validation rules:                                             │
+│     - prefix: required, numeric, 1-20 chars                      │
+│     - rate_per_minute: required, numeric, > 0                    │
+│     - destination: required, string                               │
+│     - duplicate prefix detection (within same rate_group)        │
+│  5. Import modes:                                                 │
+│     - MERGE: add new prefixes, update existing (by prefix match) │
+│     - REPLACE: delete all existing rates in group, insert new    │
+│     - ADD_ONLY: skip existing prefixes, only add new             │
+│  6. Background job (ImportRatesJob) for large files (>1000 rows) │
+│  7. Import log stored in rate_imports table for audit             │
+│  8. Error report downloadable as CSV                             │
+│                                                                   │
+│  EXPORT (CSV download):                                           │
+│  1. Export entire rate group as CSV                               │
+│  2. Export filtered rates (by prefix range, destination, status)  │
+│  3. Columns: prefix, destination, rate_per_minute, connection_fee,│
+│     min_duration, billing_increment, effective_date, status       │
+│  4. Used for: rate comparison, provider negotiation, backup       │
+│                                                                   │
+│  CSV format example:                                              │
+│  prefix,destination,rate_per_minute,connection_fee,effective_date │
+│  1,USA,0.0100,0,2026-03-01                                      │
+│  1212,USA New York,0.0085,0,2026-03-01                           │
+│  44,UK Fixed,0.0120,0,2026-03-01                                 │
+│  447,UK Mobile,0.0250,0,2026-03-01                               │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Reseller Rate Markup Model:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   RESELLER RATE MARKUP MODEL                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Admin rate group (base rates — admin's sell rate to resellers):  │
+│  ┌──────────┬─────────────────┬──────────────────┐               │
+│  │ prefix   │ destination     │ rate_per_minute   │               │
+│  │ 1        │ USA             │ $0.0100           │               │
+│  │ 44       │ UK Fixed        │ $0.0120           │               │
+│  │ 880      │ Bangladesh      │ $0.0200           │               │
+│  └──────────┴─────────────────┴──────────────────┘               │
+│                                                                   │
+│  Reseller creates own rate group (linked via parent_rate_group_id)│
+│  Reseller's rate = admin's rate + reseller's markup               │
+│  ┌──────────┬─────────────────┬──────────────────┐               │
+│  │ prefix   │ destination     │ rate_per_minute   │               │
+│  │ 1        │ USA             │ $0.0150 (+50%)    │               │
+│  │ 44       │ UK Fixed        │ $0.0180 (+50%)    │               │
+│  │ 880      │ Bangladesh      │ $0.0250 (+25%)    │               │
+│  └──────────┴─────────────────┴──────────────────┘               │
+│                                                                   │
+│  Enforcement rules:                                               │
+│  ├── Reseller rate MUST be >= admin's rate for same prefix        │
+│  ├── Laravel validates on save: if reseller_rate < admin_rate     │
+│  │   → reject with error "Rate below minimum"                    │
+│  ├── Reseller can import CSV to set rates in bulk                │
+│  ├── Reseller can ONLY create rates for prefixes that exist in   │
+│  │   the admin's parent rate group                               │
+│  └── If admin updates base rate above reseller's rate →           │
+│      flag as "margin_warning" for reseller to fix                │
+│                                                                   │
+│  Billing chain at call time:                                      │
+│  ├── Client charged at: reseller's rate (client's rate_group)    │
+│  ├── Reseller charged at: admin's rate (reseller's rate_group)   │
+│  ├── Profit: reseller's rate - admin's rate                      │
+│  ├── call_records.total_cost = client charge                     │
+│  └── call_records.reseller_cost = admin's charge to reseller     │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### CDR & Billing (High Volume — 10M rows/day)
@@ -878,18 +1156,20 @@ exten => _X.,1,NoOp(== SIP call from ${CHANNEL(endpoint)} to ${EXTEN} ==)
  same => n,Goto(hangup)
 
  ; --- FLOW 1: SIP Account → Outbound Trunk (PSTN) ---
- same => n(trunk),NoOp(Trunk call via ${TRUNK_1} to ${DIAL_NUM})
+ same => n(trunk),NoOp(Trunk call via ${TRUNK_1} to ${DIAL_NUM_1})
  same => n,Set(CDR(userfield)=${RATE_ID})
  same => n,Set(TIMEOUT(absolute)=${MAX_DURATION})
- same => n,Set(DIAL_NUM=${TRUNK_PREFIX}${EXTEN:${TRUNK_STRIP}})
- ; Primary trunk
- same => n,Dial(PJSIP/${DIAL_NUM}@${TRUNK_1},60,Tt)
+ ; Apply CLI manipulation from AGI
+ same => n,Set(CALLERID(num)=${CLI_NUM})
+ same => n,Set(CALLERID(name)=${CLI_NAME})
+ ; Primary trunk (DIAL_NUM_1 already formatted by AGI for this trunk)
+ same => n,Dial(PJSIP/${DIAL_NUM_1}@${TRUNK_1},60,Tt)
  same => n,NoOp(Primary trunk result: ${DIALSTATUS})
  same => n,GotoIf($["${DIALSTATUS}" = "ANSWER"]?done)
- ; Failover trunk
+ ; Failover trunk (DIAL_NUM_2 formatted for failover trunk)
  same => n,GotoIf($["${TRUNK_2}" = ""]?hangup)
  same => n,NoOp(Failover to ${TRUNK_2})
- same => n,Dial(PJSIP/${DIAL_NUM}@${TRUNK_2},60,Tt)
+ same => n,Dial(PJSIP/${DIAL_NUM_2}@${TRUNK_2},60,Tt)
  same => n,Goto(done)
 
  ; --- Denied (no balance / no route) ---
@@ -1002,13 +1282,16 @@ Step 3 — External call: security checks
     If >= user.daily_spend_limit → Set ROUTE_TYPE = "denied",
     auto-suspend user, alert admin, RETURN
 
-Step 4 — External call: rate lookup
+Step 4 — External call: rate lookup (with effective date)
   → Longest prefix match on rates table using caller's rate_group_id
+    WHERE effective_date <= CURDATE()
+      AND (end_date IS NULL OR end_date > CURDATE())
   → If NO rate found → Set ROUTE_TYPE = "denied", RETURN
+  → Also lookup reseller's rate (if user has reseller) for reseller_cost calculation
 
-Step 5 — External call: balance check
-  → Prepaid:  max_duration = (balance / rate_per_minute) * 60
-              If balance <= 0 → DENIED
+Step 5 — External call: balance check (with minimum threshold)
+  → Prepaid:  If balance < user.min_balance_for_calls → DENIED
+              max_duration = ((balance - min_balance_for_calls) / rate_per_minute) * 60
   → Postpaid: remaining = credit_limit - outstanding_charges
               If remaining <= 0 → DENIED
   → Set MAX_DURATION (seconds)
@@ -1046,9 +1329,24 @@ Step 6 — External call: select outgoing trunk (prefix + time-based)
       )
     ORDER BY LENGTH(tr.prefix) DESC, tr.priority ASC, tr.weight DESC
   → Check trunk capacity (active channels < max_channels via AMI)
+  → Filter out trunks with health_status = 'down' or status = 'auto_disabled'
   → Pick TRUNK_1 (primary, lowest priority number in time window)
   → Pick TRUNK_2 (failover, next priority or NULL-time fallback route)
   → If NO trunk found → DENIED
+
+Step 6b — Apply dial string manipulation (per trunk)
+  → For TRUNK_1: apply dial_strip_digits → dial_pattern_match/replace → dial_prefix → tech_prefix
+  → For TRUNK_2: same manipulation with TRUNK_2's settings
+  → Result: DIAL_NUM_1 and DIAL_NUM_2 (formatted for each trunk's expected format)
+
+Step 6c — Apply Caller ID / CLI manipulation (per trunk)
+  → Read trunk.cli_mode for TRUNK_1:
+    passthrough: use SIP account's caller_id_number as-is
+    override:    set CALLERID(num) = trunk.cli_override_number
+    prefix_strip: strip N digits from left, prepend cli_prefix_add
+    translate:   strip + add (format conversion)
+    hide:        set CALLERID(num)="anonymous", set Privacy header
+  → Set CLI_NUM for use in Dial()
 
 Step 7 — Create call_record + cache in Redis
   → INSERT call_records (status='in_progress', call_start=NOW(),
@@ -1059,12 +1357,14 @@ Step 7 — Create call_record + cache in Redis
   → TTL = 7200 seconds (2hr safety net)
 
 Step 8 — Return variables
-  → ROUTE_TYPE  = "trunk"
-  → TRUNK_1     = trunk endpoint name (e.g. "trunk-outgoing-1")
-  → TRUNK_2     = failover trunk endpoint name (or empty)
-  → TRUNK_PREFIX= trunk's tech prefix
-  → TRUNK_STRIP = trunk's strip_digits
-  → MAX_DURATION= max call duration in seconds
+  → ROUTE_TYPE   = "trunk"
+  → TRUNK_1      = trunk endpoint name (e.g. "trunk-outgoing-1")
+  → TRUNK_2      = failover trunk endpoint name (or empty)
+  → DIAL_NUM_1   = formatted destination for TRUNK_1 (after dial manipulation)
+  → DIAL_NUM_2   = formatted destination for TRUNK_2 (after dial manipulation)
+  → CLI_NUM      = formatted Caller ID for outgoing trunk
+  → CLI_NAME     = Caller ID name
+  → MAX_DURATION = max call duration in seconds
 
 
 ═══════════════════════════════════════════════════════════════
@@ -1196,6 +1496,8 @@ rSwitch/
 │   │   │   │   ├── TrunkRouteController.php  -- prefix→trunk routing rules
 │   │   │   │   ├── DidController.php
 │   │   │   │   ├── RateGroupController.php
+│   │   │   │   ├── RateImportController.php     -- CSV upload, preview, import rates
+│   │   │   │   ├── TrunkHealthController.php    -- view trunk health, manual check
 │   │   │   │   ├── TransferController.php         -- transfer SIP accounts & clients
 │   │   │   │   ├── TransferLogController.php     -- view transfer audit history
 │   │   │   │   ├── ManualRechargeController.php  -- admin recharges any user
@@ -1209,6 +1511,7 @@ rSwitch/
 │   │   │   │   ├── SipAccountController.php
 │   │   │   │   ├── DidController.php
 │   │   │   │   ├── RateGroupController.php
+│   │   │   │   ├── RateImportController.php     -- CSV import for own rate groups
 │   │   │   │   └── ClientRechargeController.php  -- reseller recharges own clients
 │   │   │   ├── Client/
 │   │   │   │   ├── DashboardController.php
@@ -1247,6 +1550,7 @@ rSwitch/
 │   │   ├── Invoice.php
 │   │   ├── TransferLog.php
 │   │   ├── AuditLog.php
+│   │   ├── RateImport.php
 │   │   ├── DestinationBlacklist.php
 │   │   ├── DestinationWhitelist.php
 │   │   └── Asterisk/                  -- Asterisk realtime models
@@ -1262,11 +1566,18 @@ rSwitch/
 │   │   │   ├── AmiService.php         -- AMI connection for live monitoring
 │   │   │   └── DialplanService.php    -- Generate/reload dialplan if needed
 │   │   ├── Billing/
-│   │   │   ├── RatingEngine.php       -- Longest prefix match, cost calculation
+│   │   │   ├── RatingEngine.php       -- Longest prefix match + effective_date, cost calc
 │   │   │   ├── BalanceService.php     -- Credit/debit operations (atomic)
 │   │   │   ├── CallRecordService.php   -- Insert at call start, update at call end
 │   │   │   ├── InvoiceGenerator.php   -- Monthly invoice creation
 │   │   │   └── PaymentService.php     -- Online payment + manual recharge logic
+│   │   ├── Rate/
+│   │   │   ├── RateImportService.php  -- CSV parse, validate, preview, import
+│   │   │   └── RateExportService.php  -- CSV/Excel export of rate groups
+│   │   ├── Trunk/
+│   │   │   ├── DialStringService.php  -- Per-trunk number format manipulation
+│   │   │   ├── CliManipulationService.php -- Per-trunk Caller ID rules
+│   │   │   └── TrunkHealthService.php -- SIP OPTIONS ping, ASR monitoring
 │   │   ├── PaymentGateway/
 │   │   │   ├── PaymentGatewayInterface.php  -- common interface
 │   │   │   ├── StripeGateway.php      -- Stripe Checkout / Payment Intent
@@ -1286,10 +1597,14 @@ rSwitch/
 │   │   ├── PaymentFailedNotification.php     -- notify user on failed payment
 │   │   ├── LowBalanceNotification.php        -- notify when balance below threshold
 │   │   ├── FraudAlertNotification.php        -- alert admin on suspicious activity
-│   │   └── AccountLockedNotification.php     -- notify on failed login lockout
+│   │   ├── AccountLockedNotification.php     -- notify on failed login lockout
+│   │   ├── TrunkDownNotification.php         -- alert admin when trunk fails health check
+│   │   ├── TrunkRecoveredNotification.php    -- notify admin when trunk comes back up
+│   │   └── TrunkDegradedNotification.php     -- alert admin when trunk ASR drops
 │   ├── Jobs/
 │   │   ├── SyncCdrSummaryJob.php      -- Every 5 min: Redis counters → MySQL summary tables
 │   │   ├── RateHangupJob.php          -- Queued: rate + debit on call end (async fallback)
+│   │   ├── ImportRatesJob.php         -- Background: CSV rate import (large files)
 │   │   ├── GenerateInvoicesJob.php    -- Monthly
 │   │   ├── SuspendOverdueJob.php      -- Check postpaid limits
 │   │   └── ProvisionEndpointJob.php
@@ -1305,6 +1620,7 @@ rSwitch/
 │           ├── CompressCdrPartitionCommand.php -- monthly: compress 6-12 month partitions
 │           ├── RecoverStalledCallsCommand.php  -- hourly: find in_progress > 2hrs, mark failed
 │           ├── GenerateInvoicesCommand.php
+│           ├── TrunkHealthCheckCommand.php   -- every 60s: SIP OPTIONS ping + ASR check
 │           └── AsteriskHealthCheckCommand.php
 ├── agi/
 │   ├── server.php                     -- FastAGI daemon entry point
@@ -1333,7 +1649,8 @@ rSwitch/
 │       ├── 0012_create_transfer_logs_table.php
 │       ├── 0013_create_audit_logs_table.php
 │       ├── 0014_create_destination_blacklist_table.php
-│       └── 0015_create_destination_whitelist_table.php
+│       ├── 0015_create_destination_whitelist_table.php
+│       └── 0016_create_rate_imports_table.php
 ├── routes/
 │   ├── web.php
 │   └── api.php
@@ -1351,15 +1668,18 @@ rSwitch/
 
 ### Key Service Logic
 
-#### RatingEngine — Longest Prefix Match
+#### RatingEngine — Longest Prefix Match (with Effective Date)
 ```php
-// Find rate: ORDER BY LENGTH(prefix) DESC, match longest prefix first
+// Find rate: match longest prefix, valid at call time
 SELECT * FROM rates
 WHERE rate_group_id = ?
   AND ? LIKE CONCAT(prefix, '%')
   AND status = 'active'
-ORDER BY LENGTH(prefix) DESC
+  AND effective_date <= CURDATE()
+  AND (end_date IS NULL OR end_date > CURDATE())
+ORDER BY LENGTH(prefix) DESC, effective_date DESC
 LIMIT 1;
+// effective_date DESC ensures latest valid rate wins if overlapping dates
 ```
 
 #### BalanceService — Atomic Balance Operations
@@ -1538,6 +1858,8 @@ Using **Spatie Laravel Permission** or custom middleware:
 | Manage all DIDs | Yes | No | No |
 | View CDR | All | Own tree | Own |
 | Manage rates | All groups | Own groups | No |
+| Import/export rates (CSV) | All groups | Own groups | No |
+| Trunk health monitoring | Yes | No | No |
 | View invoices | All | Own tree | Own |
 | Transfer SIP accounts | Yes | No | No |
 | Transfer clients | Yes | No | No |
@@ -1585,14 +1907,24 @@ Using **Spatie Laravel Permission** or custom middleware:
 - **Deliverable**: Login, user management with hierarchy, KYC workflow, Asterisk running, security hardened
 
 ### Phase 2: Core Switching
-- SIP Account CRUD → auto-provision to Asterisk realtime tables (ps_endpoints/ps_auths/ps_aors)
+- **SIP Account CRUD** → auto-provision to Asterisk realtime tables (ps_endpoints/ps_auths/ps_aors)
+  - Support all auth modes: password, IP-based, both
+  - IP restriction (allowed_ips) with ps_endpoint_id_ips provisioning
+  - Per-account max channels
 - **Trunk management (incoming + outgoing + both)**:
   - Admin: add/edit/delete trunks with direction (incoming/outgoing/both)
   - Auto-generate `pjsip_trunks.conf` with endpoint, auth, AOR, identify, registration sections
   - Reload PJSIP via AMI after trunk changes
+  - **Dial string manipulation** per trunk (strip, pattern match/replace, prefix, tech prefix)
+  - **Caller ID / CLI manipulation** per trunk (passthrough, override, strip, translate, hide)
 - **Trunk routing rules**: prefix-based outgoing trunk selection with priority/failover
+- **Trunk health monitoring**:
+  - SIP OPTIONS ping every 60 seconds (`TrunkHealthCheckCommand`)
+  - Auto-disable trunk after N consecutive failures
+  - ASR-based degradation alerts
+  - Admin notifications on trunk down/recovered/degraded
 - Basic dialplan:
-  - Outbound: SIP account → AGI selects outgoing trunk by prefix → Dial via trunk
+  - Outbound: SIP account → AGI (security + rate + balance + trunk + CLI/dial manipulation) → Dial
   - Inbound: incoming trunk → AGI matches DID → routes to SIP account
   - Internal: SIP-to-SIP direct calls
 - DID management and assignment (linked to incoming/both trunks)
@@ -1606,16 +1938,26 @@ Using **Spatie Laravel Permission** or custom middleware:
   - Account lockout after repeated failed logins
   - Trunk IP ACLs (acl.conf per trunk provider)
   - Destination whitelist option per client (restrict to specific prefixes)
-- **Deliverable**: Working calls — SIP accounts register, outbound via trunks, inbound via DIDs, trunk ACLs active
+- **Deliverable**: Working calls with all auth modes, trunk health monitoring, CLI/dial manipulation, ACLs active
 
 ### Phase 3: Billing Engine
-- Rate group and rate management (prefix-based)
-- Rating engine (longest prefix match)
+- **Rate group and rate management** (prefix-based):
+  - Rate groups with `effective_date` and `end_date` per rate
+  - Schedule future rate changes (auto-activate on effective_date)
+  - **CSV rate import**: upload, preview, validate, import (MERGE/REPLACE/ADD_ONLY modes)
+  - **CSV rate export**: download rate group as CSV/Excel
+  - Background `ImportRatesJob` for large files (>1000 rows)
+  - Import audit trail (`rate_imports` table with error log)
+- **Rating engine** (longest prefix match + effective date):
+  - Picks rate valid at call time (`effective_date <= today AND (end_date IS NULL OR end_date > today)`)
+  - Dual rate lookup: client rate + reseller rate (for commission tracking)
 - **Real-time billing via hangup handler AGI** (no batch CDR processor):
   - AGI inserts `call_records` at call start, caches rate in Redis
   - Hangup handler AGI calculates cost, updates record, debits balance
   - `RecoverStalledCallsCommand` — hourly cleanup for orphaned in_progress records
-- Balance service (atomic credit/debit with row locking)
+- **Balance service** (atomic credit/debit with row locking):
+  - Minimum balance threshold (`min_balance_for_calls`) checked before call
+  - Configurable `low_balance_threshold` for notifications
 - Prepaid: AGI balance check before call, max duration enforcement
 - Postpaid: credit limit enforcement
 - Transaction log
@@ -1623,10 +1965,15 @@ Using **Spatie Laravel Permission** or custom middleware:
 - **Real-time Redis counters** — hangup handler INCRBY on every call end (per-user, per-trunk, per-destination, system-wide)
 - **MySQL summary sync** — `SyncCdrSummaryCommand` every 5 min (Redis → MySQL for persistence)
 - Active channel counters in Redis (INCR on start, DECR on end)
-- **Deliverable**: Calls are rated in real-time, balances deducted instantly, dashboard stats are live
+- **Deliverable**: Calls are rated in real-time, balances deducted instantly, rate import/export works, dashboard stats are live
 
 ### Phase 4: Business Features
-- Reseller rate groups (reseller creates own rates with markup over admin base rate)
+- **Reseller rate markup model**:
+  - Reseller rate group linked to admin's base rate group (`parent_rate_group_id`)
+  - Reseller sets own rates — must be >= admin's rate (enforced by validation)
+  - Reseller can import rates via CSV (own groups only)
+  - Margin warning flag if admin raises base rate above reseller's sell rate
+  - Billing chain: client charged at reseller rate, reseller charged at admin rate
 - Reseller credit system (admin allocates credit to reseller, reseller allocates to clients)
 - Invoice generation (monthly, for postpaid accounts)
 - Invoice PDF export
@@ -1684,6 +2031,14 @@ Using **Spatie Laravel Permission** or custom middleware:
 | Web auth security | Rate limiting + 2FA (admin) + account lockout + audit log | Protects against brute force; full audit trail for compliance |
 | AGI resilience | Supervisor auto-restart + AGISTATUS dialplan fallback | Prevents silent call failure if AGI daemon crashes |
 | Module loading | autoload=no, explicit module loading | Reduces attack surface; disables dangerous dialplan apps |
+| Rate effective dates | `effective_date` + `end_date` on rates table | Schedule future rate changes; rating engine picks valid rate at call time |
+| Rate CSV import | Background job with validation + preview + error report | Can't add 5000+ rates manually; supports MERGE/REPLACE/ADD_ONLY modes |
+| Reseller rate markup | `parent_rate_group_id` links reseller→admin rate group | Enforces minimum margin; reseller can't sell below admin's rate |
+| CLI manipulation | Per-trunk `cli_mode` (passthrough/override/strip/translate/hide) | Different providers require different CallerID formats |
+| Dial string manipulation | Per-trunk pattern match/replace + prefix + strip pipeline | Different trunks expect different number formats (E.164, national, etc.) |
+| SIP account auth modes | password, IP, or both (per-account `auth_type`) | PBX trunking needs IP auth; high-security accounts need both |
+| Trunk health monitoring | SIP OPTIONS ping + ASR threshold alerts | Auto-disable dead trunks; flag degraded trunks for admin review |
+| Minimum balance threshold | `min_balance_for_calls` per user | Prevents micro-balance abuse; ensures meaningful call duration |
 
 ---
 
