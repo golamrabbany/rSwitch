@@ -83,6 +83,14 @@
                         Routing Rules
                     </a>
 
+                    <a href="{{ route('admin.dids.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('admin.dids.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                        </svg>
+                        DIDs
+                    </a>
+
                     <div class="pt-4">
                         <p class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Coming Soon</p>
                     </div>

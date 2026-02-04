@@ -39,6 +39,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::post('trunk-routes/test', [Admin\TrunkRouteController::class, 'testRoute'])->name('trunk-routes.test');
     Route::resource('trunk-routes', Admin\TrunkRouteController::class)->except(['show']);
+
+    Route::resource('dids', Admin\DidController::class);
 });
 
 // Reseller routes (placeholder)
