@@ -132,7 +132,10 @@ dids
 ├── provider VARCHAR(100)
 ├── trunk_id (FK→trunks.id)         -- incoming trunk (must be 'incoming' or 'both')
 ├── assigned_to_user_id (FK→users.id) NULL  -- client or reseller
-├── destination_type ENUM('sip_account','ivr','queue','ring_group','external')
+├── destination_type ENUM('sip_account','ring_group','external')
+│                                       -- sip_account: Flow 3 (rings a SIP phone)
+│                                       -- ring_group: Flow 3 variant (rings multiple SIP phones)
+│                                       -- external: Flow 4 (forwards to PSTN via outbound trunk)
 ├── destination_id INT NULL         -- FK to relevant table
 ├── monthly_cost DECIMAL(8,4)       -- admin's cost from provider
 ├── monthly_price DECIMAL(8,4)      -- price charged to client
@@ -196,14 +199,18 @@ cdr
 rated_cdr
 ├── id (PK, BIGINT)
 ├── cdr_id (FK→cdr.id)
-├── sip_account_id (FK→sip_accounts.id)
-├── user_id (FK→users.id)           -- client
+├── sip_account_id (FK→sip_accounts.id) NULL  -- NULL for Flow 4 (trunk→trunk)
+├── user_id (FK→users.id)           -- billed client (or DID owner for Flow 4)
 ├── reseller_id (FK→users.id) NULL  -- reseller (for commission tracking)
-├── direction ENUM('inbound','outbound')
+├── call_flow ENUM('sip_to_trunk','sip_to_sip','trunk_to_sip','trunk_to_trunk')
+│                                    -- maps to Flow 1, 2, 3, 4
 ├── caller VARCHAR(40)
 ├── callee VARCHAR(40)
 ├── destination VARCHAR(100)        -- matched destination name
 ├── matched_prefix VARCHAR(20)
+├── incoming_trunk_id (FK→trunks.id) NULL  -- trunk call arrived on (Flow 3 & 4)
+├── outgoing_trunk_id (FK→trunks.id) NULL  -- trunk call went out on (Flow 1 & 4)
+├── did_id (FK→dids.id) NULL        -- DID involved (Flow 3 & 4)
 ├── duration INT                    -- total seconds
 ├── billable_duration INT           -- after min_duration & increment rounding
 ├── rate_per_minute DECIMAL(10,6)
@@ -215,6 +222,7 @@ rated_cdr
 ├── processed_at TIMESTAMP
 ├── INDEX idx_user_date (user_id, call_start)
 ├── INDEX idx_reseller_date (reseller_id, call_start)
+├── INDEX idx_call_flow (call_flow, call_start)
 
 -- Transactions (all money movements)
 transactions
@@ -360,97 +368,237 @@ pre-connect => yes
 max_connections => 20
 ```
 
+### Call Flow Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    4 SUPPORTED CALL FLOWS                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  FLOW 1: SIP Account ──→ Outbound Trunk ──→ PSTN           │
+│          (Client dials external number)                     │
+│                                                             │
+│  FLOW 2: SIP Account ──→ SIP Account (same server)         │
+│          (Internal extension-to-extension call)             │
+│                                                             │
+│  FLOW 3: Inbound Trunk ──→ SIP Account                     │
+│          (PSTN caller reaches a DID → rings SIP phone)      │
+│                                                             │
+│  FLOW 4: Inbound Trunk ──→ Outbound Trunk                  │
+│          (DID forwards to external PSTN number)             │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ### Dialplan (`extensions.conf`)
+
+All SIP accounts use context `from-internal`. All incoming trunks use context `from-trunk`.
+A single AGI call per context handles routing decisions.
 
 ```ini
 ; =============================================================
-; OUTBOUND CALLS — from SIP accounts to PSTN via outgoing trunks
+; CONTEXT: from-internal
+; SOURCE:  SIP accounts (registered endpoints)
+; HANDLES: Flow 1 (SIP→Trunk) and Flow 2 (SIP→SIP)
 ; =============================================================
 [from-internal]
-; All registered SIP endpoints land here when they dial
-exten => _X.,1,NoOp(Outbound call from ${CALLERID(num)} to ${EXTEN})
+
+exten => _X.,1,NoOp(== SIP call from ${CHANNEL(endpoint)} to ${EXTEN} ==)
  same => n,Set(ACCOUNTCODE=${CHANNEL(endpoint)})
- ; AGI checks balance AND selects best outgoing trunk based on prefix + priority
- same => n,AGI(agi://127.0.0.1:4573,check_balance,${CHANNEL(endpoint)},${EXTEN})
- ; AGI returns: ALLOWED/DENIED, RATE, MAX_DURATION, TRUNK_1, TRUNK_2 (failover)
- same => n,GotoIf($["${AGIRESULT}" = "DENIED"]?denied)
+
+ ; --- AGI does ALL routing decisions ---
+ ; 1. Checks if ${EXTEN} matches a local SIP account username
+ ; 2. If local  → sets ROUTE_TYPE=local, DEST_ENDPOINT=<sip_username>
+ ; 3. If external→ checks balance, finds rate, selects outgoing trunk
+ ;                 sets ROUTE_TYPE=trunk, TRUNK_1, TRUNK_2, MAX_DURATION, etc.
+ ; 4. If denied  → sets ROUTE_TYPE=denied
+ same => n,AGI(agi://127.0.0.1:4573,route_outbound,${CHANNEL(endpoint)},${EXTEN})
+
+ same => n,GotoIf($["${ROUTE_TYPE}" = "local"]?local)
+ same => n,GotoIf($["${ROUTE_TYPE}" = "trunk"]?trunk)
+ same => n,Goto(denied)
+
+ ; --- FLOW 2: SIP Account → SIP Account (local) ---
+ same => n(local),NoOp(Local call to ${DEST_ENDPOINT})
+ same => n,Dial(PJSIP/${DEST_ENDPOINT},30,Tt)
+ same => n,Goto(hangup)
+
+ ; --- FLOW 1: SIP Account → Outbound Trunk (PSTN) ---
+ same => n(trunk),NoOp(Trunk call via ${TRUNK_1} to ${DIAL_NUM})
  same => n,Set(CDR(userfield)=${RATE_ID})
  same => n,Set(TIMEOUT(absolute)=${MAX_DURATION})
- ; Prepare dialed number (strip digits + add prefix per trunk config)
  same => n,Set(DIAL_NUM=${TRUNK_PREFIX}${EXTEN:${TRUNK_STRIP}})
- ; Try primary outgoing trunk
- same => n,Dial(PJSIP/${DIAL_NUM}@${TRUNK_1},60,T)
+ ; Primary trunk
+ same => n,Dial(PJSIP/${DIAL_NUM}@${TRUNK_1},60,Tt)
+ same => n,NoOp(Primary trunk result: ${DIALSTATUS})
  same => n,GotoIf($["${DIALSTATUS}" = "ANSWER"]?done)
- ; Failover to secondary outgoing trunk if available
- same => n,GotoIf($["${TRUNK_2}" = ""]?notrunk2)
- same => n,Dial(PJSIP/${DIAL_NUM}@${TRUNK_2},60,T)
- same => n(notrunk2),Goto(hangup)
+ ; Failover trunk
+ same => n,GotoIf($["${TRUNK_2}" = ""]?hangup)
+ same => n,NoOp(Failover to ${TRUNK_2})
+ same => n,Dial(PJSIP/${DIAL_NUM}@${TRUNK_2},60,Tt)
+ same => n,Goto(done)
+
+ ; --- Denied (no balance / no route) ---
  same => n(denied),Playback(ss-noservice)
- same => n,Hangup()
+ same => n,Goto(hangup)
+
  same => n(done),Hangup()
  same => n(hangup),Hangup()
 
+
 ; =============================================================
-; INBOUND CALLS — from PSTN incoming trunks to SIP accounts/DIDs
+; CONTEXT: from-trunk
+; SOURCE:  Incoming PSTN trunks
+; HANDLES: Flow 3 (Trunk→SIP) and Flow 4 (Trunk→Trunk)
 ; =============================================================
 [from-trunk]
-; All incoming trunk endpoints use this context
-; The AGI looks up which incoming trunk sent the call + DID routing
-exten => _X.,1,NoOp(Inbound call on trunk ${CHANNEL(endpoint)} to DID ${EXTEN})
+
+exten => _X.,1,NoOp(== Inbound from trunk ${CHANNEL(endpoint)} DID ${EXTEN} ==)
  same => n,Set(ACCOUNTCODE=trunk-${CHANNEL(endpoint)})
- ; AGI looks up DID→destination, validates trunk is incoming/both
+
+ ; --- AGI does ALL routing decisions ---
+ ; 1. Validates trunk is incoming/both
+ ; 2. Looks up DID in dids table by ${EXTEN}
+ ; 3. Finds destination: sip_account, ring_group, or external forward
+ ; 4. If external → also selects outgoing trunk for forwarding
+ ; 5. Checks DID owner has balance (if forwarding to external charges apply)
  same => n,AGI(agi://127.0.0.1:4573,route_inbound,${CHANNEL(endpoint)},${EXTEN})
- same => n,GotoIf($["${DEST_TYPE}" = "sip_account"]?sip)
- same => n,GotoIf($["${DEST_TYPE}" = "ring_group"]?ringgroup)
- same => n,GotoIf($["${DEST_TYPE}" = "external"]?external)
+
+ same => n,GotoIf($["${ROUTE_TYPE}" = "sip"]?sip)
+ same => n,GotoIf($["${ROUTE_TYPE}" = "ring_group"]?ringgroup)
+ same => n,GotoIf($["${ROUTE_TYPE}" = "trunk_forward"]?forward)
+ same => n,Goto(no_route)
+
+ ; --- FLOW 3: Inbound Trunk → SIP Account ---
+ same => n(sip),NoOp(Route to SIP endpoint ${DEST_ENDPOINT})
+ same => n,Dial(PJSIP/${DEST_ENDPOINT},30,Tt)
+ same => n,Goto(hangup)
+
+ ; --- FLOW 3 variant: Inbound Trunk → Ring Group ---
+ same => n(ringgroup),NoOp(Route to ring group ${DEST_ENDPOINTS})
+ same => n,Dial(${DEST_ENDPOINTS},30,Tt)
+ same => n,Goto(hangup)
+
+ ; --- FLOW 4: Inbound Trunk → Outbound Trunk (call forwarding) ---
+ same => n(forward),NoOp(Forward DID to ${DEST_NUMBER} via trunk ${DEST_TRUNK})
+ same => n,Set(TIMEOUT(absolute)=${MAX_DURATION})
+ same => n,Set(CDR(userfield)=${RATE_ID})
+ same => n,Dial(PJSIP/${DEST_NUMBER}@${DEST_TRUNK},60,Tt)
+ same => n,Goto(hangup)
+
+ ; --- No route found ---
+ same => n(no_route),NoOp(No route for DID ${EXTEN})
  same => n,Playback(ss-noservice)
- same => n,Hangup()
- same => n(sip),Dial(PJSIP/${DEST_ENDPOINT},30)
- same => n,Hangup()
- same => n(ringgroup),Dial(${DEST_ENDPOINTS},30)
- same => n,Hangup()
- same => n(external),Dial(PJSIP/${DEST_NUMBER}@${DEST_TRUNK},60)
- same => n,Hangup()
 
-; =============================================================
-; INTERNAL SIP-TO-SIP CALLS (between registered endpoints)
-; =============================================================
-[from-internal-local]
-exten => _XXXX,1,NoOp(Internal call to ${EXTEN})
- same => n,Dial(PJSIP/${EXTEN},30)
- same => n,Hangup()
+ same => n(hangup),Hangup()
 ```
 
-### AGI Billing Script (PHP FastAGI)
+### AGI Billing & Routing Script (PHP FastAGI)
 
-A PHP FastAGI daemon (using `phpagi` or `PAGI` library) running on port 4573:
+A PHP FastAGI daemon (using `phpagi` or `PAGI` library) running on port 4573.
+**Two AGI handlers** — one per dialplan context. Each handler is the single decision point.
 
 ```
-Key functions:
+═══════════════════════════════════════════════════════════════
+AGI HANDLER 1: route_outbound(endpoint, destination)
+Called from: [from-internal] context
+Handles:     Flow 1 (SIP→Trunk) and Flow 2 (SIP→SIP)
+═══════════════════════════════════════════════════════════════
 
-1. check_balance(endpoint, destination)
-   - Look up SIP account → client → rate_group
-   - Match destination against rates table (longest prefix match)
-   - For prepaid: calculate max_duration = balance / rate_per_minute
-   - For postpaid: check credit_limit - balance
-   - SELECT OUTGOING TRUNK: query trunk_routes table
-     - Match destination prefix against trunk_routes (longest prefix match)
-     - Order by priority ASC, pick top 2 for primary + failover
-     - Apply trunk's strip_digits and prefix to format the dial string
-   - Return: ALLOWED/DENIED, rate, max_duration, trunk_1, trunk_2,
-             trunk_prefix, trunk_strip
+Step 1 — Identify caller
+  → Look up SIP account by endpoint name
+  → Get client user, reseller, billing_type, balance, rate_group_id
 
-2. route_inbound(trunk_endpoint, did_number)
-   - Identify which incoming trunk the call arrived on (by endpoint name)
-   - Validate trunk direction is 'incoming' or 'both'
-   - Look up DID → destination mapping from dids table
-   - Validate DID belongs to this trunk
-   - Return: destination type (sip_account/ring_group/external),
-             endpoint(s) to dial, trunk for external forwarding
+Step 2 — Check if destination is a LOCAL SIP account
+  → SELECT * FROM sip_accounts WHERE username = ${destination}
+    AND status = 'active'
+  → If FOUND and same server:
+      Set ROUTE_TYPE = "local"
+      Set DEST_ENDPOINT = sip_account.username
+      RETURN (no billing check for internal calls)
 
-3. get_trunk_status(trunk_id)
-   - Check active channel count vs max_channels for the trunk
-   - Used by check_balance to skip trunks that are at capacity
+Step 3 — External call: rate lookup
+  → Longest prefix match on rates table using caller's rate_group_id
+  → If NO rate found → Set ROUTE_TYPE = "denied", RETURN
+
+Step 4 — External call: balance check
+  → Prepaid:  max_duration = (balance / rate_per_minute) * 60
+              If balance <= 0 → DENIED
+  → Postpaid: remaining = credit_limit - outstanding_charges
+              If remaining <= 0 → DENIED
+  → Set MAX_DURATION (seconds)
+
+Step 5 — External call: select outgoing trunk
+  → Longest prefix match on trunk_routes table:
+    SELECT t.*, tr.prefix, tr.priority, tr.weight
+    FROM trunk_routes tr
+    JOIN trunks t ON t.id = tr.trunk_id
+    WHERE ${destination} LIKE CONCAT(tr.prefix, '%')
+      AND t.status = 'active'
+      AND t.direction IN ('outgoing','both')
+    ORDER BY LENGTH(tr.prefix) DESC, tr.priority ASC
+  → Check trunk capacity (active channels < max_channels via AMI)
+  → Pick TRUNK_1 (primary) and TRUNK_2 (failover)
+  → If NO trunk found → DENIED
+
+Step 6 — Return variables
+  → ROUTE_TYPE  = "trunk"
+  → TRUNK_1     = trunk endpoint name (e.g. "trunk-outgoing-1")
+  → TRUNK_2     = failover trunk endpoint name (or empty)
+  → TRUNK_PREFIX= trunk's tech prefix
+  → TRUNK_STRIP = trunk's strip_digits
+  → RATE_ID     = matched rate ID
+  → MAX_DURATION= max call duration in seconds
+
+
+═══════════════════════════════════════════════════════════════
+AGI HANDLER 2: route_inbound(trunk_endpoint, did_number)
+Called from: [from-trunk] context
+Handles:     Flow 3 (Trunk→SIP) and Flow 4 (Trunk→Trunk)
+═══════════════════════════════════════════════════════════════
+
+Step 1 — Validate incoming trunk
+  → Look up trunk by endpoint name
+  → Verify direction is 'incoming' or 'both'
+  → If invalid → Set ROUTE_TYPE = "denied", RETURN
+
+Step 2 — Look up DID
+  → SELECT * FROM dids WHERE number = ${did_number}
+    AND trunk_id = trunk.id AND status = 'active'
+  → If NOT found → Set ROUTE_TYPE = "denied", RETURN
+
+Step 3 — Get DID destination
+  → Read destination_type and destination_id from dids table
+  → Look up the DID owner (assigned_to_user_id)
+
+Step 4 — Route by destination type
+
+  IF destination_type = "sip_account":
+    → FLOW 3: Inbound Trunk → SIP Account
+    → Look up SIP account, verify it's active
+    → Set ROUTE_TYPE = "sip"
+    → Set DEST_ENDPOINT = sip_account.username
+    → RETURN
+
+  IF destination_type = "ring_group":
+    → FLOW 3 variant: Inbound Trunk → Multiple SIP Accounts
+    → Build dial string: PJSIP/ext1&PJSIP/ext2&PJSIP/ext3
+    → Set ROUTE_TYPE = "ring_group"
+    → Set DEST_ENDPOINTS = dial string
+    → RETURN
+
+  IF destination_type = "external":
+    → FLOW 4: Inbound Trunk → Outbound Trunk (forwarding)
+    → Check DID owner's balance (they pay for the forward leg)
+    → Rate lookup for the external destination number
+    → If no balance or no rate → DENIED
+    → Select outgoing trunk (same logic as route_outbound Step 5)
+    → Set ROUTE_TYPE = "trunk_forward"
+    → Set DEST_NUMBER = external number
+    → Set DEST_TRUNK  = outgoing trunk endpoint name
+    → Set MAX_DURATION = based on DID owner's balance
+    → Set RATE_ID = matched rate
+    → RETURN
 ```
 
 ### CDR Collection (`cdr_adaptive_odbc.conf`)
@@ -549,8 +697,8 @@ rSwitch/
 ├── agi/
 │   ├── server.php                     -- FastAGI daemon entry point
 │   ├── handlers/
-│   │   ├── CheckBalanceHandler.php
-│   │   └── RouteInboundHandler.php
+│   │   ├── RouteOutboundHandler.php   -- Flow 1 & 2: SIP→Trunk or SIP→SIP
+│   │   └── RouteInboundHandler.php    -- Flow 3 & 4: Trunk→SIP or Trunk→Trunk
 │   └── bootstrap.php                  -- Laravel app bootstrap for AGI context
 ├── database/
 │   └── migrations/
