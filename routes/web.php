@@ -41,6 +41,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::resource('trunk-routes', Admin\TrunkRouteController::class)->except(['show']);
 
     Route::resource('dids', Admin\DidController::class);
+
+    Route::get('cdr', [Admin\CdrController::class, 'index'])->name('cdr.index');
+    Route::get('cdr/export', [Admin\CdrController::class, 'export'])->name('cdr.export');
+    Route::get('cdr/{uuid}', [Admin\CdrController::class, 'show'])->name('cdr.show');
 });
 
 // Reseller routes (placeholder)
