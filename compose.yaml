@@ -64,6 +64,35 @@ services:
                 - ping
             retries: 3
             timeout: 5s
+    asterisk:
+        build:
+            context: './docker/asterisk'
+            dockerfile: Dockerfile
+        image: 'rswitch/asterisk:21'
+        ports:
+            - '${SIP_PORT:-5060}:5060/udp'
+            - '${SIP_PORT:-5060}:5060/tcp'
+            - '${SIP_TLS_PORT:-5061}:5061/tcp'
+        environment:
+            ODBC_HOST: mysql
+            ODBC_PORT: 3306
+            ODBC_DATABASE: '${DB_DATABASE}'
+            ODBC_USERNAME: '${DB_USERNAME}'
+            ODBC_PASSWORD: '${DB_PASSWORD}'
+        volumes:
+            - './docker/asterisk/conf/asterisk.conf:/etc/asterisk/asterisk.conf'
+            - './docker/asterisk/conf/modules.conf:/etc/asterisk/modules.conf'
+            - './docker/asterisk/conf/pjsip.conf:/etc/asterisk/pjsip.conf'
+            - './docker/asterisk/conf/pjsip_trunks.conf:/etc/asterisk/pjsip_trunks.conf'
+            - './docker/asterisk/conf/extensions.conf:/etc/asterisk/extensions.conf'
+            - './docker/asterisk/conf/extconfig.conf:/etc/asterisk/extconfig.conf'
+            - './docker/asterisk/conf/res_odbc.conf:/etc/asterisk/res_odbc.conf'
+            - './docker/asterisk/conf/logger.conf:/etc/asterisk/logger.conf'
+        networks:
+            - sail
+        depends_on:
+            mysql:
+                condition: service_healthy
 networks:
     sail:
         driver: bridge
