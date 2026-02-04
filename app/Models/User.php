@@ -112,6 +112,26 @@ class User extends Authenticatable
         return $query->where('status', 'active');
     }
 
+    /**
+     * Scope query to only users visible to the given user.
+     * Admin sees all, reseller sees own clients, client sees only self.
+     */
+    public function scopeVisibleTo($query, User $user)
+    {
+        if ($user->isAdmin()) {
+            return $query;
+        }
+
+        if ($user->isReseller()) {
+            return $query->where(function ($q) use ($user) {
+                $q->where('id', $user->id)
+                  ->orWhere('parent_id', $user->id);
+            });
+        }
+
+        return $query->where('id', $user->id);
+    }
+
     // --- Helpers ---
 
     public function isAdmin(): bool
@@ -132,5 +152,40 @@ class User extends Authenticatable
     public function isPrepaid(): bool
     {
         return $this->billing_type === 'prepaid';
+    }
+
+    /**
+     * Get all user IDs in this user's subtree (self + children + grandchildren).
+     */
+    public function descendantIds(): array
+    {
+        if ($this->isAdmin()) {
+            return User::pluck('id')->all();
+        }
+
+        $ids = [$this->id];
+
+        if ($this->isReseller()) {
+            $clientIds = User::where('parent_id', $this->id)->pluck('id')->all();
+            $ids = array_merge($ids, $clientIds);
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Check if this user can manage the given user.
+     */
+    public function canManage(User $target): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ($this->isReseller() && $target->parent_id === $this->id) {
+            return true;
+        }
+
+        return $this->id === $target->id;
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\RateGroup;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -80,6 +81,8 @@ class UserController extends Controller
 
         $user->assignRole($validated['role']);
 
+        AuditService::logCreated($user, 'user.created');
+
         return redirect()->route('admin.users.index')
             ->with('success', ucfirst($validated['role']) . ' created successfully.');
     }
@@ -115,6 +118,8 @@ class UserController extends Controller
             'daily_call_limit' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        $original = $user->getAttributes();
+
         $user->fill([
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -137,14 +142,19 @@ class UserController extends Controller
 
         $user->save();
 
+        AuditService::logUpdated($user, $original, 'user.updated');
+
         return redirect()->route('admin.users.show', $user)
             ->with('success', 'User updated successfully.');
     }
 
     public function toggleStatus(User $user)
     {
+        $original = $user->getAttributes();
         $user->status = $user->status === 'active' ? 'suspended' : 'active';
         $user->save();
+
+        AuditService::logUpdated($user, $original, 'user.status_toggled');
 
         return back()->with('success', "User {$user->status}.");
     }

@@ -30,6 +30,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('kyc/{kycProfile}', [Admin\KycController::class, 'show'])->name('kyc.show');
     Route::post('kyc/{kycProfile}/approve', [Admin\KycController::class, 'approve'])->name('kyc.approve');
     Route::post('kyc/{kycProfile}/reject', [Admin\KycController::class, 'reject'])->name('kyc.reject');
+
+    Route::resource('sip-accounts', Admin\SipAccountController::class);
+    Route::post('sip-accounts/{sip_account}/reprovision', [Admin\SipAccountController::class, 'reprovision'])->name('sip-accounts.reprovision');
 });
 
 // Reseller routes (placeholder)
