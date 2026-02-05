@@ -70,7 +70,7 @@ class UserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
-            'parent_id' => $validated['parent_id'],
+            'parent_id' => $validated['parent_id'] ?? null,
             'billing_type' => $validated['billing_type'],
             'rate_group_id' => $validated['rate_group_id'] ?? null,
             'balance' => $validated['balance'] ?? 0,

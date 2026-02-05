@@ -54,14 +54,18 @@ class PurgeOldRecords extends Command
         }
 
         // --- CDR Summary tables ---
-        $summaryTables = ['cdr_summary_daily', 'cdr_summary_hourly', 'cdr_summary_destination'];
+        $summaryTables = [
+            'cdr_summary_daily' => 'date',
+            'cdr_summary_hourly' => 'hour_start',
+            'cdr_summary_destination' => 'date',
+        ];
 
-        foreach ($summaryTables as $table) {
-            $count = DB::table($table)->where('date', '<', $cdrCutoff->toDateString())->count();
+        foreach ($summaryTables as $table => $dateColumn) {
+            $count = DB::table($table)->where($dateColumn, '<', $cdrCutoff->toDateString())->count();
             $this->line("  {$table} to purge: {$count}");
 
             if ($count > 0 && !$dryRun) {
-                $deleted = DB::table($table)->where('date', '<', $cdrCutoff->toDateString())->delete();
+                $deleted = DB::table($table)->where($dateColumn, '<', $cdrCutoff->toDateString())->delete();
                 $this->info("  {$table} purge complete: {$deleted} rows deleted.");
             }
         }
@@ -90,7 +94,7 @@ class PurgeOldRecords extends Command
         // --- Summary ---
         $this->table(['Category', 'Retention', 'Records'], [
             ['Call Records', "{$cdrDays} days", $cdrCount],
-            ['CDR Summaries', "{$cdrDays} days", collect($summaryTables)->sum(fn ($t) => DB::table($t)->where('date', '<', $cdrCutoff->toDateString())->count())],
+            ['CDR Summaries', "{$cdrDays} days", collect($summaryTables)->map(fn ($dateColumn, $table) => DB::table($table)->where($dateColumn, '<', $cdrCutoff->toDateString())->count())->sum()],
             ['Audit Logs', "{$auditDays} days", $auditCount],
         ]);
 

@@ -20,7 +20,7 @@ class CallRecordFactory extends Factory
         return [
             'uuid' => Str::uuid()->toString(),
             'user_id' => User::factory(),
-            'call_flow' => 'outbound',
+            'call_flow' => 'sip_to_trunk',
             'caller' => fake()->numerify('1##########'),
             'callee' => fake()->numerify('44##########'),
             'call_start' => $callStart,
@@ -68,11 +68,11 @@ class CallRecordFactory extends Factory
 
     public function outbound(): static
     {
-        return $this->state(fn () => ['call_flow' => 'outbound']);
+        return $this->state(fn () => ['call_flow' => 'sip_to_trunk']);
     }
 
     public function inbound(): static
     {
-        return $this->state(fn () => ['call_flow' => 'inbound']);
+        return $this->state(fn () => ['call_flow' => 'trunk_to_sip']);
     }
 }

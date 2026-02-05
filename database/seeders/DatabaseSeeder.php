@@ -3,9 +3,12 @@
 namespace Database\Seeders;
 
 use App\Models\RateGroup;
+use App\Models\SystemSetting;
 use App\Models\User;
+use App\Models\WebhookEndpoint;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -63,5 +66,18 @@ class DatabaseSeeder extends Seeder
             'rate_group_id' => $rateGroup->id,
         ]);
         $client->assignRole('client');
+
+        // Seed system settings
+        SystemSetting::seedDefaults();
+
+        // Create sample webhook endpoint for admin
+        WebhookEndpoint::create([
+            'user_id' => $admin->id,
+            'url' => 'https://example.com/webhooks/rswitch',
+            'secret' => Str::random(32),
+            'events' => ['call.completed', 'call.failed', 'payment.received', 'balance.low'],
+            'active' => true,
+            'description' => 'Demo webhook endpoint',
+        ]);
     }
 }

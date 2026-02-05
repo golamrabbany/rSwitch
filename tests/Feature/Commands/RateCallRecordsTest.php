@@ -39,6 +39,8 @@ class RateCallRecordsTest extends TestCase
             'billsec' => 120,
             'status' => 'in_progress',
             'disposition' => 'ANSWERED',
+            'call_start' => now()->subMinutes(30),
+            'call_end' => now()->subMinutes(28),
         ]);
 
         $this->artisan('billing:rate-calls')
@@ -58,6 +60,7 @@ class RateCallRecordsTest extends TestCase
             'user_id' => $user->id,
             'status' => 'in_progress',
             'billsec' => 0,
+            'call_start' => now()->subMinutes(30),
         ]);
 
         $this->artisan('billing:rate-calls')
@@ -78,6 +81,8 @@ class RateCallRecordsTest extends TestCase
             'billsec' => 60,
             'status' => 'in_progress',
             'disposition' => 'ANSWERED',
+            'call_start' => now()->subMinutes(30),
+            'call_end' => now()->subMinutes(29),
         ]);
 
         $this->artisan('billing:rate-calls')
@@ -106,6 +111,8 @@ class RateCallRecordsTest extends TestCase
             'billsec' => 60,
             'status' => 'in_progress',
             'disposition' => 'ANSWERED',
+            'call_start' => now()->subMinutes(30),
+            'call_end' => now()->subMinutes(29),
         ]);
 
         $this->artisan('billing:rate-calls --dry-run')

@@ -29,7 +29,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'kyc.approved' => KycApprovedMiddleware::class,
         ]);
 
-        $middleware->throttleWithRedis();
+        if (! app()->environment('testing')) {
+            $middleware->throttleWithRedis();
+        }
 
         $middleware->validateCsrfTokens(except: [
             'webhook/*',

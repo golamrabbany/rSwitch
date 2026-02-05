@@ -66,7 +66,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        return response()->json([
+        return response()->json(['user' => [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
@@ -77,6 +77,6 @@ class AuthController extends Controller
             'balance' => $user->balance,
             'currency' => $user->currency,
             'rate_group_id' => $user->rate_group_id,
-        ]);
+        ]]);
     }
 }

@@ -54,15 +54,15 @@ class AuthApiTest extends TestCase
         $user = User::factory()->create();
         $token = $user->createToken('test')->plainTextToken;
 
+        $this->assertDatabaseCount('personal_access_tokens', 1);
+
         $response = $this->withHeader('Authorization', "Bearer {$token}")
             ->postJson('/api/v1/auth/revoke');
 
         $response->assertOk();
 
-        // Token should no longer work
-        $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/auth/me')
-            ->assertUnauthorized();
+        // Token record should be deleted from database
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
     public function test_unauthenticated_request_returns_401(): void

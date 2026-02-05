@@ -75,6 +75,7 @@ class SipAccountController extends Controller
         ]);
 
         $sipAccount = SipAccount::create($validated);
+        $sipAccount->refresh();
 
         app(SipProvisioningService::class)->provision($sipAccount);
 

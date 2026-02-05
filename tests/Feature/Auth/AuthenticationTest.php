@@ -62,9 +62,8 @@ class AuthenticationTest extends TestCase
 
         $response = $this->get('/dashboard');
 
-        $response
-            ->assertOk()
-            ->assertSeeVolt('layout.navigation');
+        // Dashboard redirects to role-specific dashboard
+        $response->assertRedirect();
     }
 
     public function test_users_can_logout(): void

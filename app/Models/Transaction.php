@@ -15,6 +15,7 @@ class Transaction extends Model
     protected $fillable = [
         'user_id', 'type', 'amount', 'balance_after',
         'reference_type', 'reference_id', 'description', 'created_by',
+        'created_at',
     ];
 
     protected function casts(): array

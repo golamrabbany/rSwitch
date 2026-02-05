@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WebhookLog extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'webhook_endpoint_id', 'event', 'payload', 'response_code',
         'response_body', 'response_time_ms', 'status', 'attempt', 'error',
