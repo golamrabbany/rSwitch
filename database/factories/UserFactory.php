@@ -11,16 +11,8 @@ use Illuminate\Support\Str;
  */
 class UserFactory extends Factory
 {
-    /**
-     * The current password being used by the factory.
-     */
     protected static ?string $password;
 
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
         return [
@@ -29,16 +21,55 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'role' => 'client',
+            'status' => 'active',
+            'kyc_status' => 'approved',
+            'billing_type' => 'prepaid',
+            'balance' => '100.0000',
+            'credit_limit' => '0.0000',
+            'currency' => 'USD',
+            'max_channels' => 10,
+            'low_balance_threshold' => '5.0000',
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
+        return $this->state(fn () => ['email_verified_at' => null]);
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn () => ['role' => 'admin', 'kyc_status' => 'approved']);
+    }
+
+    public function reseller(): static
+    {
+        return $this->state(fn () => ['role' => 'reseller', 'balance' => '500.0000']);
+    }
+
+    public function client(): static
+    {
+        return $this->state(fn () => ['role' => 'client']);
+    }
+
+    public function prepaid(): static
+    {
+        return $this->state(fn () => ['billing_type' => 'prepaid']);
+    }
+
+    public function postpaid(): static
+    {
+        return $this->state(fn () => ['billing_type' => 'postpaid', 'credit_limit' => '1000.0000']);
+    }
+
+    public function suspended(): static
+    {
+        return $this->state(fn () => ['status' => 'suspended']);
+    }
+
+    public function withBalance(string $amount): static
+    {
+        return $this->state(fn () => ['balance' => $amount]);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class InvoiceController extends Controller
@@ -28,5 +29,16 @@ class InvoiceController extends Controller
         $invoice->load('payments');
 
         return view('client.invoices.show', compact('invoice'));
+    }
+
+    public function pdf(Invoice $invoice)
+    {
+        abort_unless($invoice->user_id === auth()->id(), 403);
+
+        $invoice->load('user');
+
+        $pdf = Pdf::loadView('pdf.invoice', compact('invoice'));
+
+        return $pdf->download("{$invoice->invoice_number}.pdf");
     }
 }

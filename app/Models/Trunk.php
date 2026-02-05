@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Trunk extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'name', 'provider', 'direction', 'host', 'port', 'username', 'password',
         'register', 'register_string', 'transport', 'codec_allow', 'max_channels',

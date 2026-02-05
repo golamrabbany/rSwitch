@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\SipAccount;
 
 class Did extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'number', 'provider', 'trunk_id', 'assigned_to_user_id',
         'destination_type', 'destination_id', 'destination_number',

@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class KycProfile extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'user_id', 'account_type', 'full_name', 'contact_person',
         'phone', 'alt_phone', 'address_line1', 'address_line2',

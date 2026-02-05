@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Rate extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'rate_group_id', 'prefix', 'destination', 'rate_per_minute',
         'connection_fee', 'min_duration', 'billing_increment',

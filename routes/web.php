@@ -61,6 +61,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::post('balance', [Admin\BalanceController::class, 'store'])->name('balance.store');
 
     Route::resource('invoices', Admin\InvoiceController::class)->only(['index', 'create', 'store', 'show', 'update']);
+    Route::get('invoices/{invoice}/pdf', [Admin\InvoiceController::class, 'pdf'])->name('invoices.pdf');
 
     Route::get('payments', [Admin\PaymentController::class, 'index'])->name('payments.index');
     Route::get('payments/{payment}', [Admin\PaymentController::class, 'show'])->name('payments.show');
@@ -126,6 +127,7 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
 
         Route::get('invoices', [Client\InvoiceController::class, 'index'])->name('invoices.index');
         Route::get('invoices/{invoice}', [Client\InvoiceController::class, 'show'])->name('invoices.show');
+        Route::get('invoices/{invoice}/pdf', [Client\InvoiceController::class, 'pdf'])->name('invoices.pdf');
     });
 });
 

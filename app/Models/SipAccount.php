@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SipAccount extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'user_id', 'username', 'password', 'auth_type', 'allowed_ips',
         'caller_id_name', 'caller_id_number', 'max_channels',

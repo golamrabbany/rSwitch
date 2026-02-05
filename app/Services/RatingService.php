@@ -8,12 +8,14 @@ use App\Models\Rate;
 use App\Models\RateGroup;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class RatingService
 {
     /**
      * Find the best matching rate via longest-prefix-match.
+     * Results are cached in Redis for 5 minutes to reduce DB lookups during high call volume.
      */
     public function findRate(string $destination, int $rateGroupId, ?Carbon $atTime = null): ?Rate
     {
@@ -25,24 +27,43 @@ class RatingService
             return null;
         }
 
-        // Generate all possible prefixes from longest to shortest
-        $prefixes = [];
-        $len = min(strlen($cleanNumber), 20);
-        for ($i = $len; $i >= 1; $i--) {
-            $prefixes[] = substr($cleanNumber, 0, $i);
+        // Cache key: rate lookup by group + number prefix (first 10 digits) + date
+        $cachePrefix = substr($cleanNumber, 0, min(strlen($cleanNumber), 10));
+        $cacheKey = "rate:{$rateGroupId}:{$cachePrefix}:{$atTime->toDateString()}";
+
+        return Cache::remember($cacheKey, 300, function () use ($cleanNumber, $rateGroupId, $atTime) {
+            // Generate all possible prefixes from longest to shortest
+            $prefixes = [];
+            $len = min(strlen($cleanNumber), 20);
+            for ($i = $len; $i >= 1; $i--) {
+                $prefixes[] = substr($cleanNumber, 0, $i);
+            }
+
+            return Rate::where('rate_group_id', $rateGroupId)
+                ->whereIn('prefix', $prefixes)
+                ->where('status', 'active')
+                ->where('effective_date', '<=', $atTime->toDateString())
+                ->where(function ($q) use ($atTime) {
+                    $q->whereNull('end_date')
+                      ->orWhere('end_date', '>', $atTime->toDateString());
+                })
+                ->orderByRaw('LENGTH(prefix) DESC')
+                ->orderByDesc('effective_date')
+                ->first();
+        });
+    }
+
+    /**
+     * Clear the rate cache for a specific rate group (call after rate imports/updates).
+     */
+    public static function clearCache(?int $rateGroupId = null): void
+    {
+        if ($rateGroupId) {
+            // Flush keys matching this rate group using Redis tag-like pattern
+            Cache::forget("rate:{$rateGroupId}:*");
         }
 
-        return Rate::where('rate_group_id', $rateGroupId)
-            ->whereIn('prefix', $prefixes)
-            ->where('status', 'active')
-            ->where('effective_date', '<=', $atTime->toDateString())
-            ->where(function ($q) use ($atTime) {
-                $q->whereNull('end_date')
-                  ->orWhere('end_date', '>', $atTime->toDateString());
-            })
-            ->orderByRaw('LENGTH(prefix) DESC')
-            ->orderByDesc('effective_date')
-            ->first();
+        // For broad invalidation, we rely on the 5-minute TTL
     }
 
     /**

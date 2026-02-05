@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\SipAccount;
+use App\Services\AuditService;
 use App\Services\SipProvisioningService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,7 +38,11 @@ class SipAccountController extends Controller
 
         $accounts = $query->orderBy('username')->paginate(50);
 
-        return response()->json($accounts);
+        return response()->json(['data' => $accounts->items(), 'meta' => [
+            'current_page' => $accounts->currentPage(),
+            'last_page' => $accounts->lastPage(),
+            'total' => $accounts->total(),
+        ]]);
     }
 
     public function show(Request $request, SipAccount $sipAccount): JsonResponse
@@ -46,7 +51,7 @@ class SipAccountController extends Controller
 
         $sipAccount->load('user:id,name,email');
 
-        return response()->json($sipAccount);
+        return response()->json(['data' => $sipAccount]);
     }
 
     public function store(Request $request): JsonResponse
@@ -73,7 +78,9 @@ class SipAccountController extends Controller
 
         app(SipProvisioningService::class)->provision($sipAccount);
 
-        return response()->json($sipAccount, 201);
+        AuditService::logCreated($sipAccount, 'api.sip_account.created');
+
+        return response()->json(['data' => $sipAccount], 201);
     }
 
     public function update(Request $request, SipAccount $sipAccount): JsonResponse
@@ -101,11 +108,14 @@ class SipAccountController extends Controller
             ]);
         }
 
+        $original = $sipAccount->getAttributes();
         $sipAccount->update($validated);
 
         app(SipProvisioningService::class)->provision($sipAccount);
 
-        return response()->json($sipAccount);
+        AuditService::logUpdated($sipAccount, $original, 'api.sip_account.updated');
+
+        return response()->json(['data' => $sipAccount]);
     }
 
     public function destroy(Request $request, SipAccount $sipAccount): JsonResponse
@@ -115,6 +125,8 @@ class SipAccountController extends Controller
         if (!$user->isAdmin()) {
             return response()->json(['message' => 'Forbidden.'], 403);
         }
+
+        AuditService::logAction('api.sip_account.deleted', $sipAccount, $sipAccount->toArray());
 
         app(SipProvisioningService::class)->deprovision($sipAccount);
         $sipAccount->delete();

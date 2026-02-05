@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\User;
 use App\Notifications\InvoiceIssuedNotification;
 use App\Services\AuditService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -132,5 +133,14 @@ class InvoiceController extends Controller
         AuditService::logUpdated($invoice, $original, 'invoice.' . $validated['action']);
 
         return back()->with('success', 'Invoice status updated.');
+    }
+
+    public function pdf(Invoice $invoice)
+    {
+        $invoice->load('user');
+
+        $pdf = Pdf::loadView('pdf.invoice', compact('invoice'));
+
+        return $pdf->download("{$invoice->invoice_number}.pdf");
     }
 }
