@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Notifications\InvoiceIssuedNotification;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -110,6 +111,7 @@ class InvoiceController extends Controller
                     return back()->with('warning', 'Only draft invoices can be issued.');
                 }
                 $invoice->update(['status' => 'issued']);
+                $invoice->user->notify(new InvoiceIssuedNotification($invoice));
                 break;
 
             case 'mark_paid':

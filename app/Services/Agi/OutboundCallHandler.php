@@ -7,9 +7,11 @@ use App\Models\DestinationBlacklist;
 use App\Models\DestinationWhitelist;
 use App\Models\SipAccount;
 use App\Models\Trunk;
+use App\Models\User;
 use App\Services\BalanceService;
 use App\Services\RatingService;
 use App\Services\RouteSelectionService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -87,6 +89,36 @@ class OutboundCallHandler
             $agi->verbose("rSwitch: Insufficient balance for user {$user->id}", 1);
             $this->reject($agi, 'no_balance');
             return;
+        }
+
+        // 5a. Daily spend limit
+        if ($user->daily_spend_limit > 0) {
+            $todaySpend = $this->getTodaySpend($user->id);
+            if (bccomp($todaySpend, (string) $user->daily_spend_limit, 4) >= 0) {
+                $agi->verbose("rSwitch: Daily spend limit reached for user {$user->id} ({$todaySpend})", 1);
+                $this->reject($agi, 'daily_spend_limit');
+                return;
+            }
+        }
+
+        // 5b. Daily call limit
+        if ($user->daily_call_limit > 0) {
+            $todayCalls = $this->getTodayCallCount($user->id);
+            if ($todayCalls >= $user->daily_call_limit) {
+                $agi->verbose("rSwitch: Daily call limit reached for user {$user->id} ({$todayCalls})", 1);
+                $this->reject($agi, 'daily_call_limit');
+                return;
+            }
+        }
+
+        // 5c. Max concurrent channels
+        if ($user->max_channels > 0) {
+            $activeCalls = $this->getActiveChannelCount($user->id);
+            if ($activeCalls >= $user->max_channels) {
+                $agi->verbose("rSwitch: Max channels reached for user {$user->id} ({$activeCalls}/{$user->max_channels})", 1);
+                $this->reject($agi, 'max_channels');
+                return;
+            }
         }
 
         // 6. Trunk selection via RouteSelectionService
@@ -320,5 +352,50 @@ class OutboundCallHandler
         }
 
         return [$cliName, $cliNum];
+    }
+
+    /**
+     * Get today's total spend for a user from call_records.
+     */
+    private function getTodaySpend(int $userId): string
+    {
+        $today = now()->toDateString();
+
+        $result = DB::selectOne("
+            SELECT COALESCE(SUM(total_cost), 0) AS spend
+            FROM call_records
+            WHERE user_id = ?
+              AND call_start >= ?
+              AND status != 'unbillable'
+        ", [$userId, $today . ' 00:00:00']);
+
+        return (string) ($result->spend ?? '0');
+    }
+
+    /**
+     * Get today's total call count for a user.
+     */
+    private function getTodayCallCount(int $userId): int
+    {
+        $today = now()->toDateString();
+
+        $result = DB::selectOne("
+            SELECT COUNT(*) AS cnt
+            FROM call_records
+            WHERE user_id = ?
+              AND call_start >= ?
+        ", [$userId, $today . ' 00:00:00']);
+
+        return (int) ($result->cnt ?? 0);
+    }
+
+    /**
+     * Get count of currently active (in_progress) calls for a user.
+     */
+    private function getActiveChannelCount(int $userId): int
+    {
+        return CallRecord::where('user_id', $userId)
+            ->where('status', 'in_progress')
+            ->count();
     }
 }

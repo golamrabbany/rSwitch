@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\KycDocument;
 use App\Models\KycProfile;
 use App\Models\User;
+use App\Notifications\KycStatusNotification;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -48,6 +49,8 @@ class KycController extends Controller
 
         AuditService::logAction('kyc.approved', $kycProfile, ['user_id' => $user->id, 'user_name' => $user->name]);
 
+        $user->notify(new KycStatusNotification('approved'));
+
         return back()->with('success', 'KYC approved for ' . $user->name);
     }
 
@@ -69,6 +72,8 @@ class KycController extends Controller
         ]);
 
         AuditService::logAction('kyc.rejected', $kycProfile, ['user_id' => $user->id, 'reason' => $request->reason]);
+
+        $user->notify(new KycStatusNotification('rejected', $request->reason));
 
         return back()->with('success', 'KYC rejected for ' . $user->name);
     }
