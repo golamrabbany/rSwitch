@@ -72,6 +72,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     // Destination blacklist/whitelist
     Route::resource('blacklist', Admin\BlacklistController::class)->except(['show']);
     Route::resource('whitelist', Admin\WhitelistController::class)->except(['show']);
+
+    // Transfer logs
+    Route::get('transfer-logs', [Admin\TransferLogController::class, 'index'])->name('transfer-logs.index');
+    Route::get('transfer-logs/{transferLog}', [Admin\TransferLogController::class, 'show'])->name('transfer-logs.show');
+
+    // Rate imports history
+    Route::get('rate-imports', [Admin\RateImportController::class, 'index'])->name('rate-imports.index');
+    Route::get('rate-imports/{rateImport}', [Admin\RateImportController::class, 'show'])->name('rate-imports.show');
 });
 
 // Reseller routes
