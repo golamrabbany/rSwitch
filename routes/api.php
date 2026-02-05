@@ -4,7 +4,7 @@ use App\Http\Controllers\Api\V1;
 use Illuminate\Support\Facades\Route;
 
 // Public: issue API token
-Route::post('v1/auth/token', [V1\AuthController::class, 'token']);
+Route::post('v1/auth/token', [V1\AuthController::class, 'token'])->middleware('throttle:5,1');
 
 // Authenticated API routes
 Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->group(function () {

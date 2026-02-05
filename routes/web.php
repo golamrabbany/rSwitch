@@ -61,7 +61,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('transactions/{transaction}', [Admin\TransactionController::class, 'show'])->name('transactions.show');
 
     Route::get('balance/create', [Admin\BalanceController::class, 'create'])->name('balance.create');
-    Route::post('balance', [Admin\BalanceController::class, 'store'])->name('balance.store');
+    Route::post('balance', [Admin\BalanceController::class, 'store'])->middleware('throttle:30,1')->name('balance.store');
 
     Route::resource('invoices', Admin\InvoiceController::class)->only(['index', 'create', 'store', 'show', 'update']);
     Route::get('invoices/{invoice}/pdf', [Admin\InvoiceController::class, 'pdf'])->name('invoices.pdf');
@@ -148,14 +148,14 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
 
         // Payments / Stripe top-up
         Route::get('payments/create', [Client\PaymentController::class, 'create'])->name('payments.create');
-        Route::post('payments/checkout', [Client\PaymentController::class, 'checkout'])->name('payments.checkout');
+        Route::post('payments/checkout', [Client\PaymentController::class, 'checkout'])->middleware('throttle:10,1')->name('payments.checkout');
         Route::get('payments/success', [Client\PaymentController::class, 'success'])->name('payments.success');
     });
 });
 
 // Two-factor authentication challenge (guest — user not yet authenticated)
 Route::get('two-factor/challenge', [TwoFactorController::class, 'challenge'])->name('two-factor.challenge');
-Route::post('two-factor/verify', [TwoFactorController::class, 'verify'])->name('two-factor.verify');
+Route::post('two-factor/verify', [TwoFactorController::class, 'verify'])->middleware('throttle:5,1')->name('two-factor.verify');
 
 // Two-factor authentication management (authenticated)
 Route::middleware('auth')->group(function () {
