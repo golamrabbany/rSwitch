@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'rSwitch') }} - Reseller</title>
+        <title>{{ config('app.name', 'rSwitch') }} - Client</title>
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
@@ -26,7 +26,7 @@
             <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
                    class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transition-transform duration-300 ease-in-out lg:translate-x-0">
                 <div class="flex h-16 items-center justify-between px-6 border-b border-gray-800">
-                    <a href="{{ route('reseller.dashboard') }}" class="text-xl font-bold text-white">rSwitch</a>
+                    <a href="{{ route('client.dashboard') }}" class="text-xl font-bold text-white">rSwitch</a>
                     <button @click="sidebarOpen = false" class="lg:hidden text-gray-400 hover:text-white">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -35,52 +35,52 @@
                 </div>
 
                 <nav class="mt-6 px-3 space-y-1">
-                    <a href="{{ route('reseller.dashboard') }}"
-                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('reseller.dashboard') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                    <a href="{{ route('client.dashboard') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('client.dashboard') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4"/>
                         </svg>
                         Dashboard
                     </a>
 
-                    <a href="{{ route('reseller.clients.index') }}"
-                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('reseller.clients.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
-                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
-                        </svg>
-                        Clients
-                    </a>
-
-                    <a href="{{ route('reseller.sip-accounts.index') }}"
-                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('reseller.sip-accounts.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                    <a href="{{ route('client.sip-accounts.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('client.sip-accounts.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                         </svg>
                         SIP Accounts
                     </a>
 
-                    <a href="{{ route('reseller.cdr.index') }}"
-                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('reseller.cdr.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                    <a href="{{ route('client.dids.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('client.dids.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                        </svg>
+                        DIDs
+                    </a>
+
+                    <a href="{{ route('client.cdr.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('client.cdr.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
                         CDR / Reports
                     </a>
 
-                    <a href="{{ route('reseller.transactions.index') }}"
-                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('reseller.transactions.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                    <a href="{{ route('client.transactions.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('client.transactions.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
                         </svg>
                         Transactions
                     </a>
 
-                    <a href="{{ route('reseller.balance.create') }}"
-                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('reseller.balance.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                    <a href="{{ route('client.invoices.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('client.invoices.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                         <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
                         </svg>
-                        Topup Client
+                        Invoices
                     </a>
                 </nav>
 

@@ -106,6 +106,62 @@
                         </svg>
                         Rates
                     </a>
+
+                    <div class="mt-4 pt-4 border-t border-gray-800">
+                        <p class="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Financial</p>
+                    </div>
+
+                    <a href="{{ route('admin.transactions.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('admin.transactions.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                        </svg>
+                        Transactions
+                    </a>
+
+                    <a href="{{ route('admin.balance.create') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('admin.balance.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                        Balance
+                    </a>
+
+                    <a href="{{ route('admin.invoices.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('admin.invoices.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                        </svg>
+                        Invoices
+                    </a>
+
+                    <a href="{{ route('admin.payments.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('admin.payments.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                        </svg>
+                        Payments
+                    </a>
+
+                    <div class="mt-4 pt-4 border-t border-gray-800">
+                        <p class="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">System</p>
+                    </div>
+
+                    <a href="{{ route('admin.audit-logs.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('admin.audit-logs.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Audit Logs
+                    </a>
+
+                    <a href="{{ route('admin.blacklist.index') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('admin.blacklist.*', 'admin.whitelist.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                        </svg>
+                        Blacklist / Whitelist
+                    </a>
                 </nav>
 
                 {{-- Sidebar footer --}}
