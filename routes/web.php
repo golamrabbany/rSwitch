@@ -3,7 +3,9 @@
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\Client;
 use App\Http\Controllers\Reseller;
+use App\Http\Controllers\Webhook;
 use App\Http\Controllers\KycSubmissionController;
+use App\Http\Controllers\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
@@ -87,6 +89,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('settings', [Admin\SystemSettingController::class, 'index'])->name('settings.index');
     Route::put('settings', [Admin\SystemSettingController::class, 'update'])->name('settings.update');
 
+    // Webhook endpoints
+    Route::resource('webhooks', Admin\WebhookEndpointController::class);
+    Route::post('webhooks/{webhook}/regenerate-secret', [Admin\WebhookEndpointController::class, 'regenerateSecret'])->name('webhooks.regenerate-secret');
+
     // Bulk import
     Route::get('bulk-import', [Admin\BulkImportController::class, 'index'])->name('bulk-import.index');
     Route::post('bulk-import/users', [Admin\BulkImportController::class, 'importUsers'])->name('bulk-import.users');
@@ -139,7 +145,24 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::get('invoices', [Client\InvoiceController::class, 'index'])->name('invoices.index');
         Route::get('invoices/{invoice}', [Client\InvoiceController::class, 'show'])->name('invoices.show');
         Route::get('invoices/{invoice}/pdf', [Client\InvoiceController::class, 'pdf'])->name('invoices.pdf');
+
+        // Payments / Stripe top-up
+        Route::get('payments/create', [Client\PaymentController::class, 'create'])->name('payments.create');
+        Route::post('payments/checkout', [Client\PaymentController::class, 'checkout'])->name('payments.checkout');
+        Route::get('payments/success', [Client\PaymentController::class, 'success'])->name('payments.success');
     });
+});
+
+// Two-factor authentication challenge (guest — user not yet authenticated)
+Route::get('two-factor/challenge', [TwoFactorController::class, 'challenge'])->name('two-factor.challenge');
+Route::post('two-factor/verify', [TwoFactorController::class, 'verify'])->name('two-factor.verify');
+
+// Two-factor authentication management (authenticated)
+Route::middleware('auth')->group(function () {
+    Route::get('two-factor/setup', [TwoFactorController::class, 'setup'])->name('two-factor.setup');
+    Route::post('two-factor/confirm', [TwoFactorController::class, 'confirm'])->name('two-factor.confirm');
+    Route::get('two-factor/status', [TwoFactorController::class, 'status'])->name('two-factor.status');
+    Route::delete('two-factor', [TwoFactorController::class, 'disable'])->name('two-factor.disable');
 });
 
 // KYC submission (reseller and client)
@@ -148,5 +171,8 @@ Route::middleware(['auth', 'role:reseller,client'])->group(function () {
     Route::post('kyc', [KycSubmissionController::class, 'store'])->name('kyc.store');
     Route::post('kyc/upload', [KycSubmissionController::class, 'uploadDocument'])->name('kyc.upload');
 });
+
+// Stripe webhook (no CSRF, signature verified in controller)
+Route::post('webhook/stripe', [Webhook\StripeWebhookController::class, 'handle'])->name('webhook.stripe');
 
 require __DIR__.'/auth.php';

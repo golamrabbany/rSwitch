@@ -82,6 +82,14 @@
                         </svg>
                         Invoices
                     </a>
+
+                    <a href="{{ route('client.payments.create') }}"
+                       class="flex items-center px-3 py-2 text-sm font-medium rounded-md {{ request()->routeIs('client.payments.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                        <svg class="mr-3 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/>
+                        </svg>
+                        Add Funds
+                    </a>
                 </nav>
 
                 {{-- Sidebar footer --}}

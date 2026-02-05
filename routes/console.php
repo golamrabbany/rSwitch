@@ -30,3 +30,7 @@ Schedule::command('billing:generate-invoices')
 Schedule::command('billing:check-low-balances')
     ->hourly()
     ->withoutOverlapping();
+
+Schedule::command('data:purge')
+    ->dailyAt('03:00')
+    ->withoutOverlapping();
