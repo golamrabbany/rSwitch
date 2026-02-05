@@ -42,6 +42,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::post('trunk-routes/test', [Admin\TrunkRouteController::class, 'testRoute'])->name('trunk-routes.test');
     Route::resource('trunk-routes', Admin\TrunkRouteController::class)->except(['show']);
 
+    Route::resource('ring-groups', Admin\RingGroupController::class);
     Route::resource('dids', Admin\DidController::class);
 
     Route::resource('rate-groups', Admin\RateGroupController::class);
@@ -81,6 +82,16 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     // Rate imports history
     Route::get('rate-imports', [Admin\RateImportController::class, 'index'])->name('rate-imports.index');
     Route::get('rate-imports/{rateImport}', [Admin\RateImportController::class, 'show'])->name('rate-imports.show');
+
+    // System settings
+    Route::get('settings', [Admin\SystemSettingController::class, 'index'])->name('settings.index');
+    Route::put('settings', [Admin\SystemSettingController::class, 'update'])->name('settings.update');
+
+    // Bulk import
+    Route::get('bulk-import', [Admin\BulkImportController::class, 'index'])->name('bulk-import.index');
+    Route::post('bulk-import/users', [Admin\BulkImportController::class, 'importUsers'])->name('bulk-import.users');
+    Route::post('bulk-import/sip-accounts', [Admin\BulkImportController::class, 'importSipAccounts'])->name('bulk-import.sip-accounts');
+    Route::post('bulk-import/dids', [Admin\BulkImportController::class, 'importDids'])->name('bulk-import.dids');
 });
 
 // Reseller routes

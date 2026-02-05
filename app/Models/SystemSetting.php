@@ -1,0 +1,100 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
+
+class SystemSetting extends Model
+{
+    protected $primaryKey = 'key';
+    public $incrementing = false;
+    protected $keyType = 'string';
+
+    protected $fillable = ['key', 'value', 'type', 'group', 'label', 'description'];
+
+    /**
+     * Get a setting value with optional default.
+     */
+    public static function get(string $key, mixed $default = null): mixed
+    {
+        $setting = Cache::remember("setting:{$key}", 300, function () use ($key) {
+            return static::find($key);
+        });
+
+        if (!$setting) {
+            return $default;
+        }
+
+        return match ($setting->type) {
+            'integer' => (int) $setting->value,
+            'float'   => (float) $setting->value,
+            'boolean' => filter_var($setting->value, FILTER_VALIDATE_BOOLEAN),
+            'json'    => json_decode($setting->value, true),
+            default   => $setting->value,
+        };
+    }
+
+    /**
+     * Set a setting value.
+     */
+    public static function set(string $key, mixed $value): void
+    {
+        $setting = static::find($key);
+
+        if ($setting) {
+            $storeValue = is_array($value) ? json_encode($value) : (string) $value;
+            $setting->update(['value' => $storeValue]);
+        } else {
+            static::create([
+                'key'   => $key,
+                'value' => is_array($value) ? json_encode($value) : (string) $value,
+                'type'  => is_array($value) ? 'json' : (is_bool($value) ? 'boolean' : 'string'),
+            ]);
+        }
+
+        Cache::forget("setting:{$key}");
+    }
+
+    /**
+     * Get all settings grouped.
+     */
+    public static function allGrouped(): array
+    {
+        return static::orderBy('group')->orderBy('key')
+            ->get()
+            ->groupBy('group')
+            ->toArray();
+    }
+
+    /**
+     * Seed default settings.
+     */
+    public static function seedDefaults(): void
+    {
+        $defaults = [
+            ['key' => 'company_name', 'value' => 'rSwitch', 'type' => 'string', 'group' => 'general', 'label' => 'Company Name', 'description' => 'Company name shown in invoices and emails.'],
+            ['key' => 'company_address', 'value' => '', 'type' => 'string', 'group' => 'general', 'label' => 'Company Address', 'description' => 'Full company address for invoices.'],
+            ['key' => 'company_email', 'value' => '', 'type' => 'string', 'group' => 'general', 'label' => 'Support Email', 'description' => 'Email displayed in notifications.'],
+            ['key' => 'default_currency', 'value' => 'USD', 'type' => 'string', 'group' => 'general', 'label' => 'Default Currency', 'description' => 'Currency code for new users.'],
+
+            ['key' => 'default_billing_type', 'value' => 'prepaid', 'type' => 'string', 'group' => 'billing', 'label' => 'Default Billing Type', 'description' => 'Default billing type for new users (prepaid or postpaid).'],
+            ['key' => 'default_credit_limit', 'value' => '0', 'type' => 'float', 'group' => 'billing', 'label' => 'Default Credit Limit', 'description' => 'Default credit limit for postpaid users.'],
+            ['key' => 'low_balance_threshold', 'value' => '5.00', 'type' => 'float', 'group' => 'billing', 'label' => 'Low Balance Threshold', 'description' => 'Send low-balance alerts when balance drops below this.'],
+            ['key' => 'invoice_prefix', 'value' => 'INV', 'type' => 'string', 'group' => 'billing', 'label' => 'Invoice Number Prefix', 'description' => 'Prefix for auto-generated invoice numbers.'],
+            ['key' => 'invoice_due_days', 'value' => '30', 'type' => 'integer', 'group' => 'billing', 'label' => 'Invoice Due Days', 'description' => 'Days until invoice is due after issuance.'],
+
+            ['key' => 'default_max_channels', 'value' => '10', 'type' => 'integer', 'group' => 'sip', 'label' => 'Default Max Channels', 'description' => 'Default max concurrent calls per SIP account.'],
+            ['key' => 'default_codec_allow', 'value' => 'ulaw,alaw,g729,opus', 'type' => 'string', 'group' => 'sip', 'label' => 'Default Codecs', 'description' => 'Default allowed codecs for new SIP accounts.'],
+            ['key' => 'sip_password_length', 'value' => '20', 'type' => 'integer', 'group' => 'sip', 'label' => 'Auto Password Length', 'description' => 'Length of auto-generated SIP passwords.'],
+
+            ['key' => 'cdr_retention_days', 'value' => '365', 'type' => 'integer', 'group' => 'system', 'label' => 'CDR Retention Days', 'description' => 'Number of days to retain call records.'],
+            ['key' => 'audit_retention_days', 'value' => '180', 'type' => 'integer', 'group' => 'system', 'label' => 'Audit Log Retention Days', 'description' => 'Number of days to retain audit logs.'],
+            ['key' => 'api_rate_limit', 'value' => '60', 'type' => 'integer', 'group' => 'system', 'label' => 'API Rate Limit', 'description' => 'Max API requests per minute per user.'],
+        ];
+
+        foreach ($defaults as $setting) {
+            static::firstOrCreate(['key' => $setting['key']], $setting);
+        }
+    }
+}

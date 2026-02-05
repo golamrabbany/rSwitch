@@ -4,6 +4,7 @@ namespace App\Services\Agi;
 
 use App\Models\CallRecord;
 use App\Models\Did;
+use App\Models\RingGroup;
 use App\Models\Trunk;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -43,6 +44,7 @@ class InboundCallHandler
         // 3. Route to destination
         $dialString = '';
         $destinationDesc = '';
+        $ringTimeout = null;
 
         switch ($did->destination_type) {
             case 'sip_account':
@@ -57,6 +59,29 @@ class InboundCallHandler
 
                 $dialString = "PJSIP/{$sipAccount->username}";
                 $destinationDesc = "SIP:{$sipAccount->username}";
+                break;
+
+            case 'ring_group':
+                $ringGroup = RingGroup::with('activeMembers')->find($did->destination_id);
+
+                if (!$ringGroup || $ringGroup->status !== 'active') {
+                    $agi->verbose("rSwitch: DID {$extension} ring group inactive or missing", 1);
+                    $agi->setVariable('ROUTE_ACTION', 'REJECT');
+                    $agi->setVariable('ROUTE_REJECT_REASON', 'destination_unavailable');
+                    return;
+                }
+
+                $dialString = $ringGroup->buildDialString();
+
+                if (empty($dialString)) {
+                    $agi->verbose("rSwitch: Ring group {$ringGroup->name} has no active members", 1);
+                    $agi->setVariable('ROUTE_ACTION', 'REJECT');
+                    $agi->setVariable('ROUTE_REJECT_REASON', 'no_ring_group_members');
+                    return;
+                }
+
+                $destinationDesc = "RG:{$ringGroup->name}";
+                $ringTimeout = $ringGroup->ring_timeout;
                 break;
 
             case 'external':
@@ -115,7 +140,7 @@ class InboundCallHandler
         $agi->setVariable('ROUTE_ACTION', 'DIAL');
         $agi->setVariable('ROUTE_DIAL_STRING', $dialString);
         $agi->setVariable('ROUTE_FAILOVER', '');
-        $agi->setVariable('ROUTE_DIAL_TIMEOUT', '60');
+        $agi->setVariable('ROUTE_DIAL_TIMEOUT', (string) ($ringTimeout ?? 60));
         $agi->setVariable('CDR_UUID', $uuid);
 
         $agi->verbose("rSwitch: DID {$extension} -> {$dialString}", 2);

@@ -63,6 +63,14 @@
                                     </a>
                                     <span class="text-gray-500">— {{ $destinationSip->user->name ?? 'Unknown' }}</span>
                                 </span>
+                            @elseif ($did->destination_type === 'ring_group' && $destinationRingGroup)
+                                <span class="inline-flex items-center gap-1">
+                                    <span class="text-xs font-medium text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">RING</span>
+                                    <a href="{{ route('admin.ring-groups.show', $destinationRingGroup) }}" class="text-indigo-600 hover:text-indigo-500">
+                                        {{ $destinationRingGroup->name }}
+                                    </a>
+                                    <span class="text-gray-500">— {{ $destinationRingGroup->members_count }} members, {{ ucfirst($destinationRingGroup->strategy) }}</span>
+                                </span>
                             @elseif ($did->destination_type === 'external' && $did->destination_number)
                                 <span class="inline-flex items-center gap-1">
                                     <span class="text-xs font-medium text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">EXT</span>

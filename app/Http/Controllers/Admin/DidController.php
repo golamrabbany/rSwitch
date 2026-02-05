@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Did;
+use App\Models\RingGroup;
 use App\Models\SipAccount;
 use App\Models\Trunk;
 use App\Models\User;
@@ -60,9 +61,11 @@ class DidController extends Controller
             ->orderBy('username')
             ->get();
 
+        $ringGroups = RingGroup::where('status', 'active')->orderBy('name')->get();
+
         $selectedUserId = $request->query('user_id');
 
-        return view('admin.dids.create', compact('trunks', 'users', 'sipAccounts', 'selectedUserId'));
+        return view('admin.dids.create', compact('trunks', 'users', 'sipAccounts', 'ringGroups', 'selectedUserId'));
     }
 
     public function store(Request $request)
@@ -91,11 +94,14 @@ class DidController extends Controller
         $did->load('trunk', 'assignedUser');
 
         $destinationSip = null;
+        $destinationRingGroup = null;
         if ($did->destination_type === 'sip_account' && $did->destination_id) {
             $destinationSip = SipAccount::with('user')->find($did->destination_id);
+        } elseif ($did->destination_type === 'ring_group' && $did->destination_id) {
+            $destinationRingGroup = RingGroup::withCount('members')->find($did->destination_id);
         }
 
-        return view('admin.dids.show', compact('did', 'destinationSip'));
+        return view('admin.dids.show', compact('did', 'destinationSip', 'destinationRingGroup'));
     }
 
     public function edit(Did $did)
@@ -115,7 +121,9 @@ class DidController extends Controller
             ->orderBy('username')
             ->get();
 
-        return view('admin.dids.edit', compact('did', 'trunks', 'users', 'sipAccounts'));
+        $ringGroups = RingGroup::where('status', 'active')->orderBy('name')->get();
+
+        return view('admin.dids.edit', compact('did', 'trunks', 'users', 'sipAccounts', 'ringGroups'));
     }
 
     public function update(Request $request, Did $did)
@@ -167,8 +175,8 @@ class DidController extends Controller
             'provider'            => ['required', 'string', 'max:100'],
             'trunk_id'            => ['required', 'exists:trunks,id'],
             'assigned_to_user_id' => ['nullable', 'exists:users,id'],
-            'destination_type'    => ['required', Rule::in(['sip_account', 'external'])],
-            'destination_id'      => ['nullable', 'required_if:destination_type,sip_account', 'exists:sip_accounts,id'],
+            'destination_type'    => ['required', Rule::in(['sip_account', 'ring_group', 'external'])],
+            'destination_id'      => ['nullable', 'required_if:destination_type,sip_account', 'required_if:destination_type,ring_group'],
             'destination_number'  => ['nullable', 'required_if:destination_type,external', 'string', 'max:30'],
             'monthly_cost'        => ['required', 'numeric', 'min:0', 'max:9999.9999'],
             'monthly_price'       => ['required', 'numeric', 'min:0', 'max:9999.9999'],
@@ -177,10 +185,10 @@ class DidController extends Controller
 
     protected function cleanDestinationFields(array &$validated): void
     {
-        if ($validated['destination_type'] === 'sip_account') {
-            $validated['destination_number'] = null;
-        } else {
-            $validated['destination_id'] = null;
-        }
+        match ($validated['destination_type']) {
+            'sip_account' => $validated['destination_number'] = null,
+            'ring_group'  => $validated['destination_number'] = null,
+            'external'    => $validated['destination_id'] = null,
+        };
     }
 }

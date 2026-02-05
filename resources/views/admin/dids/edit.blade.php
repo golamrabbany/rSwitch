@@ -84,7 +84,7 @@
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         <option value="sip_account">SIP Account</option>
                         <option value="external">External Number</option>
-                        <option value="ring_group" disabled>Ring Group (Coming Soon)</option>
+                        <option value="ring_group">Ring Group</option>
                     </select>
                     <x-input-error :messages="$errors->get('destination_type')" class="mt-2" />
                 </div>
@@ -101,6 +101,21 @@
                         @endforeach
                     </select>
                     <p class="mt-1 text-xs text-gray-500">Incoming calls to this DID will ring this SIP account.</p>
+                    <x-input-error :messages="$errors->get('destination_id')" class="mt-2" />
+                </div>
+
+                <div x-show="destinationType === 'ring_group'" x-cloak>
+                    <label for="destination_id_rg" class="block text-sm font-medium text-gray-700">Ring Group</label>
+                    <select id="destination_id_rg" name="destination_id"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <option value="">Select ring group...</option>
+                        @foreach ($ringGroups as $rg)
+                            <option value="{{ $rg->id }}" {{ old('destination_id', $did->destination_type === 'ring_group' ? $did->destination_id : '') == $rg->id ? 'selected' : '' }}>
+                                {{ $rg->name }} — {{ ucfirst($rg->strategy) }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">Incoming calls will ring all members of the selected ring group.</p>
                     <x-input-error :messages="$errors->get('destination_id')" class="mt-2" />
                 </div>
 

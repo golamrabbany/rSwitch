@@ -40,6 +40,11 @@ class Did extends Model
         return $this->belongsTo(SipAccount::class, 'destination_id');
     }
 
+    public function destinationRingGroup(): BelongsTo
+    {
+        return $this->belongsTo(RingGroup::class, 'destination_id');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

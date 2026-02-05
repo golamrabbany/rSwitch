@@ -1,0 +1,765 @@
+openapi: 3.0.3
+info:
+  title: rSwitch API
+  description: |
+    REST API for the rSwitch VoIP Softswitch platform. Provides endpoints for managing
+    SIP accounts, DIDs, CDR records, balance operations, and rate lookups.
+
+    ## Authentication
+    All endpoints except `POST /auth/token` require Bearer token authentication.
+    Obtain a token by sending credentials to the token endpoint.
+
+    ## Rate Limiting
+    API requests are throttled per user. Default: 60 requests/minute.
+
+    ## Role-Based Access
+    - **Admin**: Full access to all resources
+    - **Reseller**: Access to own resources and descendants (clients)
+    - **Client**: Access to own resources only (limited update on SIP accounts)
+  version: 1.0.0
+  contact:
+    name: rSwitch Support
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum Token
+      description: "Bearer token from POST /auth/token"
+
+  schemas:
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        last_page:
+          type: integer
+          example: 5
+        total:
+          type: integer
+          example: 250
+
+    UserBrief:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+
+    SipAccount:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        username:
+          type: string
+          example: "1001"
+        auth_type:
+          type: string
+          enum: [password, ip, both]
+        allowed_ips:
+          type: string
+          nullable: true
+          example: "192.168.1.100"
+        caller_id_name:
+          type: string
+          nullable: true
+        caller_id_number:
+          type: string
+          nullable: true
+        max_channels:
+          type: integer
+          example: 10
+        codec_allow:
+          type: string
+          nullable: true
+          example: "ulaw,alaw,g729"
+        status:
+          type: string
+          enum: [active, suspended, disabled]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/UserBrief'
+
+    Did:
+      type: object
+      properties:
+        id:
+          type: integer
+        number:
+          type: string
+          example: "+18005551234"
+        provider:
+          type: string
+        trunk_id:
+          type: integer
+        assigned_to_user_id:
+          type: integer
+          nullable: true
+        destination_type:
+          type: string
+          enum: [sip_account, ring_group, external]
+        destination_id:
+          type: integer
+          nullable: true
+        destination_number:
+          type: string
+          nullable: true
+        monthly_cost:
+          type: string
+          example: "1.5000"
+        monthly_price:
+          type: string
+          example: "3.0000"
+        status:
+          type: string
+          enum: [active, unassigned, disabled]
+        created_at:
+          type: string
+          format: date-time
+
+    CallRecord:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        user_id:
+          type: integer
+        call_flow:
+          type: string
+          enum: [inbound, outbound]
+        caller:
+          type: string
+        callee:
+          type: string
+        call_start:
+          type: string
+          format: date-time
+        duration:
+          type: integer
+          description: Total duration in seconds
+        billsec:
+          type: integer
+          description: Billable seconds
+        disposition:
+          type: string
+          enum: [ANSWERED, NO ANSWER, BUSY, FAILED, CANCEL]
+        total_cost:
+          type: string
+          example: "0.1500"
+        status:
+          type: string
+          enum: [in_progress, rated, unbillable, unrated]
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+
+paths:
+  /auth/token:
+    post:
+      summary: Issue API Token
+      description: Authenticate with email/password and receive a Bearer token.
+      operationId: issueToken
+      security: []
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, device_name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "admin@example.com"
+                password:
+                  type: string
+                  example: "password"
+                device_name:
+                  type: string
+                  example: "My App"
+                  maxLength: 255
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "1|abc123def456..."
+                  user:
+                    $ref: '#/components/schemas/UserBrief'
+        '422':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/me:
+    get:
+      summary: Get Authenticated User
+      description: Returns the profile of the currently authenticated user.
+      operationId: getMe
+      tags: [Authentication]
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+                  email:
+                    type: string
+                  role:
+                    type: string
+                    enum: [admin, reseller, client]
+                  status:
+                    type: string
+                  billing_type:
+                    type: string
+                    enum: [prepaid, postpaid]
+                  balance:
+                    type: string
+                  currency:
+                    type: string
+                  rate_group_id:
+                    type: integer
+                    nullable: true
+        '401':
+          description: Unauthenticated
+
+  /auth/revoke:
+    post:
+      summary: Revoke Current Token
+      description: Revokes the token used to authenticate this request.
+      operationId: revokeToken
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Token revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Token revoked."
+
+  /sip-accounts:
+    get:
+      summary: List SIP Accounts
+      description: |
+        Returns SIP accounts visible to the authenticated user.
+        - Admin: all accounts (filterable by user_id)
+        - Reseller: accounts belonging to own clients
+        - Client: own accounts only
+      operationId: listSipAccounts
+      tags: [SIP Accounts]
+      parameters:
+        - name: user_id
+          in: query
+          description: Filter by user (admin only)
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, suspended, disabled]
+        - name: search
+          in: query
+          description: Prefix search on username
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SipAccount'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      summary: Create SIP Account
+      description: Create a new SIP account. Admin and reseller only.
+      operationId: createSipAccount
+      tags: [SIP Accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, username, password, auth_type]
+              properties:
+                user_id:
+                  type: integer
+                username:
+                  type: string
+                  maxLength: 50
+                  pattern: "^[a-zA-Z0-9._-]+$"
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 64
+                auth_type:
+                  type: string
+                  enum: [password, ip, both]
+                allowed_ips:
+                  type: string
+                  maxLength: 500
+                caller_id_name:
+                  type: string
+                  maxLength: 80
+                caller_id_number:
+                  type: string
+                  maxLength: 20
+                max_channels:
+                  type: integer
+                  minimum: 1
+                  maximum: 1000
+                codec_allow:
+                  type: string
+                  maxLength: 100
+      responses:
+        '201':
+          description: SIP account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SipAccount'
+        '403':
+          description: Forbidden (client role)
+        '422':
+          description: Validation error
+
+  /sip-accounts/{id}:
+    get:
+      summary: Get SIP Account
+      operationId: getSipAccount
+      tags: [SIP Accounts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: SIP account details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SipAccount'
+        '403':
+          description: Forbidden
+        '404':
+          description: Not found
+    put:
+      summary: Update SIP Account
+      description: |
+        Clients can only update: password, caller_id_name, caller_id_number.
+        Admin/Reseller can update all fields.
+      operationId: updateSipAccount
+      tags: [SIP Accounts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 64
+                auth_type:
+                  type: string
+                  enum: [password, ip, both]
+                allowed_ips:
+                  type: string
+                caller_id_name:
+                  type: string
+                caller_id_number:
+                  type: string
+                max_channels:
+                  type: integer
+                codec_allow:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, suspended, disabled]
+      responses:
+        '200':
+          description: Updated SIP account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SipAccount'
+    delete:
+      summary: Delete SIP Account
+      description: Admin only. Deprovisions from Asterisk.
+      operationId: deleteSipAccount
+      tags: [SIP Accounts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '403':
+          description: Forbidden (non-admin)
+
+  /dids:
+    get:
+      summary: List DIDs
+      description: Returns DIDs visible to the authenticated user (role-scoped).
+      operationId: listDids
+      tags: [DIDs]
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search DID number
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated DID list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Did'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /dids/{id}:
+    get:
+      summary: Get DID Details
+      operationId: getDid
+      tags: [DIDs]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: DID details with relationships
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Did'
+
+  /cdr:
+    get:
+      summary: List Call Records
+      description: |
+        Returns CDR records. Always requires date range (defaults to last 7 days).
+        Results are scoped by role.
+      operationId: listCdr
+      tags: [CDR]
+      parameters:
+        - name: date_from
+          in: query
+          description: Start date (YYYY-MM-DD), defaults to 7 days ago
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: End date (YYYY-MM-DD), defaults to today
+          schema:
+            type: string
+            format: date
+        - name: user_id
+          in: query
+          description: Filter by user (admin only)
+          schema:
+            type: integer
+        - name: disposition
+          in: query
+          schema:
+            type: string
+        - name: call_flow
+          in: query
+          schema:
+            type: string
+            enum: [inbound, outbound]
+        - name: search
+          in: query
+          description: Prefix search on caller/callee
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated CDR list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CallRecord'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /cdr/{uuid}:
+    get:
+      summary: Get Call Record
+      operationId: getCdr
+      tags: [CDR]
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          description: Call date for partition-aware lookup (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Call record details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallRecord'
+        '404':
+          description: Not found
+
+  /balance:
+    get:
+      summary: Check Balance
+      description: Returns the balance and billing info for the authenticated user.
+      operationId: checkBalance
+      tags: [Balance]
+      responses:
+        '200':
+          description: Balance info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: string
+                    example: "1000.5000"
+                  currency:
+                    type: string
+                    example: "USD"
+                  billing_type:
+                    type: string
+                    enum: [prepaid, postpaid]
+                  credit_limit:
+                    type: string
+                    example: "0.0000"
+                  available:
+                    type: string
+                    example: "1000.5000"
+
+  /balance/topup:
+    post:
+      summary: Top Up User Balance
+      description: Admin or reseller top-up a user's balance. Resellers can only top up their own clients.
+      operationId: topupBalance
+      tags: [Balance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, amount]
+              properties:
+                user_id:
+                  type: integer
+                  description: User to credit
+                amount:
+                  type: number
+                  minimum: 0.01
+                  maximum: 999999.99
+                notes:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Balance credited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  transaction_id:
+                    type: integer
+                  new_balance:
+                    type: string
+        '403':
+          description: Forbidden (client role or reseller trying to top up non-client)
+
+  /rates/lookup:
+    get:
+      summary: Rate Lookup
+      description: |
+        Look up the rate for a destination number. Returns rate details and
+        cost estimates for 1, 3, 5, and 10 minute calls.
+      operationId: rateLookup
+      tags: [Rates]
+      parameters:
+        - name: destination
+          in: query
+          required: true
+          description: "Destination number (E.164 format, e.g. 447700123456)"
+          schema:
+            type: string
+            maxLength: 30
+      responses:
+        '200':
+          description: Rate found with cost estimates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  destination:
+                    type: string
+                  prefix:
+                    type: string
+                    description: Matched rate prefix
+                  rate_per_minute:
+                    type: string
+                  connection_fee:
+                    type: string
+                  min_duration:
+                    type: integer
+                  billing_increment:
+                    type: integer
+                  destination_name:
+                    type: string
+                  estimates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        duration_seconds:
+                          type: integer
+                        billable_seconds:
+                          type: integer
+                        cost:
+                          type: string
+        '404':
+          description: No rate found or no rate group assigned
+
+tags:
+  - name: Authentication
+    description: Token management
+  - name: SIP Accounts
+    description: SIP account CRUD
+  - name: DIDs
+    description: DID numbers (read-only via API)
+  - name: CDR
+    description: Call Detail Records
+  - name: Balance
+    description: Balance check and top-up
+  - name: Rates
+    description: Rate lookup
