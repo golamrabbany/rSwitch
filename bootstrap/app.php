@@ -29,7 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'kyc.approved' => KycApprovedMiddleware::class,
         ]);
 
-        if (! app()->environment('testing')) {
+        if (env('APP_ENV') !== 'testing') {
             $middleware->throttleWithRedis();
         }
 
