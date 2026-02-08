@@ -1,84 +1,139 @@
 <x-reseller-layout>
     <x-slot name="header">Clients</x-slot>
 
-    {{-- Filters --}}
-    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <form method="GET" class="flex flex-wrap items-center gap-3">
-            <select name="status" onchange="this.form.submit()" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div>
+            <h2 class="page-title">Client Accounts</h2>
+            <p class="page-subtitle">Manage your client accounts</p>
+        </div>
+        <div class="page-actions">
+            <a href="{{ route('reseller.clients.create') }}" class="btn-action-primary-reseller">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Add Client
+            </a>
+        </div>
+    </div>
+
+    {{-- Filter Card --}}
+    <div class="filter-card">
+        <form method="GET" class="filter-row">
+            <div class="filter-search-box">
+                <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by name, email..." class="filter-input">
+            </div>
+
+            <select name="status" class="filter-select">
                 <option value="">All Statuses</option>
                 <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
                 <option value="suspended" {{ request('status') === 'suspended' ? 'selected' : '' }}>Suspended</option>
             </select>
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name or email..."
-                   class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-64">
-            <button type="submit" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Search</button>
-            @if(request()->hasAny(['status', 'search']))
-                <a href="{{ route('reseller.clients.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+
+            <select name="kyc" class="filter-select">
+                <option value="">All KYC</option>
+                <option value="approved" {{ request('kyc') === 'approved' ? 'selected' : '' }}>Approved</option>
+                <option value="pending" {{ request('kyc') === 'pending' ? 'selected' : '' }}>Pending</option>
+                <option value="rejected" {{ request('kyc') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+            </select>
+
+            <button type="submit" class="btn-search-reseller">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Search
+            </button>
+
+            @if(request()->hasAny(['status', 'search', 'kyc']))
+                <a href="{{ route('reseller.clients.index') }}" class="btn-clear">Clear</a>
             @endif
         </form>
-        <a href="{{ route('reseller.clients.create') }}" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-            <svg class="-ml-0.5 mr-1.5 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            Create Client
-        </a>
     </div>
 
-    {{-- Clients Table --}}
-    <div class="overflow-hidden bg-white shadow sm:rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    {{-- Table --}}
+    <div class="data-table-container">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KYC</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Channels</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th>Account</th>
+                    <th>Balance</th>
+                    <th>Tariff</th>
+                    <th>Billing Type</th>
+                    <th>Channels</th>
+                    <th>SIP</th>
+                    <th>Status</th>
+                    <th class="text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody>
                 @forelse ($clients as $client)
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div>
-                                <div class="text-sm font-medium text-gray-900">{{ $client->name }}</div>
-                                <div class="text-sm text-gray-500">{{ $client->email }}</div>
+                        <td>
+                            <div class="user-cell">
+                                <div class="avatar avatar-emerald">
+                                    {{ strtoupper(substr($client->name, 0, 1)) }}
+                                </div>
+                                <div>
+                                    <div class="user-name">{{ $client->name }}</div>
+                                    <div class="user-email">{{ $client->email }}</div>
+                                </div>
                             </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $client->status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
-                                {{ ucfirst($client->status) }}
-                            </span>
+                        <td class="font-medium">${{ number_format($client->balance, 2) }}</td>
+                        <td>{{ $client->rateGroup?->name ?? '-' }}</td>
+                        <td>
+                            @if($client->billing_type === 'prepaid')
+                                <span class="badge badge-blue">Prepaid</span>
+                            @else
+                                <span class="badge badge-purple">Postpaid</span>
+                            @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${{ number_format($client->balance, 2) }}
+                        <td>{{ $client->max_channels }}</td>
+                        <td>{{ $client->sip_accounts_count ?? 0 }}</td>
+                        <td>
+                            @if($client->status === 'active')
+                                <span class="badge badge-success">Active</span>
+                            @else
+                                <span class="badge badge-warning">Suspended</span>
+                            @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $client->kyc_status === 'approved' ? 'bg-green-100 text-green-800' : ($client->kyc_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : ($client->kyc_status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800')) }}">
-                                {{ ucfirst($client->kyc_status) }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {{ $client->max_channels }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <a href="{{ route('reseller.clients.show', $client) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
-                            <a href="{{ route('reseller.clients.edit', $client) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+                        <td class="text-center">
+                            <a href="{{ route('reseller.clients.show', $client) }}" class="action-icon" title="View">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </a>
+                            <a href="{{ route('reseller.clients.edit', $client) }}" class="action-icon" title="Edit">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </a>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">No clients found.</td>
+                        <td colspan="8" class="text-center py-12">
+                            <div class="empty-state">
+                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                                <p class="empty-text">No clients found</p>
+                                <a href="{{ route('reseller.clients.create') }}" class="empty-link-reseller">Add your first client</a>
+                            </div>
+                        </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="mt-4">
-        {{ $clients->withQueryString()->links() }}
-    </div>
+    @if($clients->hasPages())
+        <div class="mt-6">
+            {{ $clients->withQueryString()->links() }}
+        </div>
+    @endif
 </x-reseller-layout>

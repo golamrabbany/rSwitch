@@ -1,88 +1,303 @@
 <x-admin-layout>
     <x-slot name="header">SIP Accounts</x-slot>
 
-    {{-- Filters --}}
-    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <form method="GET" class="flex flex-wrap items-center gap-3">
-            <select name="status" onchange="this.form.submit()" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div>
+            <h2 class="page-title">SIP Accounts</h2>
+            <p class="page-subtitle">Manage SIP endpoints and credentials</p>
+        </div>
+        <div class="page-actions">
+            <a href="{{ route('admin.sip-accounts.export', request()->query()) }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Export
+            </a>
+            <a href="{{ route('admin.sip-accounts.import-form') }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                Import
+            </a>
+            <a href="{{ route('admin.sip-accounts.create') }}" class="btn-action-primary-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Add SIP Account
+            </a>
+        </div>
+    </div>
+
+    {{-- Filter Card --}}
+    <div class="filter-card" x-data="{
+        resellerOpen: false,
+        resellerSearch: '{{ $resellers->firstWhere('id', request('reseller_id'))?->name ?? '' }}',
+        resellerId: '{{ request('reseller_id') }}',
+        resellers: {{ $resellers->toJson() }},
+
+        clientOpen: false,
+        clientSearch: '{{ $clients->firstWhere('id', request('client_id'))?->name ?? '' }}',
+        clientId: '{{ request('client_id') }}',
+        clients: {{ $clients->toJson() }},
+
+        get filteredResellers() {
+            if (!this.resellerSearch) return this.resellers;
+            return this.resellers.filter(r =>
+                r.name.toLowerCase().includes(this.resellerSearch.toLowerCase()) ||
+                r.email.toLowerCase().includes(this.resellerSearch.toLowerCase())
+            );
+        },
+
+        get filteredClients() {
+            let filtered = this.clients;
+            if (this.resellerId) {
+                filtered = filtered.filter(c => c.parent_id == this.resellerId);
+            }
+            if (!this.clientSearch) return filtered;
+            return filtered.filter(c =>
+                c.name.toLowerCase().includes(this.clientSearch.toLowerCase()) ||
+                c.email.toLowerCase().includes(this.clientSearch.toLowerCase())
+            );
+        },
+
+        selectReseller(reseller) {
+            this.resellerSearch = reseller.name;
+            this.resellerId = reseller.id;
+            this.resellerOpen = false;
+            this.clientSearch = '';
+            this.clientId = '';
+        },
+
+        clearReseller() {
+            this.resellerSearch = '';
+            this.resellerId = '';
+            this.clientSearch = '';
+            this.clientId = '';
+        },
+
+        selectClient(client) {
+            this.clientSearch = client.name;
+            this.clientId = client.id;
+            this.clientOpen = false;
+        },
+
+        clearClient() {
+            this.clientSearch = '';
+            this.clientId = '';
+        }
+    }">
+        <form method="GET" class="filter-row flex-wrap">
+            <div class="filter-search-box">
+                <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search username, caller ID..." class="filter-input">
+            </div>
+
+            {{-- Reseller Filter --}}
+            @if($resellers->count() > 0)
+                <div class="relative">
+                    <input type="hidden" name="reseller_id" :value="resellerId">
+                    <div class="relative">
+                        <input type="text"
+                               x-model="resellerSearch"
+                               @focus="resellerOpen = true"
+                               @click="resellerOpen = true"
+                               @input="resellerOpen = true; resellerId = ''"
+                               placeholder="Filter by Reseller..."
+                               class="filter-input pr-9 w-48"
+                               :class="resellerId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
+                               autocomplete="off">
+                        <button type="button"
+                                x-show="resellerSearch"
+                                @click="clearReseller()"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 hover:text-indigo-700 transition-colors">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div x-show="resellerOpen && filteredResellers.length > 0"
+                         @click.away="resellerOpen = false"
+                         x-transition
+                         class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        <template x-for="reseller in filteredResellers" :key="reseller.id">
+                            <button type="button"
+                                    @click="selectReseller(reseller)"
+                                    class="w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-medium flex-shrink-0"
+                                     x-text="reseller.name.charAt(0).toUpperCase()"></div>
+                                <div class="min-w-0">
+                                    <div class="text-sm font-medium text-gray-900 truncate" x-text="reseller.name"></div>
+                                    <div class="text-xs text-gray-500 truncate" x-text="reseller.email"></div>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            @endif
+
+            {{-- Client Filter --}}
+            @if($clients->count() > 0)
+                <div class="relative">
+                    <input type="hidden" name="client_id" :value="clientId">
+                    <div class="relative">
+                        <input type="text"
+                               x-model="clientSearch"
+                               @focus="clientOpen = true"
+                               @click="clientOpen = true"
+                               @input="clientOpen = true; clientId = ''"
+                               placeholder="Filter by Client..."
+                               class="filter-input pr-9 w-48"
+                               :class="clientId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
+                               autocomplete="off">
+                        <button type="button"
+                                x-show="clientSearch"
+                                @click="clearClient()"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 hover:text-indigo-700 transition-colors">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div x-show="clientOpen && filteredClients.length > 0"
+                         @click.away="clientOpen = false"
+                         x-transition
+                         class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        <template x-for="client in filteredClients" :key="client.id">
+                            <button type="button"
+                                    @click="selectClient(client)"
+                                    class="w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-sm font-medium flex-shrink-0"
+                                     x-text="client.name.charAt(0).toUpperCase()"></div>
+                                <div class="min-w-0">
+                                    <div class="text-sm font-medium text-gray-900 truncate" x-text="client.name"></div>
+                                    <div class="text-xs text-gray-500 truncate" x-text="client.email"></div>
+                                </div>
+                            </button>
+                        </template>
+                        <div x-show="filteredClients.length === 0 && resellerId" class="px-4 py-3 text-sm text-gray-500 text-center">
+                            No clients for this reseller
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            <select name="status" class="filter-select">
                 <option value="">All Statuses</option>
                 <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
                 <option value="suspended" {{ request('status') === 'suspended' ? 'selected' : '' }}>Suspended</option>
                 <option value="disabled" {{ request('status') === 'disabled' ? 'selected' : '' }}>Disabled</option>
             </select>
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search username, CID, or owner..."
-                   class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-64">
-            <button type="submit" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Search</button>
-            @if(request()->hasAny(['status', 'search', 'user_id']))
-                <a href="{{ route('admin.sip-accounts.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+
+            <button type="submit" class="btn-search-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Search
+            </button>
+
+            @if(request()->hasAny(['status', 'search', 'reseller_id', 'client_id']))
+                <a href="{{ route('admin.sip-accounts.index') }}" class="btn-clear">Clear</a>
             @endif
         </form>
-        <a href="{{ route('admin.sip-accounts.create') }}" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-            <svg class="-ml-0.5 mr-1.5 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            Create SIP Account
-        </a>
     </div>
 
-    {{-- Table --}}
-    <div class="overflow-hidden bg-white shadow sm:rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    {{-- Data Table --}}
+    <div class="data-table-container">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auth</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Caller ID</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Channels</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th>SIP Account</th>
+                    <th>Owner</th>
+                    <th>Auth Type</th>
+                    <th>Caller ID</th>
+                    <th>Channels</th>
+                    <th>Status</th>
+                    <th class="text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody>
                 @forelse ($sipAccounts as $sip)
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">{{ $sip->username }}</div>
-                            @if($sip->last_registered_at)
-                                <div class="text-xs text-gray-500">Last reg: {{ $sip->last_registered_at->diffForHumans() }}</div>
-                            @endif
+                        <td>
+                            <div class="user-cell">
+                                <div class="avatar avatar-indigo">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="user-name font-mono">{{ $sip->username }}</div>
+                                    @if($sip->last_registered_at)
+                                        <div class="user-email">Reg: {{ $sip->last_registered_at->diffForHumans() }}</div>
+                                    @else
+                                        <div class="user-email">Never registered</div>
+                                    @endif
+                                </div>
+                            </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <a href="{{ route('admin.users.show', $sip->user) }}" class="text-sm text-indigo-600 hover:text-indigo-900">{{ $sip->user->name }}</a>
+                        <td>
+                            <a href="{{ route('admin.users.show', $sip->user) }}" class="text-indigo-600 hover:text-indigo-700 font-medium">
+                                {{ $sip->user->name }}
+                            </a>
                             <div class="text-xs text-gray-500">{{ ucfirst($sip->user->role) }}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ ucfirst($sip->auth_type) }}
+                        <td>
+                            <span class="badge badge-gray">{{ ucfirst($sip->auth_type) }}</span>
                             @if(in_array($sip->auth_type, ['ip', 'both']))
-                                <div class="text-xs text-gray-400">{{ Str::limit($sip->allowed_ips, 30) }}</div>
+                                <div class="text-xs text-gray-400 mt-1 font-mono">{{ Str::limit($sip->allowed_ips, 20) }}</div>
                             @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ $sip->caller_id_name ? $sip->caller_id_name . ' ' : '' }}&lt;{{ $sip->caller_id_number }}&gt;
+                        <td>
+                            <div class="text-sm text-gray-900">{{ $sip->caller_id_name }}</div>
+                            <div class="text-xs text-gray-500 font-mono">{{ $sip->caller_id_number }}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $sip->max_channels }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $sip->status === 'active' ? 'bg-green-100 text-green-800' : ($sip->status === 'suspended' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
-                                {{ ucfirst($sip->status) }}
-                            </span>
+                        <td class="font-medium">{{ $sip->max_channels }}</td>
+                        <td>
+                            @if($sip->status === 'active')
+                                <span class="badge badge-success">Active</span>
+                            @elseif($sip->status === 'suspended')
+                                <span class="badge badge-warning">Suspended</span>
+                            @else
+                                <span class="badge badge-danger">Disabled</span>
+                            @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <a href="{{ route('admin.sip-accounts.show', $sip) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
-                            <a href="{{ route('admin.sip-accounts.edit', $sip) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+                        <td class="text-center">
+                            <a href="{{ route('admin.sip-accounts.show', $sip) }}" class="action-icon" title="View">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </a>
+                            <a href="{{ route('admin.sip-accounts.edit', $sip) }}" class="action-icon" title="Edit">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </a>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-500">No SIP accounts found.</td>
+                        <td colspan="7" class="text-center py-12">
+                            <div class="empty-state">
+                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                                </svg>
+                                <p class="empty-text">No SIP accounts found</p>
+                                <a href="{{ route('admin.sip-accounts.create') }}" class="empty-link-admin">Create your first SIP account</a>
+                            </div>
+                        </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="mt-4">
-        {{ $sipAccounts->withQueryString()->links() }}
-    </div>
+    @if($sipAccounts->hasPages())
+        <div class="mt-6">
+            {{ $sipAccounts->withQueryString()->links() }}
+        </div>
+    @endif
 </x-admin-layout>

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
 use App\Models\RateGroup;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\BalanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -14,7 +17,8 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::with('parent', 'rateGroup');
+        $query = User::with('parent', 'rateGroup')
+            ->withCount(['children', 'sipAccounts']);
 
         if ($request->filled('role')) {
             $query->where('role', $request->role);
@@ -22,6 +26,10 @@ class UserController extends Controller
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
+        }
+
+        if ($request->filled('parent_id')) {
+            $query->where('parent_id', $request->parent_id);
         }
 
         if ($request->filled('search')) {
@@ -34,7 +42,12 @@ class UserController extends Controller
 
         $users = $query->orderBy('created_at', 'desc')->paginate(20);
 
-        return view('admin.users.index', compact('users'));
+        // Get resellers for the filter dropdown (only needed for client view)
+        $resellers = $request->role === 'client'
+            ? User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email'])
+            : collect();
+
+        return view('admin.users.index', compact('users', 'resellers'));
     }
 
     public function create()
@@ -83,15 +96,97 @@ class UserController extends Controller
 
         AuditService::logCreated($user, 'user.created');
 
-        return redirect()->route('admin.users.index')
+        return redirect()->route('admin.users.index', ['role' => $validated['role']])
             ->with('success', ucfirst($validated['role']) . ' created successfully.');
     }
 
     public function show(User $user)
     {
-        $user->load('parent', 'rateGroup', 'children', 'sipAccounts', 'kycProfile');
+        $user->load('parent', 'rateGroup', 'children', 'sipAccounts', 'kycProfile', 'dids');
 
-        return view('admin.users.show', compact('user'));
+        // Get last 15 transactions for balance history
+        $recentTransactions = Transaction::where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->limit(15)
+            ->get();
+
+        return view('admin.users.show', compact('user', 'recentTransactions'));
+    }
+
+    /**
+     * Adjust user balance via AJAX from modal.
+     */
+    public function adjustBalance(Request $request, User $user, BalanceService $balanceService)
+    {
+        $validated = $request->validate([
+            'operation' => ['required', 'in:credit,debit'],
+            'amount' => ['required', 'numeric', 'gt:0', 'max:999999.99'],
+            'source' => ['required', 'string', 'max:50'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $amount = number_format((float) $validated['amount'], 4, '.', '');
+        $source = $validated['source'];
+        $remarks = $validated['remarks'] ?? '';
+
+        try {
+            if ($validated['operation'] === 'credit') {
+                $transaction = $balanceService->credit(
+                    user: $user,
+                    amount: $amount,
+                    type: 'topup',
+                    referenceType: 'manual_admin',
+                    description: "Admin topup by " . auth()->user()->name,
+                    createdBy: auth()->id(),
+                    source: $source,
+                    remarks: $remarks,
+                );
+
+                Payment::create([
+                    'user_id' => $user->id,
+                    'amount' => $amount,
+                    'currency' => 'USD',
+                    'payment_method' => $source,
+                    'recharged_by' => auth()->id(),
+                    'notes' => $remarks ?: 'Admin manual topup',
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                    'transaction_id' => $transaction->id,
+                ]);
+
+                AuditService::logAction('balance.credit', $user, [
+                    'amount' => $amount,
+                    'source' => $source,
+                    'remarks' => $remarks,
+                    'transaction_id' => $transaction->id,
+                ]);
+
+                return back()->with('success', "Credited \${$amount} to {$user->name}. New balance: \$" . number_format($user->fresh()->balance, 2));
+            }
+
+            $transaction = $balanceService->debit(
+                user: $user,
+                amount: $amount,
+                type: 'adjustment',
+                referenceType: 'manual_admin',
+                description: "Admin debit by " . auth()->user()->name,
+                createdBy: auth()->id(),
+                source: $source,
+                remarks: $remarks,
+            );
+
+            AuditService::logAction('balance.debit', $user, [
+                'amount' => $amount,
+                'source' => $source,
+                'remarks' => $remarks,
+                'transaction_id' => $transaction->id,
+            ]);
+
+            return back()->with('success', "Debited \${$amount} from {$user->name}. New balance: \$" . number_format($user->fresh()->balance, 2));
+
+        } catch (\App\Exceptions\Billing\InsufficientBalanceException $e) {
+            return back()->with('error', "Insufficient balance. Available: \$" . number_format($e->available, 2));
+        }
     }
 
     public function edit(User $user)

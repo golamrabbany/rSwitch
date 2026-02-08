@@ -1,69 +1,110 @@
 <x-client-layout>
-    <x-slot name="header">My DIDs</x-slot>
+    <x-slot name="header">DIDs</x-slot>
 
-    <div class="mb-6 flex flex-wrap items-center gap-3">
-        <form method="GET" class="flex flex-wrap items-center gap-3">
-            <select name="status" onchange="this.form.submit()" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div>
+            <h2 class="page-title">My DIDs</h2>
+            <p class="page-subtitle">View your assigned phone numbers</p>
+        </div>
+    </div>
+
+    {{-- Filter Card --}}
+    <div class="filter-card">
+        <form method="GET" class="filter-row">
+            <div class="filter-search-box">
+                <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by number..." class="filter-input">
+            </div>
+
+            <select name="status" class="filter-select">
                 <option value="">All Statuses</option>
                 <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
                 <option value="suspended" {{ request('status') === 'suspended' ? 'selected' : '' }}>Suspended</option>
             </select>
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search number..."
-                   class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-64">
-            <button type="submit" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Search</button>
+
+            <button type="submit" class="btn-search-client">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Search
+            </button>
+
             @if(request()->hasAny(['status', 'search']))
-                <a href="{{ route('client.dids.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+                <a href="{{ route('client.dids.index') }}" class="btn-clear">Clear</a>
             @endif
         </form>
     </div>
 
-    <div class="overflow-hidden bg-white shadow sm:rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    {{-- Table --}}
+    <div class="data-table-container">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trunk</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destination</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monthly Price</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                    <th>Number</th>
+                    <th>Trunk</th>
+                    <th>Destination</th>
+                    <th class="text-right">Monthly Price</th>
+                    <th>Status</th>
+                    <th class="text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody>
                 @forelse ($dids as $did)
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-mono font-medium text-gray-900">{{ $did->number }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $did->trunk?->name ?? '—' }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td>
+                            <span class="font-mono font-medium text-gray-900">{{ $did->number }}</span>
+                        </td>
+                        <td class="text-gray-500">{{ $did->trunk?->name ?? '—' }}</td>
+                        <td>
                             @if($did->destination_type === 'sip_account' && $did->destinationSipAccount)
-                                SIP: {{ $did->destinationSipAccount->username }}
+                                <span class="badge badge-info">SIP</span>
+                                <span class="ml-1 text-gray-900">{{ $did->destinationSipAccount->username }}</span>
                             @elseif($did->destination_type === 'external' && $did->destination_number)
-                                Ext: {{ $did->destination_number }}
+                                <span class="badge badge-purple">External</span>
+                                <span class="ml-1 font-mono text-gray-900">{{ $did->destination_number }}</span>
                             @else
-                                —
+                                <span class="text-gray-400">—</span>
                             @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">${{ number_format($did->monthly_price, 2) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $did->status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
-                                {{ ucfirst($did->status) }}
-                            </span>
+                        <td class="text-right font-medium">${{ number_format($did->monthly_price, 2) }}</td>
+                        <td>
+                            @if($did->status === 'active')
+                                <span class="badge badge-success">Active</span>
+                            @else
+                                <span class="badge badge-warning">Suspended</span>
+                            @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <a href="{{ route('client.dids.show', $did) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
+                        <td class="text-center">
+                            <a href="{{ route('client.dids.show', $did) }}" class="action-icon" title="View">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </a>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">No DIDs assigned to your account.</td>
+                        <td colspan="6" class="text-center py-12">
+                            <div class="empty-state">
+                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                                </svg>
+                                <p class="empty-text">No DIDs assigned to your account</p>
+                            </div>
+                        </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="mt-4">
-        {{ $dids->withQueryString()->links() }}
-    </div>
+    @if($dids->hasPages())
+        <div class="mt-6">
+            {{ $dids->withQueryString()->links() }}
+        </div>
+    @endif
 </x-client-layout>

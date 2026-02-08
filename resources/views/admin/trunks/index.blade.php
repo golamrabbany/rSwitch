@@ -1,99 +1,157 @@
 <x-admin-layout>
     <x-slot name="header">Trunks</x-slot>
 
-    {{-- Filters --}}
-    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <form method="GET" class="flex flex-wrap items-center gap-3">
-            <select name="direction" onchange="this.form.submit()" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div>
+            <h2 class="page-title">Trunks</h2>
+            <p class="page-subtitle">Manage SIP trunk connections and providers</p>
+        </div>
+        <div class="page-actions">
+            <a href="{{ route('admin.trunks.create') }}" class="btn-action-primary-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Add Trunk
+            </a>
+        </div>
+    </div>
+
+    {{-- Filter Card --}}
+    <div class="filter-card">
+        <form method="GET" class="filter-row flex-wrap">
+            <div class="filter-search-box">
+                <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name, provider, host..." class="filter-input">
+            </div>
+
+            <select name="direction" class="filter-select">
                 <option value="">All Directions</option>
                 <option value="incoming" {{ request('direction') === 'incoming' ? 'selected' : '' }}>Incoming</option>
                 <option value="outgoing" {{ request('direction') === 'outgoing' ? 'selected' : '' }}>Outgoing</option>
                 <option value="both" {{ request('direction') === 'both' ? 'selected' : '' }}>Both</option>
             </select>
-            <select name="status" onchange="this.form.submit()" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+
+            <select name="status" class="filter-select">
                 <option value="">All Statuses</option>
                 <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
                 <option value="disabled" {{ request('status') === 'disabled' ? 'selected' : '' }}>Disabled</option>
                 <option value="auto_disabled" {{ request('status') === 'auto_disabled' ? 'selected' : '' }}>Auto-disabled</option>
             </select>
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name, provider, or host..."
-                   class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-64">
-            <button type="submit" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Search</button>
+
+            <button type="submit" class="btn-search-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Search
+            </button>
+
             @if(request()->hasAny(['direction', 'status', 'search']))
-                <a href="{{ route('admin.trunks.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+                <a href="{{ route('admin.trunks.index') }}" class="btn-clear">Clear</a>
             @endif
         </form>
-        <a href="{{ route('admin.trunks.create') }}" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-            <svg class="-ml-0.5 mr-1.5 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            Create Trunk
-        </a>
     </div>
 
-    {{-- Table --}}
-    <div class="overflow-hidden bg-white shadow sm:rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    {{-- Data Table --}}
+    <div class="data-table-container">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Direction</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Host</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Channels</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Health</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th>Trunk</th>
+                    <th>Direction</th>
+                    <th>Host</th>
+                    <th>Channels</th>
+                    <th>Health</th>
+                    <th>Status</th>
+                    <th class="text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody>
                 @forelse ($trunks as $trunk)
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">{{ $trunk->name }}</div>
-                            <div class="text-xs text-gray-500">{{ $trunk->provider }}</div>
+                        <td>
+                            <div class="user-cell">
+                                <div class="avatar avatar-indigo">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="user-name">{{ $trunk->name }}</div>
+                                    <div class="user-email">{{ $trunk->provider }}</div>
+                                </div>
+                            </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $trunk->direction === 'outgoing' ? 'bg-green-100 text-green-800' : ($trunk->direction === 'incoming' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800') }}">
-                                {{ ucfirst($trunk->direction) }}
-                            </span>
+                        <td>
+                            @if($trunk->direction === 'outgoing')
+                                <span class="badge badge-success">Outgoing</span>
+                            @elseif($trunk->direction === 'incoming')
+                                <span class="badge badge-info">Incoming</span>
+                            @else
+                                <span class="badge badge-purple">Both</span>
+                            @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td>
                             <div class="text-sm font-mono text-gray-900">{{ $trunk->host }}:{{ $trunk->port }}</div>
                             <div class="text-xs text-gray-500">{{ strtoupper($trunk->transport) }}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $trunk->max_channels }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {{ in_array($trunk->direction, ['outgoing', 'both']) ? $trunk->outgoing_priority : '-' }}
+                        <td class="font-medium">{{ $trunk->max_channels }}</td>
+                        <td>
+                            @if($trunk->health_status === 'up')
+                                <span class="badge badge-success">Up</span>
+                            @elseif($trunk->health_status === 'down')
+                                <span class="badge badge-danger">Down</span>
+                            @elseif($trunk->health_status === 'degraded')
+                                <span class="badge badge-warning">Degraded</span>
+                            @else
+                                <span class="badge badge-gray">Unknown</span>
+                            @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $trunk->health_status === 'up' ? 'bg-green-100 text-green-800' : ($trunk->health_status === 'down' ? 'bg-red-100 text-red-800' : ($trunk->health_status === 'degraded' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800')) }}">
-                                {{ ucfirst($trunk->health_status) }}
-                            </span>
+                        <td>
+                            @if($trunk->status === 'active')
+                                <span class="badge badge-success">Active</span>
+                            @elseif($trunk->status === 'auto_disabled')
+                                <span class="badge badge-warning">Auto-disabled</span>
+                            @else
+                                <span class="badge badge-danger">Disabled</span>
+                            @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $trunk->status === 'active' ? 'bg-green-100 text-green-800' : ($trunk->status === 'auto_disabled' ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800') }}">
-                                {{ $trunk->status === 'auto_disabled' ? 'Auto-disabled' : ucfirst($trunk->status) }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <a href="{{ route('admin.trunks.show', $trunk) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
-                            <a href="{{ route('admin.trunks.edit', $trunk) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+                        <td class="text-center">
+                            <a href="{{ route('admin.trunks.show', $trunk) }}" class="action-icon" title="View">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </a>
+                            <a href="{{ route('admin.trunks.edit', $trunk) }}" class="action-icon" title="Edit">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </a>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-6 py-12 text-center text-sm text-gray-500">No trunks found.</td>
+                        <td colspan="7" class="text-center py-12">
+                            <div class="empty-state">
+                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                <p class="empty-text">No trunks found</p>
+                                <a href="{{ route('admin.trunks.create') }}" class="empty-link-admin">Create your first trunk</a>
+                            </div>
+                        </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="mt-4">
-        {{ $trunks->withQueryString()->links() }}
-    </div>
+    @if($trunks->hasPages())
+        <div class="mt-6">
+            {{ $trunks->withQueryString()->links() }}
+        </div>
+    @endif
 </x-admin-layout>

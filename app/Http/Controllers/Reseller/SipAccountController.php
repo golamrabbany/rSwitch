@@ -18,11 +18,12 @@ class SipAccountController extends Controller
 
     public function index(Request $request)
     {
-        $descendantIds = auth()->user()->descendantIds();
+        // Only show SIP accounts belonging to reseller's clients
+        $clientIds = auth()->user()->clientIds();
 
-        $query = SipAccount::whereIn('user_id', $descendantIds)->with('user');
+        $query = SipAccount::whereIn('user_id', $clientIds)->with('user');
 
-        if ($request->filled('user_id') && in_array((int) $request->user_id, $descendantIds)) {
+        if ($request->filled('user_id') && in_array((int) $request->user_id, $clientIds)) {
             $query->where('user_id', $request->user_id);
         }
 
@@ -41,15 +42,17 @@ class SipAccountController extends Controller
 
         $sipAccounts = $query->orderByDesc('created_at')->paginate(20);
 
-        $users = User::whereIn('id', $descendantIds)->orderBy('name')->get();
+        // Only show clients in filter dropdown
+        $users = User::whereIn('id', $clientIds)->orderBy('name')->get();
 
         return view('reseller.sip-accounts.index', compact('sipAccounts', 'users'));
     }
 
     public function create(Request $request)
     {
-        $descendantIds = auth()->user()->descendantIds();
-        $users = User::whereIn('id', $descendantIds)->active()->orderBy('name')->get();
+        // Only clients can have SIP accounts
+        $clientIds = auth()->user()->clientIds();
+        $users = User::whereIn('id', $clientIds)->active()->orderBy('name')->get();
         $selectedUserId = $request->query('user_id');
 
         return view('reseller.sip-accounts.create', compact('users', 'selectedUserId'));
@@ -57,10 +60,11 @@ class SipAccountController extends Controller
 
     public function store(Request $request)
     {
-        $descendantIds = auth()->user()->descendantIds();
+        // Only clients can have SIP accounts
+        $clientIds = auth()->user()->clientIds();
 
         $validated = $request->validate([
-            'user_id' => ['required', 'exists:users,id', Rule::in($descendantIds)],
+            'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
             'username' => ['required', 'string', 'max:40', 'unique:sip_accounts,username', 'alpha_dash'],
             'password' => ['required', 'string', 'min:12', 'max:80'],
             'auth_type' => ['required', Rule::in(['password', 'ip', 'both'])],
@@ -83,7 +87,7 @@ class SipAccountController extends Controller
 
     public function show(SipAccount $sipAccount)
     {
-        abort_unless(in_array($sipAccount->user_id, auth()->user()->descendantIds()), 403);
+        abort_unless(in_array($sipAccount->user_id, auth()->user()->clientIds()), 403);
 
         $sipAccount->load('user');
 
@@ -94,20 +98,21 @@ class SipAccountController extends Controller
 
     public function edit(SipAccount $sipAccount)
     {
-        abort_unless(in_array($sipAccount->user_id, auth()->user()->descendantIds()), 403);
+        abort_unless(in_array($sipAccount->user_id, auth()->user()->clientIds()), 403);
 
-        $users = User::whereIn('id', auth()->user()->descendantIds())->active()->orderBy('name')->get();
+        // Only clients can own SIP accounts
+        $users = User::whereIn('id', auth()->user()->clientIds())->active()->orderBy('name')->get();
 
         return view('reseller.sip-accounts.edit', compact('sipAccount', 'users'));
     }
 
     public function update(Request $request, SipAccount $sipAccount)
     {
-        $descendantIds = auth()->user()->descendantIds();
-        abort_unless(in_array($sipAccount->user_id, $descendantIds), 403);
+        $clientIds = auth()->user()->clientIds();
+        abort_unless(in_array($sipAccount->user_id, $clientIds), 403);
 
         $validated = $request->validate([
-            'user_id' => ['required', 'exists:users,id', Rule::in($descendantIds)],
+            'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
             'password' => ['nullable', 'string', 'min:12', 'max:80'],
             'auth_type' => ['required', Rule::in(['password', 'ip', 'both'])],
             'allowed_ips' => ['nullable', 'required_if:auth_type,ip', 'required_if:auth_type,both', 'string', 'max:500'],
@@ -140,7 +145,7 @@ class SipAccountController extends Controller
 
     public function reprovision(SipAccount $sipAccount)
     {
-        abort_unless(in_array($sipAccount->user_id, auth()->user()->descendantIds()), 403);
+        abort_unless(in_array($sipAccount->user_id, auth()->user()->clientIds()), 403);
 
         if ($sipAccount->status === 'active') {
             $this->provisioning->provision($sipAccount);

@@ -16,7 +16,8 @@ class ClientController extends Controller
     {
         $query = User::where('parent_id', auth()->id())
             ->where('role', 'client')
-            ->with('rateGroup');
+            ->with('rateGroup')
+            ->withCount('sipAccounts');
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);

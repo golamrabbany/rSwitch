@@ -23,12 +23,14 @@ class BalanceService
         ?int $referenceId = null,
         string $description = '',
         ?int $createdBy = null,
+        ?string $source = null,
+        ?string $remarks = null,
     ): Transaction {
         if (bccomp($amount, '0', 4) <= 0) {
             throw new \InvalidArgumentException('Debit amount must be positive');
         }
 
-        return DB::transaction(function () use ($user, $amount, $type, $referenceType, $referenceId, $description, $createdBy) {
+        return DB::transaction(function () use ($user, $amount, $type, $referenceType, $referenceId, $description, $createdBy, $source, $remarks) {
             $lockedUser = User::where('id', $user->id)->lockForUpdate()->first();
 
             if (!$lockedUser) {
@@ -59,6 +61,8 @@ class BalanceService
                 'reference_type' => $referenceType,
                 'reference_id' => $referenceId,
                 'description' => $description,
+                'source' => $source,
+                'remarks' => $remarks,
                 'created_by' => $createdBy,
                 'created_at' => now(),
             ]);
@@ -76,12 +80,14 @@ class BalanceService
         ?int $referenceId = null,
         string $description = '',
         ?int $createdBy = null,
+        ?string $source = null,
+        ?string $remarks = null,
     ): Transaction {
         if (bccomp($amount, '0', 4) <= 0) {
             throw new \InvalidArgumentException('Credit amount must be positive');
         }
 
-        return DB::transaction(function () use ($user, $amount, $type, $referenceType, $referenceId, $description, $createdBy) {
+        return DB::transaction(function () use ($user, $amount, $type, $referenceType, $referenceId, $description, $createdBy, $source, $remarks) {
             $lockedUser = User::where('id', $user->id)->lockForUpdate()->first();
 
             if (!$lockedUser) {
@@ -101,6 +107,8 @@ class BalanceService
                 'reference_type' => $referenceType,
                 'reference_id' => $referenceId,
                 'description' => $description,
+                'source' => $source,
+                'remarks' => $remarks,
                 'created_by' => $createdBy,
                 'created_at' => now(),
             ]);

@@ -1,363 +1,476 @@
 <x-admin-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <span>Trunk: {{ $trunk->name }}</span>
-            <div class="flex items-center gap-x-3">
-                <a href="{{ route('admin.trunks.edit', $trunk) }}" class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">Edit</a>
-                <form method="POST" action="{{ route('admin.trunks.reprovision', $trunk) }}">
-                    @csrf
-                    <button type="submit" class="rounded-md bg-gray-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-500">
-                        Re-provision
-                    </button>
-                </form>
-                <form method="POST" action="{{ route('admin.trunks.destroy', $trunk) }}" onsubmit="return confirm('Delete this trunk? This will also remove it from Asterisk PJSIP config.')">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="rounded-md bg-red-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-red-500">Delete</button>
-                </form>
-            </div>
-        </div>
-    </x-slot>
+    <x-slot name="header">Trunk Details</x-slot>
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {{-- Trunk Configuration --}}
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">Trunk Configuration</h3>
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-xl bg-indigo-100 flex items-center justify-center">
+                <svg class="w-7 h-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
             </div>
-            <dl class="divide-y divide-gray-200">
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Name</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->name }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Provider</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->provider }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Direction</dt>
-                    <dd class="mt-1 sm:col-span-2 sm:mt-0">
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                            {{ $trunk->direction === 'outgoing' ? 'bg-green-100 text-green-800' : ($trunk->direction === 'incoming' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800') }}">
-                            {{ ucfirst($trunk->direction) }}
-                        </span>
-                    </dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Host</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->host }}:{{ $trunk->port }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Transport</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ strtoupper($trunk->transport) }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Codecs</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->codec_allow }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Max Channels</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->max_channels }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Status</dt>
-                    <dd class="mt-1 sm:col-span-2 sm:mt-0">
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                            {{ $trunk->status === 'active' ? 'bg-green-100 text-green-800' : ($trunk->status === 'auto_disabled' ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800') }}">
-                            {{ $trunk->status === 'auto_disabled' ? 'Auto-disabled' : ucfirst($trunk->status) }}
-                        </span>
-                    </dd>
-                </div>
-            </dl>
-        </div>
-
-        {{-- Auth & Provisioning --}}
-        <div class="space-y-6">
-            @if(in_array($trunk->direction, ['outgoing', 'both']))
-            <div class="bg-white shadow sm:rounded-lg">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 class="text-base font-semibold text-gray-900">Authentication</h3>
-                </div>
-                <dl class="divide-y divide-gray-200">
-                    <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Username</dt>
-                        <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->username ?: '-' }}</dd>
-                    </div>
-                    @if($trunk->password)
-                    <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Password</dt>
-                        <dd class="mt-1 text-sm sm:col-span-2 sm:mt-0" x-data="{ show: false }">
-                            <span x-show="!show" class="text-gray-400">••••••••••••</span>
-                            <span x-show="show" x-cloak class="font-mono text-gray-900">{{ $trunk->password }}</span>
-                            <button @click="show = !show" class="ml-2 text-xs text-indigo-600 hover:text-indigo-900" x-text="show ? 'Hide' : 'Show'"></button>
-                        </dd>
-                    </div>
+            <div>
+                <h2 class="page-title">{{ $trunk->name }}</h2>
+                <div class="flex items-center gap-2 mt-1">
+                    @if($trunk->status === 'active')
+                        <span class="badge badge-success">Active</span>
+                    @elseif($trunk->status === 'auto_disabled')
+                        <span class="badge badge-warning">Auto-disabled</span>
+                    @else
+                        <span class="badge badge-danger">Disabled</span>
                     @endif
-                    <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Registration</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                            @if($trunk->register)
-                                <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Enabled</span>
-                                @if($trunk->register_string)
-                                    <span class="ml-2 text-xs font-mono text-gray-500">{{ $trunk->register_string }}</span>
-                                @endif
-                            @else
-                                <span class="text-gray-500">Disabled</span>
-                            @endif
-                        </dd>
-                    </div>
-                    <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Outgoing Priority</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->outgoing_priority }}</dd>
-                    </div>
-                </dl>
-            </div>
-            @endif
-
-            <div class="bg-white shadow sm:rounded-lg">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 class="text-base font-semibold text-gray-900">Provisioning Status</h3>
+                    @if($provisioned)
+                        <span class="badge badge-info">Provisioned</span>
+                    @else
+                        <span class="badge badge-danger">Not Provisioned</span>
+                    @endif
+                    @if($trunk->direction === 'outgoing')
+                        <span class="badge badge-success">Outgoing</span>
+                    @elseif($trunk->direction === 'incoming')
+                        <span class="badge badge-info">Incoming</span>
+                    @else
+                        <span class="badge badge-purple">Both</span>
+                    @endif
                 </div>
-                <div class="p-6">
-                    <div class="flex items-center gap-3">
-                        @if($provisioned)
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
-                                <svg class="mr-1.5 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
-                                </svg>
-                                Provisioned in Asterisk
-                            </span>
-                        @else
-                            <span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
-                                <svg class="mr-1.5 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
-                                </svg>
-                                Not in Asterisk
-                            </span>
-                        @endif
-                    </div>
+            </div>
+        </div>
+        <div class="page-actions">
+            <form method="POST" action="{{ route('admin.trunks.reprovision', $trunk) }}" class="inline">
+                @csrf
+                <button type="submit" class="btn-action-secondary">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Re-provision
+                </button>
+            </form>
+            <a href="{{ route('admin.trunks.edit', $trunk) }}" class="btn-action-primary-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Edit
+            </a>
+            <form method="POST" action="{{ route('admin.trunks.destroy', $trunk) }}" class="inline" onsubmit="return confirm('Delete this trunk? This will also remove it from Asterisk.')">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn-danger">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Delete
+                </button>
+            </form>
+        </div>
+    </div>
 
-                    {{-- Health info --}}
-                    <div class="mt-4 space-y-2">
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm font-medium text-gray-500">Health:</span>
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $trunk->health_status === 'up' ? 'bg-green-100 text-green-800' : ($trunk->health_status === 'down' ? 'bg-red-100 text-red-800' : ($trunk->health_status === 'degraded' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800')) }}">
-                                {{ ucfirst($trunk->health_status) }}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {{-- Main Content --}}
+        <div class="lg:col-span-2 space-y-6">
+            {{-- Trunk Configuration --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Trunk Configuration</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Name</span>
+                            <span class="detail-value">{{ $trunk->name }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Provider</span>
+                            <span class="detail-value">{{ $trunk->provider }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Host</span>
+                            <span class="detail-value font-mono">{{ $trunk->host }}:{{ $trunk->port }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Transport</span>
+                            <span class="detail-value">{{ strtoupper($trunk->transport) }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Max Channels</span>
+                            <span class="detail-value">{{ $trunk->max_channels }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Codecs</span>
+                            <span class="detail-value font-mono">{{ $trunk->codec_allow }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Authentication (outgoing/both only) --}}
+            @if(in_array($trunk->direction, ['outgoing', 'both']))
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Authentication</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Username</span>
+                            <span class="detail-value font-mono">{{ $trunk->username ?: '-' }}</span>
+                        </div>
+                        @if($trunk->password)
+                        <div class="detail-item">
+                            <span class="detail-label">Password</span>
+                            <div x-data="{ show: false }" class="flex items-center gap-2">
+                                <span x-show="!show" class="detail-value text-gray-400">••••••••••••</span>
+                                <span x-show="show" x-cloak class="detail-value font-mono">{{ $trunk->password }}</span>
+                                <button @click="show = !show" class="text-xs text-indigo-600 hover:text-indigo-800" x-text="show ? 'Hide' : 'Show'"></button>
+                            </div>
+                        </div>
+                        @endif
+                        <div class="detail-item">
+                            <span class="detail-label">Registration</span>
+                            <span class="detail-value">
+                                @if($trunk->register)
+                                    <span class="badge badge-success">Enabled</span>
+                                @else
+                                    <span class="text-gray-500">Disabled</span>
+                                @endif
                             </span>
                         </div>
-                        @if($trunk->health_last_checked_at)
-                            <p class="text-sm text-gray-600">Last checked: {{ $trunk->health_last_checked_at->format('M d, Y H:i:s') }}</p>
-                        @endif
-                        @if($trunk->health_last_up_at)
-                            <p class="text-sm text-gray-600">Last up: {{ $trunk->health_last_up_at->format('M d, Y H:i:s') }}</p>
-                        @endif
-                        @if($trunk->health_fail_count > 0)
-                            <p class="text-sm text-red-600">Consecutive failures: {{ $trunk->health_fail_count }}</p>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            {{-- Incoming Settings (incoming/both) --}}
+            @if(in_array($trunk->direction, ['incoming', 'both']))
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Incoming Settings</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Incoming Context</span>
+                            <span class="detail-value font-mono">{{ $trunk->incoming_context }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Auth Type</span>
+                            <span class="detail-value">{{ ucfirst($trunk->incoming_auth_type) }}</span>
+                        </div>
+                        @if($trunk->incoming_ip_acl)
+                        <div class="detail-item md:col-span-2">
+                            <span class="detail-label">IP ACL</span>
+                            <span class="detail-value font-mono">{{ $trunk->incoming_ip_acl }}</span>
+                        </div>
                         @endif
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+            @endif
 
-    {{-- Full-width sections --}}
-    <div class="mt-6 space-y-6">
-        {{-- Dial Manipulation (outgoing/both only) --}}
-        @if(in_array($trunk->direction, ['outgoing', 'both']))
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">Dial String Manipulation</h3>
-            </div>
-            <dl class="divide-y divide-gray-200">
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Pattern Match</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->dial_pattern_match ?: '-' }}</dd>
+            {{-- Dial String Manipulation (outgoing/both) --}}
+            @if(in_array($trunk->direction, ['outgoing', 'both']))
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Dial String Manipulation</h3>
                 </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Pattern Replace</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->dial_pattern_replace ?: '-' }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Dial Prefix</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->dial_prefix ?: '-' }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Strip Digits</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->dial_strip_digits }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Tech Prefix</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->tech_prefix ?: '-' }}</dd>
-                </div>
-            </dl>
-        </div>
-
-        {{-- CLI Manipulation --}}
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">CLI / Caller ID Manipulation</h3>
-            </div>
-            <dl class="divide-y divide-gray-200">
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">CLI Mode</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ ucfirst(str_replace('_', ' ', $trunk->cli_mode)) }}</dd>
-                </div>
-                @if($trunk->cli_mode === 'override')
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Override Number</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->cli_override_number ?: '-' }}</dd>
-                </div>
-                @endif
-                @if($trunk->cli_mode === 'prefix_strip')
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Strip Digits</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->cli_prefix_strip }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Add Prefix</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->cli_prefix_add ?: '-' }}</dd>
-                </div>
-                @endif
-            </dl>
-        </div>
-        @endif
-
-        {{-- Incoming Settings (incoming/both only) --}}
-        @if(in_array($trunk->direction, ['incoming', 'both']))
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">Incoming Settings</h3>
-            </div>
-            <dl class="divide-y divide-gray-200">
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Incoming Context</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->incoming_context }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Auth Type</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ ucfirst($trunk->incoming_auth_type) }}</dd>
-                </div>
-                @if($trunk->incoming_ip_acl)
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">IP ACL</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->incoming_ip_acl }}</dd>
-                </div>
-                @endif
-            </dl>
-        </div>
-        @endif
-
-        {{-- Health Monitoring --}}
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">Health Monitoring</h3>
-            </div>
-            <dl class="divide-y divide-gray-200">
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Health Check</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                        @if($trunk->health_check)
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Enabled</span>
-                        @else
-                            <span class="text-gray-500">Disabled</span>
+                <div class="detail-card-body">
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Pattern Match</span>
+                            <span class="detail-value font-mono">{{ $trunk->dial_pattern_match ?: '-' }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Pattern Replace</span>
+                            <span class="detail-value font-mono">{{ $trunk->dial_pattern_replace ?: '-' }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Dial Prefix</span>
+                            <span class="detail-value font-mono">{{ $trunk->dial_prefix ?: '-' }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Strip Digits</span>
+                            <span class="detail-value">{{ $trunk->dial_strip_digits ?? 0 }}</span>
+                        </div>
+                        @if($trunk->tech_prefix)
+                        <div class="detail-item">
+                            <span class="detail-label">Tech Prefix</span>
+                            <span class="detail-value font-mono">{{ $trunk->tech_prefix }}</span>
+                        </div>
                         @endif
-                    </dd>
+                        <div class="detail-item">
+                            <span class="detail-label">CLI Mode</span>
+                            <span class="detail-value">{{ ucfirst(str_replace('_', ' ', $trunk->cli_mode)) }}</span>
+                        </div>
+                        @if($trunk->cli_mode === 'override' && $trunk->cli_override_number)
+                        <div class="detail-item">
+                            <span class="detail-label">CLI Override</span>
+                            <span class="detail-value font-mono">{{ $trunk->cli_override_number }}</span>
+                        </div>
+                        @endif
+                        @if($trunk->cli_mode === 'prefix_strip')
+                        <div class="detail-item">
+                            <span class="detail-label">CLI Strip/Add</span>
+                            <span class="detail-value font-mono">-{{ $trunk->cli_prefix_strip ?? 0 }} / +{{ $trunk->cli_prefix_add ?: 'none' }}</span>
+                        </div>
+                        @endif
+                    </div>
                 </div>
-                @if($trunk->health_check)
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Check Interval</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->health_check_interval }}s</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Auto-disable Threshold</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->health_auto_disable_threshold }} consecutive failures</dd>
-                </div>
-                @if($trunk->health_asr_threshold)
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">ASR Threshold</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $trunk->health_asr_threshold }}%</dd>
-                </div>
-                @endif
-                @endif
-            </dl>
-        </div>
+            </div>
+            @endif
 
-        {{-- Notes --}}
-        @if($trunk->notes)
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">Notes</h3>
-            </div>
-            <div class="p-6">
-                <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ $trunk->notes }}</p>
-            </div>
-        </div>
-        @endif
-
-        {{-- Routing Rules (outgoing/both only) --}}
-        @if(in_array($trunk->direction, ['outgoing', 'both']))
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex items-center justify-between">
-                <h3 class="text-base font-semibold text-gray-900">Routing Rules</h3>
-                <a href="{{ route('admin.trunk-routes.create', ['trunk_id' => $trunk->id]) }}"
-                   class="text-sm font-medium text-indigo-600 hover:text-indigo-900">+ Add Route</a>
-            </div>
-            @if($trunk->routes->isEmpty())
-                <div class="p-6">
-                    <p class="text-sm text-gray-500">No routing rules configured for this trunk.</p>
-                    <a href="{{ route('admin.trunk-routes.create', ['trunk_id' => $trunk->id]) }}"
-                       class="mt-2 inline-block text-sm text-indigo-600 hover:text-indigo-900">
-                        Create the first routing rule
+            {{-- Routing Rules (outgoing/both) --}}
+            @if(in_array($trunk->direction, ['outgoing', 'both']))
+            <div class="detail-card">
+                <div class="detail-card-header flex items-center justify-between">
+                    <h3 class="detail-card-title">Routing Rules</h3>
+                    <a href="{{ route('admin.trunk-routes.create', ['trunk_id' => $trunk->id]) }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                        + Add Route
                     </a>
                 </div>
-            @else
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prefix</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time Window</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weight</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        @foreach($trunk->routes->sortBy(['prefix', 'priority']) as $route)
-                        <tr>
-                            <td class="px-4 py-2 text-sm font-mono">{{ $route->prefix }}</td>
-                            <td class="px-4 py-2 text-sm">
-                                @if($route->time_start)
-                                    <span class="font-mono">{{ substr($route->time_start, 0, 5) }} - {{ substr($route->time_end, 0, 5) }}</span>
-                                    <span class="text-xs text-gray-500">({{ $route->timezone }})</span>
-                                @else
-                                    <span class="text-gray-400 italic">Always</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-2 text-sm">{{ $route->priority }}</td>
-                            <td class="px-4 py-2 text-sm">{{ $route->weight }}</td>
-                            <td class="px-4 py-2">
-                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                    {{ $route->status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                    {{ ucfirst($route->status) }}
-                                </span>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-                <div class="px-4 py-3 border-t border-gray-200">
-                    <a href="{{ route('admin.trunk-routes.index', ['trunk_id' => $trunk->id]) }}"
-                       class="text-sm text-indigo-600 hover:text-indigo-900">
-                        View all routing rules for this trunk &rarr;
-                    </a>
-                </div>
+                @if($trunk->routes->isEmpty())
+                    <div class="detail-card-body">
+                        <div class="flex items-center gap-3 text-gray-500">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span class="text-sm">No routing rules configured.</span>
+                        </div>
+                    </div>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Prefix</th>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Time</th>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Priority</th>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Weight</th>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50">
+                                @foreach($trunk->routes->sortBy(['prefix', 'priority']) as $route)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-2 text-sm font-mono">{{ $route->prefix }}</td>
+                                    <td class="px-4 py-2 text-sm">
+                                        @if($route->time_start)
+                                            <span class="font-mono">{{ substr($route->time_start, 0, 5) }} - {{ substr($route->time_end, 0, 5) }}</span>
+                                        @else
+                                            <span class="text-gray-400">Always</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-2 text-sm">{{ $route->priority }}</td>
+                                    <td class="px-4 py-2 text-sm">{{ $route->weight }}</td>
+                                    <td class="px-4 py-2">
+                                        @if($route->status === 'active')
+                                            <span class="badge badge-success">Active</span>
+                                        @else
+                                            <span class="badge badge-danger">Disabled</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="px-4 py-3 border-t border-gray-100">
+                        <a href="{{ route('admin.trunk-routes.index', ['trunk_id' => $trunk->id]) }}" class="text-sm text-indigo-600 hover:text-indigo-700">
+                            View all routing rules &rarr;
+                        </a>
+                    </div>
+                @endif
+            </div>
             @endif
         </div>
-        @endif
+
+        {{-- Sidebar --}}
+        <div class="space-y-6">
+            {{-- Provisioning Status --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Asterisk Status</h3>
+                </div>
+                <div class="detail-card-body">
+                    @if($provisioned)
+                        <div class="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg">
+                            <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-emerald-800">Provisioned</p>
+                                <p class="text-xs text-emerald-600">Active in PJSIP config</p>
+                            </div>
+                        </div>
+                    @else
+                        <div class="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
+                            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-red-800">Not Provisioned</p>
+                                <p class="text-xs text-red-600">Not in PJSIP config</p>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Health Status --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Health Status</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="flex items-center gap-3 mb-4">
+                        @if($trunk->health_status === 'up')
+                            <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-emerald-800">Healthy</p>
+                                <p class="text-xs text-emerald-600">All checks passing</p>
+                            </div>
+                        @elseif($trunk->health_status === 'down')
+                            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-red-800">Down</p>
+                                <p class="text-xs text-red-600">Trunk unreachable</p>
+                            </div>
+                        @elseif($trunk->health_status === 'degraded')
+                            <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-amber-800">Degraded</p>
+                                <p class="text-xs text-amber-600">Performance issues</p>
+                            </div>
+                        @else
+                            <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Unknown</p>
+                                <p class="text-xs text-gray-500">Not monitored</p>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="space-y-2 text-sm">
+                        @if($trunk->health_last_checked_at)
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Last Checked</span>
+                            <span class="text-gray-900">{{ $trunk->health_last_checked_at->diffForHumans() }}</span>
+                        </div>
+                        @endif
+                        @if($trunk->health_last_up_at)
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Last Up</span>
+                            <span class="text-gray-900">{{ $trunk->health_last_up_at->diffForHumans() }}</span>
+                        </div>
+                        @endif
+                        @if($trunk->health_fail_count > 0)
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Fail Count</span>
+                            <span class="text-red-600 font-medium">{{ $trunk->health_fail_count }}</span>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            {{-- Health Monitoring Settings --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Health Monitoring</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Enabled</span>
+                            <span class="text-gray-900">
+                                @if($trunk->health_check)
+                                    <span class="badge badge-success">Yes</span>
+                                @else
+                                    <span class="badge badge-gray">No</span>
+                                @endif
+                            </span>
+                        </div>
+                        @if($trunk->health_check)
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Interval</span>
+                            <span class="text-gray-900">{{ $trunk->health_check_interval }}s</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Auto-disable</span>
+                            <span class="text-gray-900">{{ $trunk->health_auto_disable_threshold }} failures</span>
+                        </div>
+                        @if($trunk->health_asr_threshold)
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">ASR Threshold</span>
+                            <span class="text-gray-900">{{ $trunk->health_asr_threshold }}%</span>
+                        </div>
+                        @endif
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            {{-- Quick Actions --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Quick Actions</h3>
+                </div>
+                <div class="detail-card-body space-y-2">
+                    @if(in_array($trunk->direction, ['outgoing', 'both']))
+                    <a href="{{ route('admin.trunk-routes.create', ['trunk_id' => $trunk->id]) }}" class="quick-action-btn">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Add Routing Rule
+                    </a>
+                    @endif
+                    <a href="{{ route('admin.cdr.index', ['trunk_id' => $trunk->id]) }}" class="quick-action-btn">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        View Call Records
+                    </a>
+                </div>
+            </div>
+
+            {{-- Notes --}}
+            @if($trunk->notes)
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Notes</h3>
+                </div>
+                <div class="detail-card-body">
+                    <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ $trunk->notes }}</p>
+                </div>
+            </div>
+            @endif
+        </div>
     </div>
 
+    {{-- Back Link --}}
     <div class="mt-6">
-        <a href="{{ route('admin.trunks.index') }}" class="text-sm font-semibold text-gray-600 hover:text-gray-900">&larr; Back to trunks</a>
+        <a href="{{ route('admin.trunks.index') }}" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back to Trunks
+        </a>
     </div>
 </x-admin-layout>

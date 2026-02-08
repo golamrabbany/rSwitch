@@ -1,100 +1,165 @@
 <x-reseller-layout>
     <x-slot name="header">SIP Accounts</x-slot>
 
-    {{-- Filters --}}
-    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <form method="GET" class="flex flex-wrap items-center gap-3">
-            <select name="user_id" onchange="this.form.submit()" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">All Users</option>
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div>
+            <h2 class="page-title">SIP Accounts</h2>
+            <p class="page-subtitle">Manage SIP endpoints for you and your clients</p>
+        </div>
+        <div class="page-actions">
+            <a href="{{ route('reseller.sip-accounts.create') }}" class="btn-action-primary-reseller">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Add SIP Account
+            </a>
+        </div>
+    </div>
+
+    {{-- Filter Card --}}
+    <div class="filter-card">
+        <form method="GET" class="filter-row">
+            <div class="filter-search-box">
+                <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by username, caller ID..." class="filter-input">
+            </div>
+
+            <select name="user_id" class="filter-select">
+                <option value="">All Owners</option>
                 @foreach ($users as $user)
                     <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
                         {{ $user->id === auth()->id() ? 'You (' . $user->name . ')' : $user->name }}
                     </option>
                 @endforeach
             </select>
-            <select name="status" onchange="this.form.submit()" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+
+            <select name="status" class="filter-select">
                 <option value="">All Statuses</option>
                 <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
                 <option value="suspended" {{ request('status') === 'suspended' ? 'selected' : '' }}>Suspended</option>
                 <option value="disabled" {{ request('status') === 'disabled' ? 'selected' : '' }}>Disabled</option>
             </select>
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search username, CID, or owner..."
-                   class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-64">
-            <button type="submit" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Search</button>
-            @if(request()->hasAny(['status', 'search', 'user_id']))
-                <a href="{{ route('reseller.sip-accounts.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+
+            <select name="auth_type" class="filter-select">
+                <option value="">All Auth Types</option>
+                <option value="password" {{ request('auth_type') === 'password' ? 'selected' : '' }}>Password</option>
+                <option value="ip" {{ request('auth_type') === 'ip' ? 'selected' : '' }}>IP Based</option>
+                <option value="both" {{ request('auth_type') === 'both' ? 'selected' : '' }}>Both</option>
+            </select>
+
+            <button type="submit" class="btn-search-reseller">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Search
+            </button>
+
+            @if(request()->hasAny(['status', 'search', 'user_id', 'auth_type']))
+                <a href="{{ route('reseller.sip-accounts.index') }}" class="btn-clear">Clear</a>
             @endif
         </form>
-        <a href="{{ route('reseller.sip-accounts.create') }}" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-            <svg class="-ml-0.5 mr-1.5 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            Create SIP Account
-        </a>
     </div>
 
     {{-- Table --}}
-    <div class="overflow-hidden bg-white shadow sm:rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    <div class="data-table-container">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auth</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Caller ID</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Channels</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th>Username</th>
+                    <th>Owner</th>
+                    <th>Auth</th>
+                    <th>Caller ID</th>
+                    <th>Channels</th>
+                    <th>Status</th>
+                    <th class="text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody>
                 @forelse ($sipAccounts as $sip)
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">{{ $sip->username }}</div>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium text-gray-900">{{ $sip->username }}</span>
+                                @if($sip->is_online ?? false)
+                                    <span class="w-2 h-2 bg-emerald-500 rounded-full" title="Online"></span>
+                                @endif
+                            </div>
                             @if($sip->last_registered_at)
                                 <div class="text-xs text-gray-500">Last reg: {{ $sip->last_registered_at->diffForHumans() }}</div>
                             @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td>
                             @if($sip->user_id === auth()->id())
-                                <span class="text-sm text-gray-900">You</span>
+                                <span class="badge badge-info">You</span>
                             @else
-                                <a href="{{ route('reseller.clients.show', $sip->user) }}" class="text-sm text-indigo-600 hover:text-indigo-900">{{ $sip->user->name }}</a>
+                                <a href="{{ route('reseller.clients.show', $sip->user) }}" class="text-emerald-600 hover:text-emerald-700 font-medium">
+                                    {{ $sip->user->name }}
+                                </a>
                             @endif
-                            <div class="text-xs text-gray-500">{{ ucfirst($sip->user->role) }}</div>
+                            <div class="text-xs text-gray-500 capitalize">{{ $sip->user->role }}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ ucfirst($sip->auth_type) }}
+                        <td>
+                            <span class="badge badge-gray">{{ ucfirst($sip->auth_type) }}</span>
                             @if(in_array($sip->auth_type, ['ip', 'both']))
-                                <div class="text-xs text-gray-400">{{ Str::limit($sip->allowed_ips, 30) }}</div>
+                                <div class="text-xs text-gray-400 mt-1 font-mono">{{ Str::limit($sip->allowed_ips, 20) }}</div>
                             @endif
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ $sip->caller_id_name ? $sip->caller_id_name . ' ' : '' }}&lt;{{ $sip->caller_id_number }}&gt;
+                        <td>
+                            @if($sip->caller_id_name)
+                                <span class="font-medium text-gray-900">{{ $sip->caller_id_name }}</span><br>
+                            @endif
+                            <span class="text-gray-500 font-mono text-xs">&lt;{{ $sip->caller_id_number }}&gt;</span>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $sip->max_channels }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $sip->status === 'active' ? 'bg-green-100 text-green-800' : ($sip->status === 'suspended' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
-                                {{ ucfirst($sip->status) }}
-                            </span>
+                        <td class="font-medium">{{ $sip->max_channels }}</td>
+                        <td>
+                            @switch($sip->status)
+                                @case('active')
+                                    <span class="badge badge-success">Active</span>
+                                    @break
+                                @case('suspended')
+                                    <span class="badge badge-warning">Suspended</span>
+                                    @break
+                                @default
+                                    <span class="badge badge-danger">Disabled</span>
+                            @endswitch
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <a href="{{ route('reseller.sip-accounts.show', $sip) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
-                            <a href="{{ route('reseller.sip-accounts.edit', $sip) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+                        <td class="text-center">
+                            <a href="{{ route('reseller.sip-accounts.show', $sip) }}" class="action-icon" title="View">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </a>
+                            <a href="{{ route('reseller.sip-accounts.edit', $sip) }}" class="action-icon" title="Edit">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </a>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-500">No SIP accounts found.</td>
+                        <td colspan="7" class="text-center py-12">
+                            <div class="empty-state">
+                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                                </svg>
+                                <p class="empty-text">No SIP accounts found</p>
+                                <a href="{{ route('reseller.sip-accounts.create') }}" class="empty-link-reseller">Create your first SIP account</a>
+                            </div>
+                        </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="mt-4">
-        {{ $sipAccounts->withQueryString()->links() }}
-    </div>
+    @if($sipAccounts->hasPages())
+        <div class="mt-6">
+            {{ $sipAccounts->withQueryString()->links() }}
+        </div>
+    @endif
 </x-reseller-layout>

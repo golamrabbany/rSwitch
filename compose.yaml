@@ -1,11 +1,11 @@
 services:
     laravel.test:
         build:
-            context: './vendor/laravel/sail/runtimes/8.5'
+            context: ./vendor/laravel/sail/runtimes/8.5
             dockerfile: Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP}'
-        image: 'sail-8.5/app'
+        image: sail-8.5/app
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
@@ -65,9 +65,24 @@ services:
                 - ping
             retries: 3
             timeout: 5s
+    phpmyadmin:
+        image: 'phpmyadmin:latest'
+        ports:
+            - '${FORWARD_PHPMYADMIN_PORT:-8080}:80'
+        environment:
+            PMA_HOST: mysql
+            PMA_PORT: 3306
+            PMA_USER: '${DB_USERNAME}'
+            PMA_PASSWORD: '${DB_PASSWORD}'
+            UPLOAD_LIMIT: 100M
+        networks:
+            - sail
+        depends_on:
+            mysql:
+                condition: service_healthy
     worker:
-        image: 'sail-8.5/app'
-        command: /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+        image: sail-8.5/app
+        command: '/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf'
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         environment:
@@ -84,7 +99,7 @@ services:
             - laravel.test
     asterisk:
         build:
-            context: './docker/asterisk'
+            context: ./docker/asterisk
             dockerfile: Dockerfile
         image: 'rswitch/asterisk:21'
         ports:

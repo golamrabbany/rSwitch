@@ -1,111 +1,445 @@
 <x-admin-layout>
-    <x-slot name="header">Edit SIP Account: {{ $sipAccount->username }}</x-slot>
+    <x-slot name="header">Edit SIP Account</x-slot>
 
-    <div class="max-w-2xl">
-        <form method="POST" action="{{ route('admin.sip-accounts.update', $sipAccount) }}" class="space-y-6">
-            @csrf
-            @method('PUT')
-
-            <div class="bg-white shadow sm:rounded-lg p-6 space-y-6">
-                <div>
-                    <label for="user_id" class="block text-sm font-medium text-gray-700">Owner</label>
-                    <select id="user_id" name="user_id" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        @foreach ($users as $user)
-                            <option value="{{ $user->id }}" {{ old('user_id', $sipAccount->user_id) == $user->id ? 'selected' : '' }}>
-                                {{ $user->name }} ({{ $user->email }}) - {{ ucfirst($user->role) }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <x-input-error :messages="$errors->get('user_id')" class="mt-2" />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Username (SIP ID)</label>
-                    <p class="mt-1 text-sm font-mono text-gray-900 bg-gray-50 rounded-md px-3 py-2">{{ $sipAccount->username }}</p>
-                    <p class="mt-1 text-xs text-gray-500">Username cannot be changed after creation.</p>
-                </div>
-
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">SIP Password</label>
-                    <input type="text" id="password" name="password" value="{{ old('password') }}"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
-                           placeholder="Leave blank to keep current password">
-                    <x-input-error :messages="$errors->get('password')" class="mt-2" />
-                </div>
-
-                <div>
-                    <label for="auth_type" class="block text-sm font-medium text-gray-700">Authentication Type</label>
-                    <select id="auth_type" name="auth_type" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            x-data x-on:change="$dispatch('auth-changed', { type: $el.value })">
-                        <option value="password" {{ old('auth_type', $sipAccount->auth_type) === 'password' ? 'selected' : '' }}>Password Only</option>
-                        <option value="ip" {{ old('auth_type', $sipAccount->auth_type) === 'ip' ? 'selected' : '' }}>IP Only</option>
-                        <option value="both" {{ old('auth_type', $sipAccount->auth_type) === 'both' ? 'selected' : '' }}>Password + IP</option>
-                    </select>
-                    <x-input-error :messages="$errors->get('auth_type')" class="mt-2" />
-                </div>
-
-                <div x-data="{ authType: '{{ old('auth_type', $sipAccount->auth_type) }}' }" x-on:auth-changed.window="authType = $event.detail.type"
-                     x-show="authType === 'ip' || authType === 'both'" x-cloak>
-                    <label for="allowed_ips" class="block text-sm font-medium text-gray-700">Allowed IPs</label>
-                    <input type="text" id="allowed_ips" name="allowed_ips" value="{{ old('allowed_ips', $sipAccount->allowed_ips) }}"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                           placeholder="192.168.1.100, 10.0.0.0/24">
-                    <x-input-error :messages="$errors->get('allowed_ips')" class="mt-2" />
-                </div>
-
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                    <select id="status" name="status" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="active" {{ old('status', $sipAccount->status) === 'active' ? 'selected' : '' }}>Active</option>
-                        <option value="suspended" {{ old('status', $sipAccount->status) === 'suspended' ? 'selected' : '' }}>Suspended</option>
-                        <option value="disabled" {{ old('status', $sipAccount->status) === 'disabled' ? 'selected' : '' }}>Disabled</option>
-                    </select>
-                    <p class="mt-1 text-xs text-gray-500">Suspended/disabled accounts are deprovisioned from Asterisk.</p>
-                    <x-input-error :messages="$errors->get('status')" class="mt-2" />
-                </div>
-
-                <hr class="border-gray-200">
-
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                        <label for="caller_id_name" class="block text-sm font-medium text-gray-700">Caller ID Name</label>
-                        <input type="text" id="caller_id_name" name="caller_id_name" value="{{ old('caller_id_name', $sipAccount->caller_id_name) }}" required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <x-input-error :messages="$errors->get('caller_id_name')" class="mt-2" />
-                    </div>
-                    <div>
-                        <label for="caller_id_number" class="block text-sm font-medium text-gray-700">Caller ID Number</label>
-                        <input type="text" id="caller_id_number" name="caller_id_number" value="{{ old('caller_id_number', $sipAccount->caller_id_number) }}" required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <x-input-error :messages="$errors->get('caller_id_number')" class="mt-2" />
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                        <label for="max_channels" class="block text-sm font-medium text-gray-700">Max Channels</label>
-                        <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', $sipAccount->max_channels) }}" required min="1" max="100"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
-                    </div>
-                    <div>
-                        <label for="codec_allow" class="block text-sm font-medium text-gray-700">Codecs</label>
-                        <input type="text" id="codec_allow" name="codec_allow" value="{{ old('codec_allow', $sipAccount->codec_allow) }}" required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <x-input-error :messages="$errors->get('codec_allow')" class="mt-2" />
-                    </div>
-                </div>
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
             </div>
-
-            <div class="flex items-center justify-end gap-x-3">
-                <a href="{{ route('admin.sip-accounts.show', $sipAccount) }}" class="text-sm font-semibold text-gray-900">Cancel</a>
-                <button type="submit" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-                    Update SIP Account
-                </button>
+            <div>
+                <h2 class="page-title">Edit SIP Account</h2>
+                <p class="page-subtitle font-mono">{{ $sipAccount->username }}</p>
             </div>
-        </form>
+        </div>
+        <div class="page-actions">
+            <a href="{{ route('admin.sip-accounts.show', $sipAccount) }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back to Details
+            </a>
+        </div>
     </div>
+
+    <form method="POST" action="{{ route('admin.sip-accounts.update', $sipAccount) }}" x-data="{
+        ownerOpen: false,
+        ownerSearch: '{{ $sipAccount->user->name }}',
+        ownerId: '{{ old('user_id', $sipAccount->user_id) }}',
+        users: {{ $users->toJson() }},
+        get filteredUsers() {
+            if (!this.ownerSearch) return this.users;
+            const search = this.ownerSearch.toLowerCase();
+            return this.users.filter(u =>
+                u.name.toLowerCase().includes(search) ||
+                u.email.toLowerCase().includes(search)
+            );
+        },
+        selectOwner(user) {
+            this.ownerSearch = user.name;
+            this.ownerId = user.id;
+            this.ownerOpen = false;
+        },
+        clearOwner() {
+            this.ownerSearch = '';
+            this.ownerId = '';
+            this.$refs.ownerInput.focus();
+        }
+    }">
+        @csrf
+        @method('PUT')
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {{-- Main Form - Left Side --}}
+            <div class="lg:col-span-2 space-y-6">
+                {{-- Account Settings --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Account Settings</h3>
+                        <p class="form-card-subtitle">Basic SIP account configuration</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group md:col-span-2">
+                                <label class="form-label">Client</label>
+                                <div class="relative">
+                                    <input type="hidden" name="user_id" :value="ownerId">
+                                    <div class="relative">
+                                        <input type="text"
+                                               x-ref="ownerInput"
+                                               x-model="ownerSearch"
+                                               @focus="ownerOpen = true"
+                                               @click="ownerOpen = true"
+                                               @input="ownerOpen = true"
+                                               @keydown.escape="ownerOpen = false"
+                                               @keydown.tab="ownerOpen = false"
+                                               class="form-input pr-16"
+                                               placeholder="Search client by name or email..."
+                                               autocomplete="off">
+                                        <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                            <button type="button" x-show="ownerSearch" @click="clearOwner()" class="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                                </svg>
+                                            </button>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    {{-- Dropdown --}}
+                                    <div x-show="ownerOpen && filteredUsers.length > 0"
+                                         x-cloak
+                                         @click.outside="ownerOpen = false"
+                                         class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                                        <template x-for="user in filteredUsers" :key="user.id">
+                                            <div @click="selectOwner(user)"
+                                                 class="px-4 py-2 cursor-pointer hover:bg-indigo-50 flex items-center justify-between"
+                                                 :class="{ 'bg-indigo-50': ownerId == user.id }">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center">
+                                                        <span class="text-xs font-medium text-sky-600" x-text="user.name.substring(0, 2).toUpperCase()"></span>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-sm font-medium text-gray-900" x-text="user.name"></p>
+                                                        <p class="text-xs text-gray-500" x-text="user.email"></p>
+                                                    </div>
+                                                </div>
+                                                <span class="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">Client</span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    {{-- No results --}}
+                                    <div x-show="ownerOpen && ownerSearch && filteredUsers.length === 0"
+                                         x-cloak
+                                         class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                                        No clients found matching "<span x-text="ownerSearch"></span>"
+                                    </div>
+                                </div>
+                                <p class="form-hint">SIP accounts can only be assigned to clients</p>
+                                <x-input-error :messages="$errors->get('user_id')" class="mt-2" />
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Username (SIP ID)</label>
+                                <div class="form-input bg-gray-50 font-mono text-gray-600 flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                    </svg>
+                                    {{ $sipAccount->username }}
+                                </div>
+                                <p class="form-hint">Username cannot be changed after creation</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="max_channels" class="form-label">Max Channels</label>
+                                <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', $sipAccount->max_channels) }}" required min="1" max="100" class="form-input">
+                                <p class="form-hint">Concurrent call limit (1-100)</p>
+                                <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Authentication --}}
+                <div class="form-card" x-data="{ authType: '{{ old('auth_type', $sipAccount->auth_type) }}' }">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Authentication</h3>
+                        <p class="form-card-subtitle">Security and access control settings</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label for="password" class="form-label">SIP Password</label>
+                                <div class="relative">
+                                    <input type="text" id="password" name="password" value="{{ old('password') }}" class="form-input font-mono pr-20" placeholder="Leave blank to keep current">
+                                    <button type="button" onclick="regeneratePassword()" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                                        Generate New
+                                    </button>
+                                </div>
+                                <p class="form-hint">Min 12 chars. Leave blank to keep current password.</p>
+                                <x-input-error :messages="$errors->get('password')" class="mt-2" />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="auth_type" class="form-label">Authentication Type</label>
+                                <select id="auth_type" name="auth_type" required class="form-input" x-model="authType">
+                                    <option value="password">Password Only</option>
+                                    <option value="ip">IP Only</option>
+                                    <option value="both">Password + IP</option>
+                                </select>
+                                <x-input-error :messages="$errors->get('auth_type')" class="mt-2" />
+                            </div>
+
+                            <div class="form-group md:col-span-2" x-show="authType === 'ip' || authType === 'both'" x-cloak>
+                                <label for="allowed_ips" class="form-label">Allowed IPs</label>
+                                <input type="text" id="allowed_ips" name="allowed_ips" value="{{ old('allowed_ips', $sipAccount->allowed_ips) }}" class="form-input font-mono" placeholder="192.168.1.100, 10.0.0.0/24">
+                                <p class="form-hint">Comma-separated IPs or CIDR ranges</p>
+                                <x-input-error :messages="$errors->get('allowed_ips')" class="mt-2" />
+                            </div>
+
+                            <div class="form-group md:col-span-2">
+                                <label for="codec_allow" class="form-label">Codecs</label>
+                                <input type="text" id="codec_allow" name="codec_allow" value="{{ old('codec_allow', $sipAccount->codec_allow) }}" required class="form-input font-mono">
+                                <p class="form-hint">Comma-separated codec list in priority order</p>
+                                <x-input-error :messages="$errors->get('codec_allow')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Caller ID --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Caller ID</h3>
+                        <p class="form-card-subtitle">Outbound caller identification</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label for="caller_id_name" class="form-label">Caller ID Name</label>
+                                <input type="text" id="caller_id_name" name="caller_id_name" value="{{ old('caller_id_name', $sipAccount->caller_id_name) }}" required class="form-input">
+                                <x-input-error :messages="$errors->get('caller_id_name')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label for="caller_id_number" class="form-label">Caller ID Number</label>
+                                <input type="text" id="caller_id_number" name="caller_id_number" value="{{ old('caller_id_number', $sipAccount->caller_id_number) }}" required class="form-input font-mono">
+                                <x-input-error :messages="$errors->get('caller_id_number')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Status --}}
+                <div class="form-card" x-data="{ status: '{{ old('status', $sipAccount->status) }}' }">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Account Status</h3>
+                        <p class="form-card-subtitle">Control account access and provisioning</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="form-group">
+                            <label for="status" class="form-label">Status</label>
+                            <select id="status" name="status" required class="form-input" x-model="status">
+                                <option value="active">Active</option>
+                                <option value="suspended">Suspended</option>
+                                <option value="disabled">Disabled</option>
+                            </select>
+                            <x-input-error :messages="$errors->get('status')" class="mt-2" />
+                        </div>
+
+                        {{-- Status Warning --}}
+                        <div x-show="status !== 'active'" x-cloak class="mt-4 p-3 rounded-lg border" :class="{
+                            'bg-amber-50 border-amber-200': status === 'suspended',
+                            'bg-red-50 border-red-200': status === 'disabled'
+                        }">
+                            <div class="flex items-start gap-3">
+                                <svg class="w-5 h-5 flex-shrink-0 mt-0.5" :class="{
+                                    'text-amber-500': status === 'suspended',
+                                    'text-red-500': status === 'disabled'
+                                }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                                <div>
+                                    <p class="text-sm font-medium" :class="{
+                                        'text-amber-800': status === 'suspended',
+                                        'text-red-800': status === 'disabled'
+                                    }" x-text="status === 'suspended' ? 'Account will be suspended' : 'Account will be disabled'"></p>
+                                    <p class="text-xs mt-1" :class="{
+                                        'text-amber-600': status === 'suspended',
+                                        'text-red-600': status === 'disabled'
+                                    }">This account will be deprovisioned from Asterisk and will not be able to make or receive calls.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Form Actions --}}
+                <div class="flex items-center justify-end gap-3">
+                    <a href="{{ route('admin.sip-accounts.show', $sipAccount) }}" class="btn-secondary">Cancel</a>
+                    <button type="submit" class="btn-primary">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Update SIP Account
+                    </button>
+                </div>
+            </div>
+
+            {{-- Sidebar - Right Side --}}
+            <div class="space-y-6">
+                {{-- Current Account Info --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Account Info</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                <span class="text-lg font-bold text-white">{{ strtoupper(substr($sipAccount->username, 0, 2)) }}</span>
+                            </div>
+                            <div>
+                                <p class="font-mono font-medium text-gray-900">{{ $sipAccount->username }}</p>
+                                <span class="badge {{ $sipAccount->status === 'active' ? 'badge-success' : ($sipAccount->status === 'suspended' ? 'badge-warning' : 'badge-danger') }}">
+                                    {{ ucfirst($sipAccount->status) }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 text-sm border-t border-gray-100 pt-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">Created</span>
+                                <span class="text-gray-900">{{ $sipAccount->created_at->format('M d, Y') }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">Last Updated</span>
+                                <span class="text-gray-900">{{ $sipAccount->updated_at->diffForHumans() }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">Auth Type</span>
+                                <span class="font-mono text-gray-900">{{ $sipAccount->auth_type }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Client Info --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Current Client</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center">
+                                <span class="text-sm font-medium text-sky-600">{{ strtoupper(substr($sipAccount->user->name, 0, 2)) }}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900 truncate">{{ $sipAccount->user->name }}</p>
+                                <p class="text-xs text-gray-500 truncate">{{ $sipAccount->user->email }}</p>
+                            </div>
+                            <span class="badge badge-blue">Client</span>
+                        </div>
+                        @if($sipAccount->user->parent)
+                            <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
+                                <span>Reseller:</span>
+                                <a href="{{ route('admin.users.show', $sipAccount->user->parent) }}" class="text-indigo-600 hover:text-indigo-800 ml-1">{{ $sipAccount->user->parent->name }}</a>
+                            </div>
+                        @endif
+                        <a href="{{ route('admin.users.show', $sipAccount->user) }}" class="mt-3 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                            View Client Profile
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+
+                {{-- Authentication Types --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Authentication Types</h3>
+                    </div>
+                    <div class="detail-card-body space-y-4">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="badge badge-info">Password</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Standard SIP authentication. Most common option.</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="badge badge-purple">IP Only</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Authenticate by source IP. Good for trusted PBX systems.</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="badge badge-success">Both</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Requires password AND IP whitelist. Maximum security.</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Common Codecs --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Common Codecs</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="font-mono text-gray-700">ulaw</span>
+                                <span class="text-xs text-gray-500">G.711 (NA)</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="font-mono text-gray-700">alaw</span>
+                                <span class="text-xs text-gray-500">G.711 (EU)</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="font-mono text-gray-700">g729</span>
+                                <span class="text-xs text-gray-500">Low BW</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="font-mono text-gray-700">g722</span>
+                                <span class="text-xs text-gray-500">HD Voice</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1">
+                                <span class="font-mono text-gray-700">opus</span>
+                                <span class="text-xs text-gray-500">Modern</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Tips --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Tips</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <ul class="text-xs text-gray-600 space-y-2">
+                            <li class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span>Leave password blank to keep current</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span>Changes are auto-provisioned to Asterisk</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                                <span>Status change affects active calls</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                                <span>Changing owner may affect billing</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <script>
+        function regeneratePassword() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*';
+            let password = '';
+            for (let i = 0; i < 20; i++) {
+                password += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            document.getElementById('password').value = password;
+        }
+    </script>
 </x-admin-layout>

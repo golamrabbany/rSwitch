@@ -29,6 +29,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::resource('users', Admin\UserController::class);
     Route::post('users/{user}/toggle-status', [Admin\UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::post('users/{user}/adjust-balance', [Admin\UserController::class, 'adjustBalance'])->name('users.adjust-balance');
 
     Route::get('kyc', [Admin\KycController::class, 'index'])->name('kyc.index');
     Route::get('kyc/{kycProfile}', [Admin\KycController::class, 'show'])->name('kyc.show');
@@ -37,6 +38,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::resource('sip-accounts', Admin\SipAccountController::class);
     Route::post('sip-accounts/{sip_account}/reprovision', [Admin\SipAccountController::class, 'reprovision'])->name('sip-accounts.reprovision');
+    Route::get('sip-accounts-export', [Admin\SipAccountController::class, 'export'])->name('sip-accounts.export');
+    Route::get('sip-accounts-import', [Admin\SipAccountController::class, 'importForm'])->name('sip-accounts.import-form');
+    Route::post('sip-accounts-import', [Admin\SipAccountController::class, 'import'])->name('sip-accounts.import');
 
     Route::resource('trunks', Admin\TrunkController::class);
     Route::post('trunks/{trunk}/reprovision', [Admin\TrunkController::class, 'reprovision'])->name('trunks.reprovision');
@@ -55,6 +59,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('cdr', [Admin\CdrController::class, 'index'])->name('cdr.index');
     Route::get('cdr/export', [Admin\CdrController::class, 'export'])->name('cdr.export');
     Route::get('cdr/{uuid}', [Admin\CdrController::class, 'show'])->name('cdr.show');
+
+    // Operational Reports
+    Route::get('operational-reports', [Admin\OperationalReportController::class, 'index'])->name('operational-reports.index');
+    Route::get('operational-reports/active', [Admin\OperationalReportController::class, 'activeCalls'])->name('operational-reports.active');
+    Route::get('operational-reports/inbound', [Admin\OperationalReportController::class, 'inboundCalls'])->name('operational-reports.inbound');
+    Route::get('operational-reports/outbound', [Admin\OperationalReportController::class, 'outboundCalls'])->name('operational-reports.outbound');
+    Route::get('operational-reports/summary', [Admin\OperationalReportController::class, 'summaryCalls'])->name('operational-reports.summary');
 
     // Financial management
     Route::get('transactions', [Admin\TransactionController::class, 'index'])->name('transactions.index');

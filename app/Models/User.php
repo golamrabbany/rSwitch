@@ -175,6 +175,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Get only client IDs under this reseller (excludes self).
+     */
+    public function clientIds(): array
+    {
+        if ($this->isAdmin()) {
+            return User::where('role', 'client')->pluck('id')->all();
+        }
+
+        if ($this->isReseller()) {
+            return User::where('parent_id', $this->id)->where('role', 'client')->pluck('id')->all();
+        }
+
+        return [];
+    }
+
+    /**
      * Check if this user can manage the given user.
      */
     public function canManage(User $target): bool

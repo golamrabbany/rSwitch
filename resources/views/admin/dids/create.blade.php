@@ -1,154 +1,292 @@
 <x-admin-layout>
     <x-slot name="header">Add DID</x-slot>
 
-    <div class="max-w-2xl" x-data="{
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="page-title">Add DID</h2>
+                <p class="page-subtitle">Create a new direct inward dialing number</p>
+            </div>
+        </div>
+        <div class="page-actions">
+            <a href="{{ route('admin.dids.index') }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back to List
+            </a>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ route('admin.dids.store') }}" x-data="{
         destinationType: '{{ old('destination_type', 'sip_account') }}'
     }">
-        <form method="POST" action="{{ route('admin.dids.store') }}" class="space-y-6">
-            @csrf
+        @csrf
 
-            <div class="bg-white shadow sm:rounded-lg p-6 space-y-6">
-
-                {{-- Section: DID Information --}}
-                <h3 class="text-base font-semibold text-gray-900">DID Information</h3>
-
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                        <label for="number" class="block text-sm font-medium text-gray-700">Number</label>
-                        <input type="text" id="number" name="number" value="{{ old('number') }}" required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
-                               placeholder="+1234567890">
-                        <p class="mt-1 text-xs text-gray-500">E.164 format (e.g. +8801712345678).</p>
-                        <x-input-error :messages="$errors->get('number')" class="mt-2" />
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {{-- Main Form - Left Side --}}
+            <div class="lg:col-span-2 space-y-6">
+                {{-- DID Information --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">DID Information</h3>
+                        <p class="form-card-subtitle">Basic number details</p>
                     </div>
-                    <div>
-                        <label for="provider" class="block text-sm font-medium text-gray-700">Provider</label>
-                        <input type="text" id="provider" name="provider" value="{{ old('provider') }}" required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                               placeholder="e.g. Telnyx, Twilio">
-                        <x-input-error :messages="$errors->get('provider')" class="mt-2" />
+                    <div class="form-card-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label for="number" class="form-label">Number</label>
+                                <input type="text" id="number" name="number" value="{{ old('number') }}" required
+                                       class="form-input font-mono" placeholder="+1234567890">
+                                <p class="form-hint">E.164 format (e.g. +8801712345678)</p>
+                                <x-input-error :messages="$errors->get('number')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label for="provider" class="form-label">Provider</label>
+                                <input type="text" id="provider" name="provider" value="{{ old('provider') }}" required
+                                       class="form-input" placeholder="e.g. Telnyx, Twilio">
+                                <x-input-error :messages="$errors->get('provider')" class="mt-2" />
+                            </div>
+                            <div class="form-group md:col-span-2">
+                                <label for="trunk_id" class="form-label">Incoming Trunk</label>
+                                <select id="trunk_id" name="trunk_id" required class="form-input">
+                                    <option value="">Select a trunk...</option>
+                                    @foreach ($trunks as $trunk)
+                                        <option value="{{ $trunk->id }}" {{ old('trunk_id') == $trunk->id ? 'selected' : '' }}>
+                                            {{ $trunk->name }} ({{ $trunk->provider }}) — {{ $trunk->direction }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="form-hint">Only incoming/both trunks are shown.</p>
+                                <x-input-error :messages="$errors->get('trunk_id')" class="mt-2" />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div>
-                    <label for="trunk_id" class="block text-sm font-medium text-gray-700">Incoming Trunk</label>
-                    <select id="trunk_id" name="trunk_id" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">Select a trunk...</option>
-                        @foreach ($trunks as $trunk)
-                            <option value="{{ $trunk->id }}" {{ old('trunk_id') == $trunk->id ? 'selected' : '' }}>
-                                {{ $trunk->name }} ({{ $trunk->provider }}) — {{ $trunk->direction }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <p class="mt-1 text-xs text-gray-500">Only incoming/both trunks are shown.</p>
-                    <x-input-error :messages="$errors->get('trunk_id')" class="mt-2" />
-                </div>
-
-                {{-- Section: Assignment --}}
-                <hr class="border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">Assignment</h3>
-
-                <div>
-                    <label for="assigned_to_user_id" class="block text-sm font-medium text-gray-700">Assigned User</label>
-                    <select id="assigned_to_user_id" name="assigned_to_user_id"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">Unassigned</option>
-                        @foreach ($users as $user)
-                            <option value="{{ $user->id }}" {{ old('assigned_to_user_id', $selectedUserId) == $user->id ? 'selected' : '' }}>
-                                {{ $user->name }} ({{ $user->email }}) — {{ ucfirst($user->role) }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <p class="mt-1 text-xs text-gray-500">The reseller or client who owns this DID.</p>
-                    <x-input-error :messages="$errors->get('assigned_to_user_id')" class="mt-2" />
-                </div>
-
-                {{-- Section: Destination Routing --}}
-                <hr class="border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">Destination Routing</h3>
-
-                <div>
-                    <label for="destination_type" class="block text-sm font-medium text-gray-700">Destination Type</label>
-                    <select id="destination_type" name="destination_type" required
-                            x-model="destinationType"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="sip_account">SIP Account</option>
-                        <option value="external">External Number</option>
-                        <option value="ring_group">Ring Group</option>
-                    </select>
-                    <x-input-error :messages="$errors->get('destination_type')" class="mt-2" />
-                </div>
-
-                <div x-show="destinationType === 'sip_account'" x-cloak>
-                    <label for="destination_id" class="block text-sm font-medium text-gray-700">SIP Account</label>
-                    <select id="destination_id" name="destination_id"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">Select SIP account...</option>
-                        @foreach ($sipAccounts as $sip)
-                            <option value="{{ $sip->id }}" {{ old('destination_id') == $sip->id ? 'selected' : '' }}>
-                                {{ $sip->username }} — {{ $sip->user->name ?? 'Unknown' }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <p class="mt-1 text-xs text-gray-500">Incoming calls to this DID will ring this SIP account.</p>
-                    <x-input-error :messages="$errors->get('destination_id')" class="mt-2" />
-                </div>
-
-                <div x-show="destinationType === 'ring_group'" x-cloak>
-                    <label for="destination_id_rg" class="block text-sm font-medium text-gray-700">Ring Group</label>
-                    <select id="destination_id_rg" name="destination_id"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">Select ring group...</option>
-                        @foreach ($ringGroups as $rg)
-                            <option value="{{ $rg->id }}" {{ old('destination_id') == $rg->id ? 'selected' : '' }}>
-                                {{ $rg->name }} — {{ ucfirst($rg->strategy) }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <p class="mt-1 text-xs text-gray-500">Incoming calls will ring all members of the selected ring group.</p>
-                    <x-input-error :messages="$errors->get('destination_id')" class="mt-2" />
-                </div>
-
-                <div x-show="destinationType === 'external'" x-cloak>
-                    <label for="destination_number" class="block text-sm font-medium text-gray-700">External Number</label>
-                    <input type="text" id="destination_number" name="destination_number" value="{{ old('destination_number') }}"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
-                           placeholder="+1234567890">
-                    <p class="mt-1 text-xs text-gray-500">Calls will be forwarded to this external number via an outgoing trunk.</p>
-                    <x-input-error :messages="$errors->get('destination_number')" class="mt-2" />
-                </div>
-
-                {{-- Section: Billing --}}
-                <hr class="border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">Billing</h3>
-
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                        <label for="monthly_cost" class="block text-sm font-medium text-gray-700">Monthly Cost</label>
-                        <input type="number" id="monthly_cost" name="monthly_cost" value="{{ old('monthly_cost', '0.0000') }}" required
-                               step="0.0001" min="0" max="9999.9999"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <p class="mt-1 text-xs text-gray-500">Your cost from the provider.</p>
-                        <x-input-error :messages="$errors->get('monthly_cost')" class="mt-2" />
+                {{-- Assignment --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Assignment</h3>
+                        <p class="form-card-subtitle">Assign DID to a user</p>
                     </div>
-                    <div>
-                        <label for="monthly_price" class="block text-sm font-medium text-gray-700">Monthly Price</label>
-                        <input type="number" id="monthly_price" name="monthly_price" value="{{ old('monthly_price', '0.0000') }}" required
-                               step="0.0001" min="0" max="9999.9999"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <p class="mt-1 text-xs text-gray-500">Price charged to the client.</p>
-                        <x-input-error :messages="$errors->get('monthly_price')" class="mt-2" />
+                    <div class="form-card-body">
+                        <div class="form-group">
+                            <label for="assigned_to_user_id" class="form-label">Assigned User</label>
+                            <select id="assigned_to_user_id" name="assigned_to_user_id" class="form-input">
+                                <option value="">Unassigned</option>
+                                @foreach ($users as $user)
+                                    <option value="{{ $user->id }}" {{ old('assigned_to_user_id', $selectedUserId ?? '') == $user->id ? 'selected' : '' }}>
+                                        {{ $user->name }} ({{ $user->email }}) — {{ ucfirst($user->role) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="form-hint">The reseller or client who owns this DID.</p>
+                            <x-input-error :messages="$errors->get('assigned_to_user_id')" class="mt-2" />
+                        </div>
                     </div>
+                </div>
+
+                {{-- Destination Routing --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Destination Routing</h3>
+                        <p class="form-card-subtitle">Where incoming calls should go</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="grid grid-cols-1 gap-4">
+                            <div class="form-group">
+                                <label for="destination_type" class="form-label">Destination Type</label>
+                                <select id="destination_type" name="destination_type" required x-model="destinationType" class="form-input">
+                                    <option value="sip_account">SIP Account</option>
+                                    <option value="external">External Number</option>
+                                    <option value="ring_group">Ring Group</option>
+                                </select>
+                                <x-input-error :messages="$errors->get('destination_type')" class="mt-2" />
+                            </div>
+
+                            <div x-show="destinationType === 'sip_account'" x-cloak class="form-group">
+                                <label for="destination_id" class="form-label">SIP Account</label>
+                                <select id="destination_id" name="destination_id" class="form-input">
+                                    <option value="">Select SIP account...</option>
+                                    @foreach ($sipAccounts as $sip)
+                                        <option value="{{ $sip->id }}" {{ old('destination_id') == $sip->id ? 'selected' : '' }}>
+                                            {{ $sip->username }} — {{ $sip->user->name ?? 'Unknown' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="form-hint">Incoming calls will ring this SIP account.</p>
+                                <x-input-error :messages="$errors->get('destination_id')" class="mt-2" />
+                            </div>
+
+                            <div x-show="destinationType === 'ring_group'" x-cloak class="form-group">
+                                <label for="destination_id_rg" class="form-label">Ring Group</label>
+                                <select id="destination_id_rg" name="destination_id" class="form-input">
+                                    <option value="">Select ring group...</option>
+                                    @foreach ($ringGroups as $rg)
+                                        <option value="{{ $rg->id }}" {{ old('destination_id') == $rg->id ? 'selected' : '' }}>
+                                            {{ $rg->name }} — {{ ucfirst($rg->strategy) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="form-hint">Incoming calls will ring all group members.</p>
+                                <x-input-error :messages="$errors->get('destination_id')" class="mt-2" />
+                            </div>
+
+                            <div x-show="destinationType === 'external'" x-cloak class="form-group">
+                                <label for="destination_number" class="form-label">External Number</label>
+                                <input type="text" id="destination_number" name="destination_number" value="{{ old('destination_number') }}"
+                                       class="form-input font-mono" placeholder="+1234567890">
+                                <p class="form-hint">Calls will be forwarded via an outgoing trunk.</p>
+                                <x-input-error :messages="$errors->get('destination_number')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Billing --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Billing</h3>
+                        <p class="form-card-subtitle">Monthly cost and pricing</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label for="monthly_cost" class="form-label">Monthly Cost ($)</label>
+                                <input type="number" id="monthly_cost" name="monthly_cost" value="{{ old('monthly_cost', '0.0000') }}" required
+                                       step="0.0001" min="0" max="9999.9999" class="form-input">
+                                <p class="form-hint">Your cost from the provider.</p>
+                                <x-input-error :messages="$errors->get('monthly_cost')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label for="monthly_price" class="form-label">Monthly Price ($)</label>
+                                <input type="number" id="monthly_price" name="monthly_price" value="{{ old('monthly_price', '0.0000') }}" required
+                                       step="0.0001" min="0" max="9999.9999" class="form-input">
+                                <p class="form-hint">Price charged to the client.</p>
+                                <x-input-error :messages="$errors->get('monthly_price')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Form Actions --}}
+                <div class="flex items-center justify-end gap-3">
+                    <a href="{{ route('admin.dids.index') }}" class="btn-secondary">Cancel</a>
+                    <button type="submit" class="btn-primary">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Add DID
+                    </button>
                 </div>
             </div>
 
-            <div class="flex items-center justify-end gap-x-3">
-                <a href="{{ route('admin.dids.index') }}" class="text-sm font-semibold text-gray-900">Cancel</a>
-                <button type="submit" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-                    Add DID
-                </button>
+            {{-- Sidebar - Right Side --}}
+            <div class="space-y-6">
+                {{-- Quick Info --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Quick Info</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg mb-4">
+                            <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-emerald-800">Inbound Number</p>
+                                <p class="text-xs text-emerald-600">Routes incoming calls to destinations</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 text-sm">
+                            <div class="flex items-center gap-2 text-gray-600">
+                                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>Assign to reseller or client</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-gray-600">
+                                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>Route to SIP, Ring Group, or External</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-gray-600">
+                                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>Monthly billing included</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Destination Types --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Destination Types</h3>
+                    </div>
+                    <div class="detail-card-body space-y-4">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="badge badge-info">SIP</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Route to a specific SIP account.</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="badge badge-purple">Ring Group</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Ring multiple extensions simultaneously or sequentially.</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="badge badge-warning">External</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Forward to an external phone number.</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Tips --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Tips</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <ul class="text-xs text-gray-600 space-y-2">
+                            <li class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span>Use E.164 format for numbers (+country code)</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span>Set price higher than cost for margin</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                                <span>DID must match trunk provider</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
             </div>
-        </form>
-    </div>
+        </div>
+    </form>
 </x-admin-layout>
