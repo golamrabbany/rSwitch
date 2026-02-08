@@ -127,9 +127,9 @@
                             @endif
                         </td>
                         <td class="font-medium">
-                            <span class="text-gray-500">${{ number_format($did->monthly_cost, 2) }}</span>
+                            <span class="text-gray-500">{{ format_currency($did->monthly_cost) }}</span>
                             <span class="text-gray-400">/</span>
-                            <span class="text-gray-900">${{ number_format($did->monthly_price, 2) }}</span>
+                            <span class="text-gray-900">{{ format_currency($did->monthly_price) }}</span>
                         </td>
                         <td>
                             @if ($did->status === 'active')

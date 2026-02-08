@@ -172,11 +172,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div class="p-4 bg-gray-50 rounded-lg text-center">
                             <p class="text-xs text-gray-500 uppercase tracking-wide">Monthly Cost</p>
-                            <p class="text-xl font-semibold text-gray-700 mt-1">${{ number_format($did->monthly_cost, 4) }}</p>
+                            <p class="text-xl font-semibold text-gray-700 mt-1">{{ format_currency($did->monthly_cost, 4) }}</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg text-center">
                             <p class="text-xs text-gray-500 uppercase tracking-wide">Monthly Price</p>
-                            <p class="text-xl font-semibold text-gray-900 mt-1">${{ number_format($did->monthly_price, 4) }}</p>
+                            <p class="text-xl font-semibold text-gray-900 mt-1">{{ format_currency($did->monthly_price, 4) }}</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg text-center">
                             <p class="text-xs text-gray-500 uppercase tracking-wide">Margin</p>
@@ -185,7 +185,7 @@
                                 $marginPct = $did->monthly_price > 0 ? ($margin / $did->monthly_price) * 100 : 0;
                             @endphp
                             <p class="text-xl font-semibold mt-1 {{ $margin >= 0 ? 'text-emerald-600' : 'text-red-600' }}">
-                                ${{ number_format($margin, 4) }}
+                                {{ format_currency($margin, 4) }}
                                 <span class="text-sm font-normal">({{ number_format($marginPct, 1) }}%)</span>
                             </p>
                         </div>

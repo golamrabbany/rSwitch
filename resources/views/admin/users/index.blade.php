@@ -183,7 +183,7 @@
                                 @endif
                             </td>
                         @endif
-                        <td class="font-medium">${{ number_format($user->balance, 2) }}</td>
+                        <td class="font-medium">{{ format_currency($user->balance) }}</td>
                         <td>{{ $user->rateGroup?->name ?? '-' }}</td>
                         <td>
                             @if($user->billing_type === 'prepaid')

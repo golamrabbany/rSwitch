@@ -173,7 +173,7 @@
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-500">Balance</span>
-                            <span class="text-gray-900 font-medium">${{ number_format($sipAccount->user->balance, 2) }}</span>
+                            <span class="text-gray-900 font-medium">{{ format_currency($sipAccount->user->balance) }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-500">Status</span>

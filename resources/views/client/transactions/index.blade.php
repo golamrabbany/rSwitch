@@ -4,7 +4,7 @@
     {{-- Balance Header --}}
     <div class="mb-6 bg-white shadow sm:rounded-lg p-6">
         <dt class="text-sm font-medium text-gray-500">Current Balance</dt>
-        <dd class="mt-1 text-3xl font-semibold text-gray-900">${{ number_format($currentBalance, 2) }}</dd>
+        <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ format_currency($currentBalance) }}</dd>
     </div>
 
     {{-- Filter --}}
@@ -62,9 +62,9 @@
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-500">{{ Str::limit($txn->description, 60) }}</td>
                         <td class="px-4 py-3 text-sm text-right tabular-nums font-medium {{ $txn->amount >= 0 ? 'text-green-600' : 'text-red-600' }}">
-                            {{ $txn->amount >= 0 ? '+' : '' }}${{ number_format($txn->amount, 4) }}
+                            {{ $txn->amount >= 0 ? '+' : '' }}{{ format_currency(abs($txn->amount), 4) }}
                         </td>
-                        <td class="px-4 py-3 text-sm text-right tabular-nums text-gray-900">${{ number_format($txn->balance_after, 4) }}</td>
+                        <td class="px-4 py-3 text-sm text-right tabular-nums text-gray-900">{{ format_currency($txn->balance_after, 4) }}</td>
                     </tr>
                 @empty
                     <tr>

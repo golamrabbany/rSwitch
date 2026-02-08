@@ -14,7 +14,7 @@
             <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
                     <dt class="truncate text-sm font-medium text-gray-500">Balance</dt>
-                    <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">${{ number_format(auth()->user()->balance, 2) }}</dd>
+                    <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">{{ format_currency(auth()->user()->balance) }}</dd>
                 </div>
                 <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
                     <dt class="truncate text-sm font-medium text-gray-500">Max Channels</dt>
@@ -67,8 +67,8 @@
                     </div>
                     <div class="bg-white shadow sm:rounded-lg p-4">
                         <dt class="text-sm font-medium text-gray-500">Total Cost</dt>
-                        <dd class="mt-1 text-2xl font-semibold text-gray-900">${{ number_format($weekStats['total_cost'], 2) }}</dd>
-                        <dd class="text-xs text-gray-400 mt-1">Today: ${{ number_format($todayStats['today_cost'], 2) }}</dd>
+                        <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ format_currency($weekStats['total_cost']) }}</dd>
+                        <dd class="text-xs text-gray-400 mt-1">Today: {{ format_currency($todayStats['today_cost']) }}</dd>
                     </div>
                 </div>
             </div>

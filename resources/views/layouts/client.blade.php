@@ -93,7 +93,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-gray-800 truncate">{{ auth()->user()->name }}</p>
-                        <p class="text-xs text-sky-600 font-semibold">${{ number_format(auth()->user()->balance, 2) }}</p>
+                        <p class="text-xs text-sky-600 font-semibold">{{ format_currency(auth()->user()->balance) }}</p>
                     </div>
                 </div>
             </div>

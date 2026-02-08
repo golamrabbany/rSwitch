@@ -44,7 +44,7 @@
                 </div>
                 <span class="text-xs font-medium text-gray-400">7 Days</span>
             </div>
-            <p class="text-2xl font-bold text-gray-900">${{ number_format($weekStats['total_cost'], 2) }}</p>
+            <p class="text-2xl font-bold text-gray-900">{{ format_currency($weekStats['total_cost']) }}</p>
             <p class="text-sm text-gray-500 mb-2">Revenue</p>
             <div class="flex items-center text-xs">
                 @php
@@ -159,7 +159,7 @@
                 </div>
                 <div class="w-px h-10 bg-white/20"></div>
                 <div class="text-center">
-                    <p class="text-3xl font-bold">${{ number_format($todayStats['today_cost'], 2) }}</p>
+                    <p class="text-3xl font-bold">{{ format_currency($todayStats['today_cost']) }}</p>
                     <p class="text-sm opacity-70">Revenue</p>
                 </div>
                 <div class="w-px h-10 bg-white/20"></div>
@@ -408,7 +408,7 @@
                                         </div>
                                         <div class="flex items-center justify-between mt-1 text-xs text-gray-500">
                                             <span>{{ number_format($dest->answered) }} answered</span>
-                                            <span>${{ number_format($dest->revenue, 2) }}</span>
+                                            <span>{{ format_currency($dest->revenue) }}</span>
                                         </div>
                                     </div>
                                 </div>

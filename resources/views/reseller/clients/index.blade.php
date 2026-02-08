@@ -82,7 +82,7 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="font-medium">${{ number_format($client->balance, 2) }}</td>
+                        <td class="font-medium">{{ format_currency($client->balance) }}</td>
                         <td>{{ $client->rateGroup?->name ?? '-' }}</td>
                         <td>
                             @if($client->billing_type === 'prepaid')

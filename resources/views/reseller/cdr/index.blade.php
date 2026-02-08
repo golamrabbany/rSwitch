@@ -33,7 +33,7 @@
         </div>
         <div class="bg-white shadow sm:rounded-lg p-4">
             <dt class="text-sm font-medium text-gray-500">Total Cost</dt>
-            <dd class="mt-1 text-2xl font-semibold text-gray-900">${{ number_format($stats['total_cost'], 2) }}</dd>
+            <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ format_currency($stats['total_cost']) }}</dd>
         </div>
     </div>
 
@@ -128,7 +128,7 @@
                             {{ sprintf('%d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }}
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">
-                            ${{ number_format($record->total_cost, 4) }}
+                            {{ format_currency($record->total_cost, 4) }}
                         </td>
                         <td class="px-4 py-3 text-sm">
                             @switch($record->disposition)

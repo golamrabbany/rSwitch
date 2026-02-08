@@ -138,19 +138,19 @@
                 <dl class="divide-y divide-gray-200">
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
                         <dt class="text-sm font-medium text-gray-500">Rate / Minute</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${{ number_format($record->rate_per_minute, 6) }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ format_currency($record->rate_per_minute, 6) }}</dd>
                     </div>
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
                         <dt class="text-sm font-medium text-gray-500">Connection Fee</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${{ number_format($record->connection_fee, 6) }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ format_currency($record->connection_fee, 6) }}</dd>
                     </div>
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
                         <dt class="text-sm font-medium text-gray-500">Total Cost</dt>
-                        <dd class="mt-1 text-sm font-semibold text-gray-900 sm:col-span-2 sm:mt-0">${{ number_format($record->total_cost, 4) }}</dd>
+                        <dd class="mt-1 text-sm font-semibold text-gray-900 sm:col-span-2 sm:mt-0">{{ format_currency($record->total_cost, 4) }}</dd>
                     </div>
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
                         <dt class="text-sm font-medium text-gray-500">Reseller Cost</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${{ number_format($record->reseller_cost, 4) }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ format_currency($record->reseller_cost, 4) }}</dd>
                     </div>
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
                         <dt class="text-sm font-medium text-gray-500">Rated At</dt>

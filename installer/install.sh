@@ -708,6 +708,7 @@ install_application() {
     log_info "Installing Composer dependencies..."
     cd $INSTALL_DIR
     sudo -u www-data composer install --no-dev --optimize-autoloader --no-interaction
+    sudo -u www-data composer dump-autoload
 
     # Create .env file
     log_info "Creating environment configuration..."

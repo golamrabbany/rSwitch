@@ -10,19 +10,19 @@ use Illuminate\Support\Facades\Request;
 class AuditService
 {
     /**
-     * Log an action on a model.
+     * Log an action on a model (or globally if no model).
      */
     public static function log(
         string $action,
-        Model $auditable,
+        ?Model $auditable = null,
         ?array $oldValues = null,
         ?array $newValues = null,
     ): AuditLog {
         return AuditLog::create([
             'user_id' => Auth::id(),
             'action' => $action,
-            'auditable_type' => $auditable->getMorphClass(),
-            'auditable_id' => $auditable->getKey(),
+            'auditable_type' => $auditable?->getMorphClass() ?? 'system',
+            'auditable_id' => $auditable?->getKey() ?? 0,
             'old_values' => $oldValues,
             'new_values' => $newValues,
             'ip_address' => Request::ip() ?? '0.0.0.0',
@@ -65,7 +65,7 @@ class AuditService
     /**
      * Log a custom action with optional metadata.
      */
-    public static function logAction(string $action, Model $model, ?array $metadata = null): AuditLog
+    public static function logAction(string $action, ?Model $model = null, ?array $metadata = null): AuditLog
     {
         return static::log($action, $model, null, $metadata);
     }

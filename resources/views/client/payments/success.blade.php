@@ -13,7 +13,7 @@
 
             @if ($payment)
                 <p class="text-sm text-gray-500">
-                    Your payment of <span class="font-semibold text-gray-900">${{ number_format($payment->amount, 2) }}</span>
+                    Your payment of <span class="font-semibold text-gray-900">{{ format_currency($payment->amount) }}</span>
                     has been received.
                 </p>
 

@@ -75,7 +75,7 @@
                 </svg>
             </div>
             <div class="stat-content">
-                <span class="stat-value">${{ number_format($stats['total_cost'], 2) }}</span>
+                <span class="stat-value">{{ format_currency($stats['total_cost']) }}</span>
                 <span class="stat-label">Total Cost</span>
             </div>
         </div>
@@ -144,7 +144,7 @@
                         <td class="text-right tabular-nums">
                             {{ sprintf('%d:%02d', intdiv($record->duration, 60), $record->duration % 60) }}
                         </td>
-                        <td class="text-right tabular-nums">${{ number_format($record->total_cost, 4) }}</td>
+                        <td class="text-right tabular-nums">{{ format_currency($record->total_cost, 4) }}</td>
                         <td>
                             @switch($record->disposition)
                                 @case('ANSWERED')

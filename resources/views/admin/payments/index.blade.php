@@ -71,7 +71,7 @@
                         <td class="px-4 py-3 text-sm whitespace-nowrap">
                             <a href="{{ route('admin.users.show', $payment->user_id) }}" class="text-indigo-600 hover:text-indigo-500">{{ $payment->user?->name ?? '—' }}</a>
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">${{ number_format($payment->amount, 2) }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{{ format_currency($payment->amount) }}</td>
                         <td class="px-4 py-3 text-sm text-gray-500">{{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</td>
                         <td class="px-4 py-3 text-sm">
                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium

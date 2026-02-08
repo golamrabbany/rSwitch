@@ -47,19 +47,19 @@
                 <dl class="divide-y divide-gray-200">
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt class="text-sm font-medium text-gray-500">Call Charges</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${{ number_format($invoice->call_charges, 2) }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ format_currency($invoice->call_charges) }}</dd>
                     </div>
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt class="text-sm font-medium text-gray-500">DID Charges</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${{ number_format($invoice->did_charges, 2) }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ format_currency($invoice->did_charges) }}</dd>
                     </div>
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt class="text-sm font-medium text-gray-500">Tax</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${{ number_format($invoice->tax_amount, 2) }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ format_currency($invoice->tax_amount) }}</dd>
                     </div>
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 bg-gray-50">
                         <dt class="text-sm font-semibold text-gray-900">Total Amount</dt>
-                        <dd class="mt-1 text-sm font-semibold text-gray-900 sm:col-span-2 sm:mt-0">${{ number_format($invoice->total_amount, 2) }}</dd>
+                        <dd class="mt-1 text-sm font-semibold text-gray-900 sm:col-span-2 sm:mt-0">{{ format_currency($invoice->total_amount) }}</dd>
                     </div>
                 </dl>
             </div>
@@ -83,7 +83,7 @@
                         @foreach ($invoice->payments as $payment)
                             <tr>
                                 <td class="px-6 py-3 text-sm text-gray-900">{{ $payment->created_at->format('M d, Y H:i') }}</td>
-                                <td class="px-6 py-3 text-sm text-gray-900 text-right">${{ number_format($payment->amount, 2) }}</td>
+                                <td class="px-6 py-3 text-sm text-gray-900 text-right">{{ format_currency($payment->amount) }}</td>
                                 <td class="px-6 py-3 text-sm text-gray-500">{{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</td>
                                 <td class="px-6 py-3 text-sm">
                                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium

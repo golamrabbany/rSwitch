@@ -76,9 +76,9 @@
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-500">{{ Str::limit($txn->description, 50) }}</td>
                         <td class="px-4 py-3 text-sm text-right tabular-nums font-medium {{ $txn->amount >= 0 ? 'text-green-600' : 'text-red-600' }}">
-                            {{ $txn->amount >= 0 ? '+' : '' }}${{ number_format($txn->amount, 4) }}
+                            {{ $txn->amount >= 0 ? '+' : '' }}{{ format_currency(abs($txn->amount), 4) }}
                         </td>
-                        <td class="px-4 py-3 text-sm text-right tabular-nums text-gray-900">${{ number_format($txn->balance_after, 4) }}</td>
+                        <td class="px-4 py-3 text-sm text-right tabular-nums text-gray-900">{{ format_currency($txn->balance_after, 4) }}</td>
                         <td class="px-4 py-3 text-sm text-right">
                             <a href="{{ route('admin.transactions.show', $txn) }}" class="text-indigo-600 hover:text-indigo-500">View</a>
                         </td>

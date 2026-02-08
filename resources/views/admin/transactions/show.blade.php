@@ -35,12 +35,12 @@
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt class="text-sm font-medium text-gray-500">Amount</dt>
                         <dd class="mt-1 text-sm font-semibold sm:col-span-2 sm:mt-0 {{ $transaction->amount >= 0 ? 'text-green-600' : 'text-red-600' }}">
-                            {{ $transaction->amount >= 0 ? '+' : '' }}${{ number_format($transaction->amount, 4) }}
+                            {{ $transaction->amount >= 0 ? '+' : '' }}{{ format_currency(abs($transaction->amount), 4) }}
                         </dd>
                     </div>
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt class="text-sm font-medium text-gray-500">Balance After</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${{ number_format($transaction->balance_after, 4) }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ format_currency($transaction->balance_after, 4) }}</dd>
                     </div>
                     <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt class="text-sm font-medium text-gray-500">Description</dt>

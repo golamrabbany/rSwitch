@@ -18,7 +18,7 @@
                         <option value="">Select a client...</option>
                         @foreach ($clients as $client)
                             <option value="{{ $client->id }}" {{ old('user_id') == $client->id ? 'selected' : '' }}>
-                                {{ $client->name }} ({{ $client->email }}) — Balance: ${{ number_format($client->balance, 2) }}
+                                {{ $client->name }} ({{ $client->email }}) — Balance: {{ format_currency($client->balance) }}
                             </option>
                         @endforeach
                     </select>
@@ -26,7 +26,7 @@
                 </div>
 
                 <div>
-                    <label for="amount" class="block text-sm font-medium text-gray-700">Amount ($)</label>
+                    <label for="amount" class="block text-sm font-medium text-gray-700">Amount ({{ currency_symbol() }})</label>
                     <input type="number" id="amount" name="amount" value="{{ old('amount') }}" step="0.01" min="0.01" max="999999.99" required
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                            placeholder="0.00">

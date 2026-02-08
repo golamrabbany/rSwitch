@@ -114,7 +114,7 @@
                                             <div class="p-4 rounded-xl mb-6 {{ $user->balance >= 0 ? 'bg-indigo-50 border border-indigo-200' : 'bg-red-50 border border-red-200' }}">
                                                 <div class="flex items-center justify-between">
                                                     <span class="text-sm font-medium {{ $user->balance >= 0 ? 'text-indigo-700' : 'text-red-700' }}">Current Balance</span>
-                                                    <span class="text-2xl font-bold {{ $user->balance >= 0 ? 'text-indigo-700' : 'text-red-700' }}">${{ number_format($user->balance, 2) }}</span>
+                                                    <span class="text-2xl font-bold {{ $user->balance >= 0 ? 'text-indigo-700' : 'text-red-700' }}">{{ format_currency($user->balance) }}</span>
                                                 </div>
                                             </div>
 
@@ -149,7 +149,7 @@
                                                 <div class="form-group mb-4">
                                                     <label for="amount" class="form-label">Amount</label>
                                                     <div class="relative">
-                                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">$</span>
+                                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">{{ currency_symbol() }}</span>
                                                         <input type="number" id="amount" name="amount" step="0.01" min="0.01" max="999999.99" required class="form-input pl-8 text-lg font-semibold" placeholder="0.00">
                                                     </div>
                                                 </div>
@@ -233,9 +233,9 @@
                                                                         </span>
                                                                     </td>
                                                                     <td class="px-3 py-2 text-right font-mono text-xs {{ $txn->amount >= 0 ? 'text-indigo-600' : 'text-red-600' }}">
-                                                                        {{ $txn->amount >= 0 ? '+' : '' }}${{ number_format($txn->amount, 2) }}
+                                                                        {{ $txn->amount >= 0 ? '+' : '' }}{{ format_currency(abs($txn->amount)) }}
                                                                     </td>
-                                                                    <td class="px-3 py-2 text-right font-mono text-xs text-gray-600">${{ number_format($txn->balance_after, 2) }}</td>
+                                                                    <td class="px-3 py-2 text-right font-mono text-xs text-gray-600">{{ format_currency($txn->balance_after) }}</td>
                                                                 </tr>
                                                             @endforeach
                                                         </tbody>
@@ -292,7 +292,7 @@
                 </svg>
             </div>
             <div class="stat-content">
-                <span class="stat-value {{ $user->balance < 0 ? 'text-red-600' : '' }}">${{ number_format($user->balance, 2) }}</span>
+                <span class="stat-value {{ $user->balance < 0 ? 'text-red-600' : '' }}">{{ format_currency($user->balance) }}</span>
                 <span class="stat-label">Balance</span>
             </div>
         </div>
@@ -429,11 +429,11 @@
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Current Balance</span>
-                            <span class="detail-value font-semibold {{ $user->balance < 0 ? 'text-red-600' : 'text-emerald-600' }}">${{ number_format($user->balance, 2) }}</span>
+                            <span class="detail-value font-semibold {{ $user->balance < 0 ? 'text-red-600' : 'text-emerald-600' }}">{{ format_currency($user->balance) }}</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Credit Limit</span>
-                            <span class="detail-value">${{ number_format($user->credit_limit, 2) }}</span>
+                            <span class="detail-value">{{ format_currency($user->credit_limit) }}</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Rate Group / Tariff</span>
@@ -445,7 +445,7 @@
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Daily Spend Limit</span>
-                            <span class="detail-value">{{ $user->daily_spend_limit ? '$' . number_format($user->daily_spend_limit, 2) : 'Unlimited' }}</span>
+                            <span class="detail-value">{{ $user->daily_spend_limit ? format_currency($user->daily_spend_limit) : 'Unlimited' }}</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Daily Call Limit</span>
@@ -566,7 +566,7 @@
                                         </div>
                                         <div>
                                             <a href="{{ route('admin.users.show', $child) }}" class="font-medium text-gray-900 hover:text-indigo-600 text-sm">{{ $child->name }}</a>
-                                            <p class="text-xs text-gray-500">${{ number_format($child->balance, 2) }}</p>
+                                            <p class="text-xs text-gray-500">{{ format_currency($child->balance) }}</p>
                                         </div>
                                     </div>
                                     @if($child->status === 'active')
@@ -600,7 +600,7 @@
                             <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50">
                                 <div>
                                     <a href="{{ route('admin.dids.show', $did) }}" class="font-mono font-medium text-gray-900 hover:text-indigo-600">{{ $did->number }}</a>
-                                    <p class="text-xs text-gray-500">${{ number_format($did->monthly_price, 2) }}/mo</p>
+                                    <p class="text-xs text-gray-500">{{ format_currency($did->monthly_price) }}/mo</p>
                                 </div>
                                 @if($did->status === 'active')
                                     <span class="badge badge-success">Active</span>
