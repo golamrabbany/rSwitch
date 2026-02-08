@@ -14,11 +14,28 @@ class DashboardController extends Controller
 
         $entityCounts = $service->getEntityCounts($user);
         $weekStats = $service->getCallStats(null, 7);
+        $prevWeekStats = $service->getPreviousPeriodStats(null, 7);
         $todayStats = $service->getTodayCallStats(null);
         $recentCalls = $service->getRecentCalls(null, 10);
+        $dailyData = $service->getDailyCallData(null, 7);
+        $hourlyData = $service->getHourlyCallData(null);
+        $topDestinations = $service->getTopDestinations(null, 5);
+        $activeCalls = $service->getActiveCallsCount(null);
+        $systemHealth = $service->getSystemHealth();
+        $financialSummary = $service->getFinancialSummary();
 
         return view('admin.dashboard', compact(
-            'entityCounts', 'weekStats', 'todayStats', 'recentCalls'
+            'entityCounts',
+            'weekStats',
+            'prevWeekStats',
+            'todayStats',
+            'recentCalls',
+            'dailyData',
+            'hourlyData',
+            'topDestinations',
+            'activeCalls',
+            'systemHealth',
+            'financialSummary'
         ));
     }
 }
