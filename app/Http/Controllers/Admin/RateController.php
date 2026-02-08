@@ -16,6 +16,13 @@ class RateController extends Controller
         return view('admin.rates.create', compact('rateGroup'));
     }
 
+    public function show(RateGroup $rateGroup, Rate $rate)
+    {
+        $rate->load('rateGroup');
+
+        return view('admin.rates.show', compact('rateGroup', 'rate'));
+    }
+
     public function store(Request $request, RateGroup $rateGroup)
     {
         $validated = $this->validateRate($request);

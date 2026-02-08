@@ -54,7 +54,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::resource('rate-groups', Admin\RateGroupController::class);
     Route::get('rate-groups/{rate_group}/export', [Admin\RateGroupController::class, 'exportCsv'])->name('rate-groups.export');
     Route::post('rate-groups/{rate_group}/import', [Admin\RateGroupController::class, 'importCsv'])->name('rate-groups.import');
-    Route::resource('rate-groups.rates', Admin\RateController::class)->except(['index', 'show']);
+    Route::resource('rate-groups.rates', Admin\RateController::class)->except(['index']);
 
     Route::get('cdr', [Admin\CdrController::class, 'index'])->name('cdr.index');
     Route::get('cdr/export', [Admin\CdrController::class, 'export'])->name('cdr.export');

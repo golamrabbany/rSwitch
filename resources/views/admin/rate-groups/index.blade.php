@@ -1,92 +1,126 @@
 <x-admin-layout>
     <x-slot name="header">Rate Management</x-slot>
 
-    {{-- Header with Create Button --}}
-    <div class="flex items-center justify-between mb-6">
-        <div></div>
-        <a href="{{ route('admin.rate-groups.create') }}"
-           class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-            <svg class="-ml-0.5 mr-1.5 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            Create Rate Group
-        </a>
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div>
+            <h2 class="page-title">Rate Groups</h2>
+            <p class="page-subtitle">Manage rate groups and pricing</p>
+        </div>
+        <div class="page-actions">
+            <a href="{{ route('admin.rate-groups.create') }}" class="btn-action-primary-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Create Rate Group
+            </a>
+        </div>
     </div>
 
-    {{-- Filters --}}
-    <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
-        <form method="GET" action="{{ route('admin.rate-groups.index') }}">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                    <label for="search" class="block text-xs font-medium text-gray-500 mb-1">Search</label>
-                    <input type="text" id="search" name="search" value="{{ request('search') }}"
-                           placeholder="Rate group name..."
-                           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                </div>
-                <div>
-                    <label for="type" class="block text-xs font-medium text-gray-500 mb-1">Type</label>
-                    <select id="type" name="type" onchange="this.form.submit()"
-                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">All Types</option>
-                        <option value="admin" {{ request('type') === 'admin' ? 'selected' : '' }}>Admin</option>
-                        <option value="reseller" {{ request('type') === 'reseller' ? 'selected' : '' }}>Reseller</option>
-                    </select>
-                </div>
-                <div class="flex items-end gap-2">
-                    <button type="submit" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-                        Filter
-                    </button>
-                    @if(request()->hasAny(['search', 'type']))
-                        <a href="{{ route('admin.rate-groups.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
-                    @endif
-                </div>
+    {{-- Filter Card --}}
+    <div class="filter-card">
+        <form method="GET" class="filter-row flex-wrap">
+            <div class="filter-search-box">
+                <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search rate group name..." class="filter-input">
             </div>
+
+            <select name="type" class="filter-select">
+                <option value="">All Types</option>
+                <option value="admin" {{ request('type') === 'admin' ? 'selected' : '' }}>Admin</option>
+                <option value="reseller" {{ request('type') === 'reseller' ? 'selected' : '' }}>Reseller</option>
+            </select>
+
+            <button type="submit" class="btn-search-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Search
+            </button>
+
+            @if(request()->hasAny(['search', 'type']))
+                <a href="{{ route('admin.rate-groups.index') }}" class="btn-clear">Clear</a>
+            @endif
         </form>
     </div>
 
-    {{-- Table --}}
-    <div class="bg-white shadow sm:rounded-lg overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    {{-- Data Table --}}
+    <div class="data-table-container">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Rates</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                    <th>Rate Group</th>
+                    <th>Type</th>
+                    <th class="text-center">Rates</th>
+                    <th class="text-center">Users</th>
+                    <th>Created By</th>
+                    <th class="text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody>
                 @forelse ($rateGroups as $group)
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900">
-                            <a href="{{ route('admin.rate-groups.show', $group) }}" class="text-indigo-600 hover:text-indigo-500">
-                                {{ $group->name }}
-                            </a>
-                            @if($group->description)
-                                <p class="text-xs text-gray-500 truncate max-w-xs">{{ $group->description }}</p>
-                            @endif
+                    <tr>
+                        <td>
+                            <div class="user-cell">
+                                <div class="avatar avatar-indigo">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="user-name">{{ $group->name }}</div>
+                                    @if($group->description)
+                                        <div class="user-email">{{ Str::limit($group->description, 40) }}</div>
+                                    @endif
+                                </div>
+                            </div>
                         </td>
-                        <td class="px-4 py-3 text-sm">
+                        <td>
                             @if($group->type === 'admin')
-                                <span class="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">Admin</span>
+                                <span class="badge badge-blue">Admin</span>
                             @else
-                                <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">Reseller</span>
+                                <span class="badge badge-purple">Reseller</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{{ number_format($group->rates_count) }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{{ number_format($group->users_count) }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-500">{{ $group->creator?->name ?? '—' }}</td>
-                        <td class="px-4 py-3 text-sm text-right space-x-3">
-                            <a href="{{ route('admin.rate-groups.show', $group) }}" class="text-indigo-600 hover:text-indigo-500">View</a>
-                            <a href="{{ route('admin.rate-groups.edit', $group) }}" class="text-indigo-600 hover:text-indigo-500">Edit</a>
+                        <td class="text-center">
+                            <span class="font-semibold text-gray-900">{{ number_format($group->rates_count) }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="font-semibold text-gray-900">{{ number_format($group->users_count) }}</span>
+                        </td>
+                        <td>
+                            @if($group->creator)
+                                <span class="text-gray-700">{{ $group->creator->name }}</span>
+                            @else
+                                <span class="text-gray-400">-</span>
+                            @endif
+                        </td>
+                        <td class="text-center">
+                            <a href="{{ route('admin.rate-groups.show', $group) }}" class="action-icon" title="View">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </a>
+                            <a href="{{ route('admin.rate-groups.edit', $group) }}" class="action-icon" title="Edit">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </a>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500">
-                            No rate groups found.
+                        <td colspan="6" class="text-center py-12">
+                            <div class="empty-state">
+                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <p class="empty-text">No rate groups found</p>
+                                <a href="{{ route('admin.rate-groups.create') }}" class="empty-link-admin">Create your first rate group</a>
+                            </div>
                         </td>
                     </tr>
                 @endforelse
@@ -94,8 +128,8 @@
         </table>
     </div>
 
-    @if ($rateGroups->hasPages())
-        <div class="mt-4">
+    @if($rateGroups->hasPages())
+        <div class="mt-6">
             {{ $rateGroups->withQueryString()->links() }}
         </div>
     @endif
