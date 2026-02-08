@@ -3,6 +3,14 @@
 
     @php
         $existingDays = $trunkRoute->days_of_week ? explode(',', $trunkRoute->days_of_week) : [];
+        $trunksJson = $trunks->map(fn($t) => [
+            'id' => $t->id,
+            'name' => $t->name,
+            'provider' => $t->provider,
+            'direction' => $t->direction,
+            'status' => $t->status,
+        ])->values()->toJson();
+        $selectedTrunk = $trunks->firstWhere('id', old('trunk_id', $trunkRoute->trunk_id));
     @endphp
 
     {{-- Page Header --}}
@@ -30,7 +38,28 @@
 
     <form method="POST" action="{{ route('admin.trunk-routes.update', $trunkRoute) }}" x-data="{
         timeBasedRouting: {{ old('time_start', $trunkRoute->time_start) ? 'true' : 'false' }},
-        dayRestriction: {{ old('days_of_week', $trunkRoute->days_of_week) || old('days') ? 'true' : 'false' }}
+        dayRestriction: {{ old('days_of_week', $trunkRoute->days_of_week) || old('days') ? 'true' : 'false' }},
+        trunkSearch: '{{ $selectedTrunk ? $selectedTrunk->name . ' (' . $selectedTrunk->provider . ')' : '' }}',
+        trunkId: '{{ old('trunk_id', $trunkRoute->trunk_id) }}',
+        trunks: {{ $trunksJson }},
+        showTrunkDropdown: false,
+        get filteredTrunks() {
+            if (!this.trunkSearch) return this.trunks;
+            const search = this.trunkSearch.toLowerCase();
+            return this.trunks.filter(t =>
+                t.name.toLowerCase().includes(search) ||
+                t.provider.toLowerCase().includes(search)
+            );
+        },
+        selectTrunk(trunk) {
+            this.trunkId = trunk.id;
+            this.trunkSearch = trunk.name + ' (' + trunk.provider + ')';
+            this.showTrunkDropdown = false;
+        },
+        clearTrunk() {
+            this.trunkId = '';
+            this.trunkSearch = '';
+        }
     }">
         @csrf
         @method('PUT')
@@ -47,15 +76,66 @@
                     <div class="form-card-body">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
-                                <label for="trunk_id" class="form-label">Trunk</label>
-                                <select id="trunk_id" name="trunk_id" required class="form-input">
-                                    <option value="">Select a trunk...</option>
-                                    @foreach ($trunks as $trunk)
-                                        <option value="{{ $trunk->id }}" {{ old('trunk_id', $trunkRoute->trunk_id) == $trunk->id ? 'selected' : '' }}>
-                                            {{ $trunk->name }} ({{ $trunk->provider }})
-                                        </option>
-                                    @endforeach
-                                </select>
+                                <label for="trunk_search" class="form-label">Trunk</label>
+                                <div class="relative">
+                                    <input type="hidden" name="trunk_id" x-model="trunkId" required>
+                                    <div class="relative">
+                                        <input type="text"
+                                               id="trunk_search"
+                                               x-model="trunkSearch"
+                                               @focus="showTrunkDropdown = true"
+                                               @click="showTrunkDropdown = true"
+                                               @input="showTrunkDropdown = true; trunkId = ''"
+                                               @keydown.escape="showTrunkDropdown = false"
+                                               @keydown.tab="showTrunkDropdown = false"
+                                               class="form-input pr-10"
+                                               placeholder="Type to search trunks..."
+                                               autocomplete="off">
+                                        <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                                            <template x-if="trunkId">
+                                                <button type="button" @click="clearTrunk()" class="text-gray-400 hover:text-gray-600">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
+                                                </button>
+                                            </template>
+                                            <template x-if="!trunkId">
+                                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                                </svg>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    {{-- Dropdown --}}
+                                    <div x-show="showTrunkDropdown"
+                                         x-cloak
+                                         @click.outside="showTrunkDropdown = false"
+                                         class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                        <template x-if="filteredTrunks.length === 0">
+                                            <div class="px-4 py-3 text-sm text-gray-500">No trunks found</div>
+                                        </template>
+                                        <template x-for="trunk in filteredTrunks" :key="trunk.id">
+                                            <button type="button"
+                                                    @click="selectTrunk(trunk)"
+                                                    class="w-full px-4 py-2.5 text-left hover:bg-indigo-50 flex items-center justify-between group transition-colors"
+                                                    :class="{ 'bg-indigo-50': trunkId == trunk.id }">
+                                                <div>
+                                                    <span class="font-medium text-gray-900" x-text="trunk.name"></span>
+                                                    <span class="text-gray-500 ml-1" x-text="'(' + trunk.provider + ')'"></span>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-xs px-2 py-0.5 rounded-full"
+                                                          :class="trunk.direction === 'outgoing' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'"
+                                                          x-text="trunk.direction"></span>
+                                                    <svg x-show="trunkId == trunk.id" class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                </div>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
                                 <p class="form-hint">Only outgoing/both trunks are shown.</p>
                                 <x-input-error :messages="$errors->get('trunk_id')" class="mt-2" />
                             </div>
@@ -97,6 +177,58 @@
                                     <option value="disabled" {{ old('status', $trunkRoute->status) === 'disabled' ? 'selected' : '' }}>Disabled</option>
                                 </select>
                                 <x-input-error :messages="$errors->get('status')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- MNP Dipping --}}
+                <div class="form-card" x-data="{ mnpEnabled: {{ old('mnp_enabled', $trunkRoute->mnp_enabled) ? 'true' : 'false' }} }">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">MNP Dipping</h3>
+                        <p class="form-card-subtitle">Mobile Number Portability transformation</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="form-group">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" name="mnp_enabled" value="1" x-model="mnpEnabled" class="form-checkbox">
+                                <span class="text-sm text-gray-700">Enable MNP Dipping</span>
+                            </label>
+                            <p class="form-hint">Transform numbers to MNP format before sending to trunk.</p>
+                        </div>
+
+                        <div x-show="mnpEnabled" x-cloak class="space-y-4 mt-4">
+                            <div class="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                                <div class="flex items-start gap-3">
+                                    <svg class="w-5 h-5 text-indigo-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <div class="text-sm">
+                                        <p class="font-medium text-indigo-800">MNP Transformation Example</p>
+                                        <p class="text-indigo-600 mt-1">
+                                            <span class="font-mono">88017XXXXXXXX</span> →
+                                            <span class="font-mono">880<strong class="text-indigo-800">71</strong>17XXXXXXXX</span>
+                                        </p>
+                                        <p class="text-indigo-600 text-xs mt-1">Insert "71" at position 3 (after country code "880")</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="form-group">
+                                    <label for="mnp_prefix" class="form-label">MNP Prefix</label>
+                                    <input type="text" id="mnp_prefix" name="mnp_prefix" value="{{ old('mnp_prefix', $trunkRoute->mnp_prefix ?? '71') }}"
+                                           class="form-input font-mono" placeholder="e.g. 71" maxlength="10">
+                                    <p class="form-hint">Digits to insert for MNP lookup</p>
+                                    <x-input-error :messages="$errors->get('mnp_prefix')" class="mt-2" />
+                                </div>
+                                <div class="form-group">
+                                    <label for="mnp_insert_position" class="form-label">Insert Position</label>
+                                    <input type="number" id="mnp_insert_position" name="mnp_insert_position" value="{{ old('mnp_insert_position', $trunkRoute->mnp_insert_position ?? 3) }}"
+                                           class="form-input" min="0" max="20" placeholder="e.g. 3">
+                                    <p class="form-hint">Position after which to insert MNP prefix (0 = beginning)</p>
+                                    <x-input-error :messages="$errors->get('mnp_insert_position')" class="mt-2" />
+                                </div>
                             </div>
                         </div>
                     </div>

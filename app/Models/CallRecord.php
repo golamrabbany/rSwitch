@@ -15,7 +15,7 @@ class CallRecord extends Model
     protected $fillable = [
         'uuid', 'sip_account_id', 'user_id', 'reseller_id', 'call_flow',
         'caller', 'callee', 'caller_id', 'src_ip', 'dst_ip',
-        'incoming_trunk_id', 'outgoing_trunk_id', 'did_id',
+        'incoming_trunk_id', 'outgoing_trunk_id', 'did_id', 'destination_sip_account_id',
         'destination', 'matched_prefix', 'rate_per_minute', 'connection_fee', 'rate_group_id',
         'call_start', 'call_end', 'duration', 'billsec', 'billable_duration',
         'total_cost', 'reseller_cost',
@@ -65,6 +65,11 @@ class CallRecord extends Model
         return $this->belongsTo(Did::class);
     }
 
+    public function destinationSipAccount(): BelongsTo
+    {
+        return $this->belongsTo(SipAccount::class, 'destination_sip_account_id');
+    }
+
     public function scopeAnswered($query)
     {
         return $query->where('disposition', 'ANSWERED');
@@ -73,5 +78,15 @@ class CallRecord extends Model
     public function scopeRated($query)
     {
         return $query->where('status', 'rated');
+    }
+
+    public function scopeInternal($query)
+    {
+        return $query->where('call_flow', 'sip_to_sip');
+    }
+
+    public function scopeExternal($query)
+    {
+        return $query->whereIn('call_flow', ['sip_to_trunk', 'trunk_to_sip']);
     }
 }

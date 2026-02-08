@@ -75,4 +75,13 @@ class CallRecordFactory extends Factory
     {
         return $this->state(fn () => ['call_flow' => 'trunk_to_sip']);
     }
+
+    public function internal(): static
+    {
+        return $this->state(fn () => [
+            'call_flow' => 'sip_to_sip',
+            'total_cost' => '0.0000',
+            'reseller_cost' => '0.0000',
+        ]);
+    }
 }

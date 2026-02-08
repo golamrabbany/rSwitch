@@ -1,0 +1,107 @@
+; rSwitch Asterisk Modules Configuration
+; Optimized for PJSIP with realtime
+
+[modules]
+autoload=yes
+
+; ============================================
+; Disabled modules - not needed
+; ============================================
+
+; Old SIP channel driver (use PJSIP instead)
+noload => chan_sip.so
+
+; Unused channel drivers
+noload => chan_alsa.so
+noload => chan_console.so
+noload => chan_skinny.so
+noload => chan_unistim.so
+noload => chan_phone.so
+noload => chan_mgcp.so
+noload => chan_oss.so
+noload => chan_motif.so
+noload => chan_iax2.so
+
+; Unused applications
+noload => app_festival.so
+noload => app_amd.so
+noload => app_followme.so
+noload => app_page.so
+noload => app_minivm.so
+noload => app_zapateller.so
+noload => app_adsiprog.so
+noload => app_alarmreceiver.so
+noload => app_dahdiras.so
+noload => app_fax.so
+noload => app_flash.so
+noload => app_getcpeid.so
+noload => app_ices.so
+noload => app_image.so
+noload => app_jack.so
+noload => app_morsecode.so
+noload => app_mp3.so
+noload => app_nbscat.so
+noload => app_osplookup.so
+noload => app_sms.so
+noload => app_speech_utils.so
+noload => app_url.so
+noload => app_waitforring.so
+noload => app_waitforsilence.so
+
+; Unused codecs
+noload => codec_lpc10.so
+noload => codec_speex.so
+
+; Unused resources
+noload => res_adsi.so
+noload => res_calendar.so
+noload => res_calendar_caldav.so
+noload => res_calendar_ews.so
+noload => res_calendar_exchange.so
+noload => res_calendar_icalendar.so
+noload => res_clialiases.so
+noload => res_config_ldap.so
+noload => res_config_pgsql.so
+noload => res_corosync.so
+noload => res_fax.so
+noload => res_fax_spandsp.so
+noload => res_hep.so
+noload => res_hep_pjsip.so
+noload => res_hep_rtcp.so
+noload => res_phoneprov.so
+noload => res_pktccops.so
+noload => res_smdi.so
+noload => res_snmp.so
+noload => res_speech.so
+noload => res_stun_monitor.so
+noload => res_xmpp.so
+
+; ============================================
+; Explicitly loaded modules
+; ============================================
+
+; PJSIP modules
+load => res_pjproject.so
+load => res_pjsip.so
+load => res_pjsip_session.so
+load => res_pjsip_authenticator_digest.so
+load => res_pjsip_endpoint_identifier_ip.so
+load => res_pjsip_endpoint_identifier_user.so
+load => res_pjsip_outbound_authenticator_digest.so
+load => res_pjsip_registrar.so
+load => res_pjsip_transport_websocket.so
+load => chan_pjsip.so
+
+; ODBC/Realtime modules
+load => res_odbc.so
+load => res_config_odbc.so
+load => func_odbc.so
+load => cdr_odbc.so
+load => cdr_custom.so
+load => res_realtime.so
+
+; AGI module
+load => res_agi.so
+
+; HTTP/WebSocket (for WebRTC)
+load => res_http_websocket.so

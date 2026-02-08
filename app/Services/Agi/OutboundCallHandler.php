@@ -5,6 +5,7 @@ namespace App\Services\Agi;
 use App\Models\CallRecord;
 use App\Models\DestinationBlacklist;
 use App\Models\DestinationWhitelist;
+use App\Models\RingGroup;
 use App\Models\SipAccount;
 use App\Models\Trunk;
 use App\Models\User;
@@ -121,7 +122,13 @@ class OutboundCallHandler
             }
         }
 
-        // 6. Trunk selection via RouteSelectionService
+        // 6. Check for internal SIP-to-SIP or Ring Group call
+        $internalResult = $this->handleInternalCall($agi, $extension, $sipAccount, $user, $channel, $callerId, $callerName);
+        if ($internalResult !== false) {
+            return; // Internal call handled
+        }
+
+        // 7. Trunk selection via RouteSelectionService (external calls)
         $routing = $this->routeService->selectTrunks($extension);
         $primaryRoute = $routing['primary'];
 
@@ -134,23 +141,30 @@ class OutboundCallHandler
         $trunk = $primaryRoute->trunk;
         $failoverRoute = $routing['failover'];
 
-        // 7. Apply dial manipulation
-        $dialNumber = $this->applyDialManipulation($extension, $trunk);
+        // 8. Apply MNP transformation if enabled on route
+        $mnpNumber = $primaryRoute->applyMnpTransformation($extension);
+        if ($mnpNumber !== $extension) {
+            $agi->verbose("rSwitch: MNP transformation {$extension} -> {$mnpNumber}", 2);
+        }
+
+        // 9. Apply trunk dial manipulation
+        $dialNumber = $this->applyDialManipulation($mnpNumber, $trunk);
         $dialString = $this->buildDialString($dialNumber, $trunk);
 
-        // 8. Build failover dial string
+        // 10. Build failover dial string
         $failoverDialString = '';
 
         if ($failoverRoute) {
             $failoverTrunk = $failoverRoute->trunk;
-            $failoverNumber = $this->applyDialManipulation($extension, $failoverTrunk);
+            $failoverMnp = $failoverRoute->applyMnpTransformation($extension);
+            $failoverNumber = $this->applyDialManipulation($failoverMnp, $failoverTrunk);
             $failoverDialString = $this->buildDialString($failoverNumber, $failoverTrunk);
         }
 
-        // 9. Apply CLI manipulation
+        // 11. Apply CLI manipulation
         [$cliName, $cliNum] = $this->applyCliManipulation($callerName, $callerId, $sipAccount, $trunk);
 
-        // 10. Create CDR entry
+        // 12. Create CDR entry
         $uuid = Str::uuid()->toString();
 
         CallRecord::create([
@@ -158,7 +172,7 @@ class OutboundCallHandler
             'sip_account_id' => $sipAccount->id,
             'user_id' => $user->id,
             'reseller_id' => $user->parent_id,
-            'call_flow' => 'outbound',
+            'call_flow' => 'sip_to_trunk',
             'caller' => $callerId,
             'callee' => $extension,
             'caller_id' => $cliNum,
@@ -171,7 +185,7 @@ class OutboundCallHandler
             'ast_context' => $agi->getContext(),
         ]);
 
-        // 11. Set channel variables for the dialplan
+        // 13. Set channel variables for the dialplan
         $agi->setVariable('ROUTE_ACTION', 'DIAL');
         $agi->setVariable('ROUTE_DIAL_STRING', $dialString);
         $agi->setVariable('ROUTE_FAILOVER', $failoverDialString);
@@ -189,6 +203,255 @@ class OutboundCallHandler
             'trunk' => $trunk->name,
             'dial' => $dialString,
         ]);
+    }
+
+    /**
+     * Handle internal SIP-to-SIP or Ring Group calls.
+     * Returns true if handled, false if should continue to trunk routing.
+     */
+    private function handleInternalCall(
+        AgiConnection $agi,
+        string $extension,
+        SipAccount $callerSip,
+        User $callerUser,
+        string $channel,
+        string $callerId,
+        string $callerName,
+    ): bool {
+        // Check if destination is a SIP account username
+        $destinationSip = SipAccount::where('username', $extension)
+            ->where('status', 'active')
+            ->first();
+
+        if ($destinationSip) {
+            return $this->routeToSipAccount($agi, $destinationSip, $callerSip, $callerUser, $channel, $extension, $callerId, $callerName);
+        }
+
+        // Check if destination is a Ring Group (by name or ID pattern like RG100)
+        $ringGroup = $this->findRingGroup($extension, $callerUser);
+
+        if ($ringGroup) {
+            return $this->routeToRingGroup($agi, $ringGroup, $callerSip, $callerUser, $channel, $extension, $callerId, $callerName);
+        }
+
+        // Not an internal call
+        return false;
+    }
+
+    /**
+     * Route call to an internal SIP account.
+     */
+    private function routeToSipAccount(
+        AgiConnection $agi,
+        SipAccount $destinationSip,
+        SipAccount $callerSip,
+        User $callerUser,
+        string $channel,
+        string $extension,
+        string $callerId,
+        string $callerName,
+    ): bool {
+        $destinationUser = $destinationSip->user;
+
+        // Check if destination user is active
+        if (!$destinationUser || $destinationUser->status !== 'active') {
+            $agi->verbose("rSwitch: Destination user for SIP {$extension} is inactive", 1);
+            $this->reject($agi, 'destination_inactive');
+            return true;
+        }
+
+        // Check if caller can call this destination (same owner or admin/reseller access)
+        if (!$this->canCallInternal($callerUser, $destinationUser)) {
+            $agi->verbose("rSwitch: User {$callerUser->id} cannot call internal {$destinationUser->id}", 1);
+            $this->reject($agi, 'internal_not_permitted');
+            return true;
+        }
+
+        // Build dial string for internal SIP account
+        $dialString = "PJSIP/{$destinationSip->username}";
+
+        // Create CDR entry for internal call
+        $uuid = Str::uuid()->toString();
+
+        CallRecord::create([
+            'uuid' => $uuid,
+            'sip_account_id' => $callerSip->id,
+            'user_id' => $callerUser->id,
+            'reseller_id' => $callerUser->parent_id,
+            'call_flow' => 'sip_to_sip',
+            'caller' => $callerId,
+            'callee' => $extension,
+            'caller_id' => $callerSip->caller_id_number ?: $callerId,
+            'destination' => $extension,
+            'destination_sip_account_id' => $destinationSip->id,
+            'call_start' => now(),
+            'disposition' => 'NO ANSWER',
+            'status' => 'in_progress',
+            'ast_channel' => $channel,
+            'ast_context' => $agi->getContext(),
+            // Internal calls are typically free (no rates applied)
+            'rate_per_min' => '0.0000',
+            'total_cost' => '0.0000',
+        ]);
+
+        // Set channel variables
+        $agi->setVariable('ROUTE_ACTION', 'DIAL_INTERNAL');
+        $agi->setVariable('ROUTE_DIAL_STRING', $dialString);
+        $agi->setVariable('ROUTE_DIAL_TIMEOUT', '30');
+        $agi->setVariable('ROUTE_CLI_NAME', $callerSip->caller_id_name ?: $callerName);
+        $agi->setVariable('ROUTE_CLI_NUM', $callerSip->caller_id_number ?: $callerId);
+        $agi->setVariable('CDR_UUID', $uuid);
+
+        $agi->verbose("rSwitch: Internal call to SIP/{$extension} -> {$dialString}", 2);
+
+        Log::info('AGI internal SIP-to-SIP routed', [
+            'uuid' => $uuid,
+            'caller_user' => $callerUser->id,
+            'destination_user' => $destinationUser->id,
+            'callee' => $extension,
+            'dial' => $dialString,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Route call to a Ring Group.
+     */
+    private function routeToRingGroup(
+        AgiConnection $agi,
+        RingGroup $ringGroup,
+        SipAccount $callerSip,
+        User $callerUser,
+        string $channel,
+        string $extension,
+        string $callerId,
+        string $callerName,
+    ): bool {
+        // Check if ring group has active members
+        $dialString = $ringGroup->buildDialString();
+
+        if (empty($dialString)) {
+            $agi->verbose("rSwitch: Ring group {$ringGroup->name} has no active members", 1);
+            $this->reject($agi, 'ring_group_empty');
+            return true;
+        }
+
+        // Create CDR entry for ring group call
+        $uuid = Str::uuid()->toString();
+
+        CallRecord::create([
+            'uuid' => $uuid,
+            'sip_account_id' => $callerSip->id,
+            'user_id' => $callerUser->id,
+            'reseller_id' => $callerUser->parent_id,
+            'call_flow' => 'sip_to_sip',
+            'caller' => $callerId,
+            'callee' => $extension,
+            'caller_id' => $callerSip->caller_id_number ?: $callerId,
+            'destination' => "RG:{$ringGroup->name}",
+            'call_start' => now(),
+            'disposition' => 'NO ANSWER',
+            'status' => 'in_progress',
+            'ast_channel' => $channel,
+            'ast_context' => $agi->getContext(),
+            'rate_per_min' => '0.0000',
+            'total_cost' => '0.0000',
+        ]);
+
+        // Determine dial timeout based on strategy
+        $dialTimeout = $ringGroup->ring_timeout ?? 30;
+
+        // Set channel variables
+        $agi->setVariable('ROUTE_ACTION', 'DIAL_INTERNAL');
+        $agi->setVariable('ROUTE_DIAL_STRING', $dialString);
+        $agi->setVariable('ROUTE_DIAL_TIMEOUT', (string) $dialTimeout);
+        $agi->setVariable('ROUTE_CLI_NAME', $callerSip->caller_id_name ?: $callerName);
+        $agi->setVariable('ROUTE_CLI_NUM', $callerSip->caller_id_number ?: $callerId);
+        $agi->setVariable('CDR_UUID', $uuid);
+        $agi->setVariable('RING_GROUP_STRATEGY', $ringGroup->strategy);
+
+        $agi->verbose("rSwitch: Ring group {$ringGroup->name} ({$ringGroup->strategy}) -> {$dialString}", 2);
+
+        Log::info('AGI ring group routed', [
+            'uuid' => $uuid,
+            'caller_user' => $callerUser->id,
+            'ring_group' => $ringGroup->name,
+            'strategy' => $ringGroup->strategy,
+            'dial' => $dialString,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Find a Ring Group by extension number.
+     * Supports formats: "RG1", "RG100", "600" (if configured as extension)
+     */
+    private function findRingGroup(string $extension, User $user): ?RingGroup
+    {
+        // Match RG prefix pattern (e.g., RG1, RG100)
+        if (preg_match('/^RG(\d+)$/i', $extension, $matches)) {
+            $ringGroupId = (int) $matches[1];
+
+            return RingGroup::where('id', $ringGroupId)
+                ->where('status', 'active')
+                ->where(function ($q) use ($user) {
+                    // Ring groups owned by the user, their parent, or admin (global)
+                    $q->where('user_id', $user->id)
+                      ->orWhere('user_id', $user->parent_id)
+                      ->orWhereNull('user_id');
+                })
+                ->first();
+        }
+
+        // Check if there's a ring group with this exact name
+        return RingGroup::where('name', $extension)
+            ->where('status', 'active')
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                  ->orWhere('user_id', $user->parent_id)
+                  ->orWhereNull('user_id');
+            })
+            ->first();
+    }
+
+    /**
+     * Check if caller user can make internal calls to destination user.
+     * Rules:
+     * - Same user (own accounts) - allowed
+     * - Same parent (reseller's clients can call each other) - allowed
+     * - Caller is parent of destination - allowed
+     * - Destination is parent of caller - allowed
+     */
+    private function canCallInternal(User $caller, User $destination): bool
+    {
+        // Same user
+        if ($caller->id === $destination->id) {
+            return true;
+        }
+
+        // Same parent (siblings under same reseller)
+        if ($caller->parent_id && $caller->parent_id === $destination->parent_id) {
+            return true;
+        }
+
+        // Caller is parent of destination
+        if ($destination->parent_id === $caller->id) {
+            return true;
+        }
+
+        // Destination is parent of caller
+        if ($caller->parent_id === $destination->id) {
+            return true;
+        }
+
+        // Admin can call anyone
+        if ($caller->role === 'admin') {
+            return true;
+        }
+
+        return false;
     }
 
     private function reject(AgiConnection $agi, string $reason): void

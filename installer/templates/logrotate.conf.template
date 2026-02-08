@@ -1,0 +1,30 @@
+# rSwitch Log Rotation Configuration
+# Place in /etc/logrotate.d/rswitch
+
+{{INSTALL_DIR}}/storage/logs/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data www-data
+    sharedscripts
+    postrotate
+        supervisorctl restart rswitch-worker:* > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/asterisk/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 0640 asterisk asterisk
+    sharedscripts
+    postrotate
+        /usr/sbin/asterisk -rx 'logger reload' > /dev/null 2>&1 || true
+    endscript
+}

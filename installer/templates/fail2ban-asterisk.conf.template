@@ -1,0 +1,23 @@
+# rSwitch Fail2Ban Asterisk Jail Configuration
+# Place in /etc/fail2ban/jail.d/asterisk.conf
+
+[asterisk]
+enabled = true
+port = 5060,5061
+protocol = udp,tcp
+filter = asterisk
+logpath = /var/log/asterisk/messages
+maxretry = 5
+bantime = 3600
+findtime = 600
+
+# Aggressive jail for repeat offenders
+[asterisk-aggressive]
+enabled = true
+port = 5060,5061
+protocol = udp,tcp
+filter = asterisk
+logpath = /var/log/asterisk/messages
+maxretry = 3
+bantime = 86400
+findtime = 86400

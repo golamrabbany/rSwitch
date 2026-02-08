@@ -408,6 +408,9 @@
     .avatar-sky {
         @apply bg-sky-100 text-sky-700;
     }
+    .avatar-purple {
+        @apply bg-purple-100 text-purple-700;
+    }
     .user-name {
         @apply font-medium text-gray-900;
     }
@@ -482,13 +485,13 @@
        Form Cards
        ======================================== */
     .form-card {
-        @apply bg-white rounded-lg border border-gray-200 overflow-hidden;
+        @apply bg-white rounded-lg border border-gray-200;
     }
     .form-card-header {
-        @apply px-5 py-4 border-b border-gray-100 bg-gray-50;
+        @apply px-5 py-4 border-b border-gray-100 bg-gray-50 rounded-t-lg;
     }
     .form-card-header-compact {
-        @apply px-4 py-3 border-b border-gray-100 bg-gray-50;
+        @apply px-4 py-3 border-b border-gray-100 bg-gray-50 rounded-t-lg;
     }
     .form-card-title {
         @apply text-sm font-semibold text-gray-900;
@@ -501,6 +504,20 @@
     }
     .form-card-body-compact {
         @apply px-4 py-3 space-y-2.5;
+    }
+
+    /* Autocomplete Dropdown */
+    .autocomplete-dropdown {
+        @apply absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto;
+    }
+    .autocomplete-item {
+        @apply w-full px-4 py-2.5 text-left hover:bg-indigo-50 flex items-center justify-between transition-colors;
+    }
+    .autocomplete-item.selected {
+        @apply bg-indigo-50;
+    }
+    .autocomplete-empty {
+        @apply px-4 py-3 text-sm text-gray-500;
     }
 
     /* Form Groups */
@@ -559,6 +576,26 @@
     }
     .form-actions-compact {
         @apply flex items-center justify-end gap-3 mt-5;
+    }
+
+    /* Member Row (Ring Groups, etc.) */
+    .member-row {
+        @apply flex items-start gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200;
+    }
+    .member-row-main {
+        @apply flex-1 min-w-0;
+    }
+    .member-row-field {
+        @apply w-24 flex-shrink-0;
+    }
+    .member-row-action {
+        @apply pt-6 flex-shrink-0;
+    }
+    .form-label-sm {
+        @apply block text-xs font-medium text-gray-500 mb-1;
+    }
+    .btn-icon-danger {
+        @apply p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors;
     }
 
     /* ========================================

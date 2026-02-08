@@ -1,0 +1,60 @@
+# rSwitch Supervisor Configuration Template
+# Replace {{INSTALL_DIR}} with actual path
+
+[program:rswitch-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php {{INSTALL_DIR}}/artisan queue:work redis --queue=default --sleep=3 --tries=3 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=2
+redirect_stderr=true
+stdout_logfile={{INSTALL_DIR}}/storage/logs/worker.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=3
+stopwaitsecs=3600
+
+[program:rswitch-webhook-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php {{INSTALL_DIR}}/artisan queue:work redis --queue=webhooks --sleep=5 --tries=3 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile={{INSTALL_DIR}}/storage/logs/webhook-worker.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=3
+
+[program:rswitch-agi]
+process_name=%(program_name)s
+command=php {{INSTALL_DIR}}/artisan agi:serve
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile={{INSTALL_DIR}}/storage/logs/agi.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=3
+
+[program:rswitch-scheduler]
+process_name=%(program_name)s
+command=/bin/bash -c "while true; do php {{INSTALL_DIR}}/artisan schedule:run >> /dev/null 2>&1; sleep 60; done"
+autostart=true
+autorestart=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile={{INSTALL_DIR}}/storage/logs/scheduler.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=3
+
+[group:rswitch]
+programs=rswitch-worker,rswitch-webhook-worker,rswitch-agi,rswitch-scheduler

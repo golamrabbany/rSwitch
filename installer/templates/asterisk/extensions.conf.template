@@ -1,16 +1,16 @@
-; rSwitch Dialplan
-; SIP accounts use context [from-internal]
-; Incoming trunks use context [from-trunk]
-; AGI handles routing, billing, and security checks
+; rSwitch Extensions Configuration Template
+; Call routing is handled by AGI
+; Supports both internal (SIP-to-SIP) and external (SIP-to-Trunk) calls
 
 [general]
 static=yes
 writeprotect=yes
-clearglobalvars=yes
+autofallthrough=yes
+clearglobalvars=no
+priorityjumping=no
 
 [globals]
-; FastAGI server address (Laravel artisan agi:serve)
-AGI_HOST=laravel.test
+AGI_HOST=127.0.0.1
 AGI_PORT=4573
 
 ; --- Context: Outbound calls from SIP accounts ---
@@ -90,4 +90,18 @@ exten => 600,1,NoOp(Echo test for ${CALLERID(all)})
  same => n,Playback(demo-echotest)
  same => n,Echo()
  same => n,Playback(demo-echodone)
+ same => n,Hangup()
+
+; Playback test
+exten => 601,1,NoOp(Playback Test)
+ same => n,Answer()
+ same => n,Wait(1)
+ same => n,Playback(hello-world)
+ same => n,Hangup()
+
+; DTMF test
+exten => 602,1,NoOp(DTMF Test)
+ same => n,Answer()
+ same => n,Wait(1)
+ same => n,SayDigits(1234567890)
  same => n,Hangup()

@@ -161,14 +161,17 @@ class TrunkRouteController extends Controller
     protected function validateRoute(Request $request, ?TrunkRoute $route = null): array
     {
         $validated = $request->validate([
-            'trunk_id'   => ['required', 'exists:trunks,id'],
-            'prefix'     => ['required', 'string', 'max:20', 'regex:/^\d+$/'],
-            'time_start' => ['nullable', 'date_format:H:i'],
-            'time_end'   => ['nullable', 'date_format:H:i', 'required_with:time_start'],
-            'timezone'   => ['required', 'string', 'max:50'],
-            'priority'   => ['required', 'integer', 'min:1', 'max:100'],
-            'weight'     => ['required', 'integer', 'min:1', 'max:1000'],
-            'status'     => ['required', Rule::in(['active', 'disabled'])],
+            'trunk_id'            => ['required', 'exists:trunks,id'],
+            'prefix'              => ['required', 'string', 'max:20', 'regex:/^\d+$/'],
+            'time_start'          => ['nullable', 'date_format:H:i'],
+            'time_end'            => ['nullable', 'date_format:H:i', 'required_with:time_start'],
+            'timezone'            => ['required', 'string', 'max:50'],
+            'priority'            => ['required', 'integer', 'min:1', 'max:100'],
+            'weight'              => ['required', 'integer', 'min:1', 'max:1000'],
+            'mnp_enabled'         => ['nullable', 'boolean'],
+            'mnp_prefix'          => ['nullable', 'string', 'max:10', 'regex:/^\d*$/'],
+            'mnp_insert_position' => ['nullable', 'integer', 'min:0', 'max:20'],
+            'status'              => ['required', Rule::in(['active', 'disabled'])],
         ]);
 
         // Validate trunk is outgoing/both
@@ -177,6 +180,15 @@ class TrunkRouteController extends Controller
             throw ValidationException::withMessages([
                 'trunk_id' => 'The selected trunk must have outgoing or both direction.',
             ]);
+        }
+
+        // Handle MNP checkbox (unchecked = not sent)
+        $validated['mnp_enabled'] = $request->boolean('mnp_enabled');
+
+        // If MNP disabled, clear related fields
+        if (!$validated['mnp_enabled']) {
+            $validated['mnp_prefix'] = null;
+            $validated['mnp_insert_position'] = 3;
         }
 
         return $validated;

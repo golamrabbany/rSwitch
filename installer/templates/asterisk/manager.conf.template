@@ -1,0 +1,33 @@
+; rSwitch AMI Configuration Template
+; Replace {{AMI_SECRET}} with actual password
+
+[general]
+enabled = yes
+port = 5038
+bindaddr = 127.0.0.1
+displayconnects = yes
+timestampevents = yes
+httptimeout = 60
+authtimeout = 30
+authlimit = 50
+
+; rSwitch application user
+[rswitch]
+secret = {{AMI_SECRET}}
+deny = 0.0.0.0/0.0.0.0
+permit = 127.0.0.1/255.255.255.255
+read = all
+write = all
+writetimeout = 5000
+eventfilter = !Event: RTCP*
+eventfilter = !Event: VarSet
+eventfilter = !Event: Cdr
+eventfilter = !Event: NewExten
+
+; Read-only monitoring user (optional)
+; [monitor]
+; secret = MONITOR_PASSWORD
+; deny = 0.0.0.0/0.0.0.0
+; permit = 127.0.0.1/255.255.255.255
+; read = system,call,agent
+; write =
