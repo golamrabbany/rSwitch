@@ -25,8 +25,34 @@
     </div>
 
     <form method="POST" action="{{ route('admin.dids.update', $did) }}" x-data="{
-        destinationType: '{{ old('destination_type', $did->destination_type) }}'
-    }">
+        destinationType: '{{ old('destination_type', $did->destination_type) }}',
+        sipSearch: '',
+        sipSelectedId: '{{ old('destination_id', $did->destination_type === 'sip_account' ? $did->destination_id : '') }}',
+        sipOpen: false,
+        sipAccounts: {{ Js::from($sipAccounts->map(fn($s) => ['id' => $s->id, 'username' => $s->username, 'owner' => $s->user->name ?? 'Unknown'])) }},
+        get sipFiltered() {
+            if (!this.sipSearch) return this.sipAccounts;
+            return this.sipAccounts.filter(s =>
+                s.username.toLowerCase().includes(this.sipSearch.toLowerCase()) ||
+                s.owner.toLowerCase().includes(this.sipSearch.toLowerCase())
+            );
+        },
+        selectSip(sip) {
+            this.sipSearch = sip.username + ' — ' + sip.owner;
+            this.sipSelectedId = sip.id;
+            this.sipOpen = false;
+        },
+        clearSip() {
+            this.sipSearch = '';
+            this.sipSelectedId = '';
+        }
+    }" x-init="
+        let selectedId = '{{ old('destination_id', $did->destination_type === 'sip_account' ? $did->destination_id : '') }}';
+        if (selectedId) {
+            let found = sipAccounts.find(s => s.id == selectedId);
+            if (found) sipSearch = found.username + ' — ' + found.owner;
+        }
+    ">
         @csrf
         @method('PUT')
 
@@ -119,15 +145,54 @@
                             </div>
 
                             <div x-show="destinationType === 'sip_account'" x-cloak class="form-group">
-                                <label for="destination_id" class="form-label">SIP Account</label>
-                                <select id="destination_id" name="destination_id" class="form-input">
-                                    <option value="">Select SIP account...</option>
-                                    @foreach ($sipAccounts as $sip)
-                                        <option value="{{ $sip->id }}" {{ old('destination_id', $did->destination_id) == $sip->id ? 'selected' : '' }}>
-                                            {{ $sip->username }} — {{ $sip->user->name ?? 'Unknown' }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                <label class="form-label">SIP Account</label>
+                                <div class="relative">
+                                    <input type="hidden" name="destination_id" :value="sipSelectedId">
+                                    <div class="relative">
+                                        <input type="text"
+                                               x-model="sipSearch"
+                                               @focus="sipOpen = true"
+                                               @click="sipOpen = true"
+                                               @input="sipOpen = true; sipSelectedId = ''"
+                                               placeholder="Search SIP account..."
+                                               class="form-input pr-9"
+                                               :class="sipSelectedId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
+                                               autocomplete="off">
+                                        <button type="button"
+                                                x-show="sipSearch"
+                                                @click="clearSip()"
+                                                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div x-show="sipOpen && sipFiltered.length > 0"
+                                         @click.away="sipOpen = false"
+                                         x-transition
+                                         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                        <template x-for="sip in sipFiltered" :key="sip.id">
+                                            <button type="button"
+                                                    @click="selectSip(sip)"
+                                                    class="w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3">
+                                                <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-medium flex-shrink-0">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                                                    </svg>
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div class="text-sm font-medium text-gray-900 font-mono truncate" x-text="sip.username"></div>
+                                                    <div class="text-xs text-gray-500 truncate" x-text="sip.owner"></div>
+                                                </div>
+                                            </button>
+                                        </template>
+                                    </div>
+                                    <div x-show="sipOpen && sipSearch && sipFiltered.length === 0"
+                                         @click.away="sipOpen = false"
+                                         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                                        No SIP accounts found
+                                    </div>
+                                </div>
                                 <p class="form-hint">Incoming calls will ring this SIP account.</p>
                                 <x-input-error :messages="$errors->get('destination_id')" class="mt-2" />
                             </div>
@@ -166,14 +231,14 @@
                     <div class="form-card-body">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
-                                <label for="monthly_cost" class="form-label">Monthly Cost ($)</label>
+                                <label for="monthly_cost" class="form-label">Monthly Cost ({{ currency_symbol() }})</label>
                                 <input type="number" id="monthly_cost" name="monthly_cost" value="{{ old('monthly_cost', $did->monthly_cost) }}" required
                                        step="0.0001" min="0" max="9999.9999" class="form-input">
                                 <p class="form-hint">Your cost from the provider.</p>
                                 <x-input-error :messages="$errors->get('monthly_cost')" class="mt-2" />
                             </div>
                             <div class="form-group">
-                                <label for="monthly_price" class="form-label">Monthly Price ($)</label>
+                                <label for="monthly_price" class="form-label">Monthly Price ({{ currency_symbol() }})</label>
                                 <input type="number" id="monthly_price" name="monthly_price" value="{{ old('monthly_price', $did->monthly_price) }}" required
                                        step="0.0001" min="0" max="9999.9999" class="form-input">
                                 <p class="form-hint">Price charged to the client.</p>
