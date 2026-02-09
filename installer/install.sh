@@ -3,7 +3,7 @@
 # rSwitch Installer
 # VoIP Billing & Routing Platform
 #
-# Supports: Ubuntu 22.04/24.04 LTS, Debian 11/12
+# Supports: Ubuntu 22.04+ LTS, Debian 12+, CentOS 9+, AlmaLinux 9+
 #
 set -e
 
@@ -16,7 +16,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Version
-INSTALLER_VERSION="1.2.0"
+INSTALLER_VERSION="1.3.0"
 ASTERISK_VERSION="21.4.0"
 PHP_VERSION="8.3"
 NODE_VERSION="20"
@@ -96,26 +96,37 @@ check_os() {
         exit 1
     fi
 
+    # Extract major version number
+    OS_MAJOR_VERSION=$(echo "$OS_VERSION" | cut -d'.' -f1)
+
     case "$OS" in
         ubuntu)
-            if [[ "$OS_VERSION" != "22.04" && "$OS_VERSION" != "24.04" ]]; then
-                log_warning "Ubuntu $OS_VERSION is not officially supported. Recommended: 22.04 or 24.04 LTS"
-                read -p "Continue anyway? (y/N): " -n 1 -r
-                echo
-                [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
+            if [[ "$OS_MAJOR_VERSION" -lt 22 ]]; then
+                log_error "Ubuntu $OS_VERSION is not supported. Minimum required: Ubuntu 22.04 LTS"
+                exit 1
             fi
             ;;
         debian)
-            if [[ "$OS_VERSION" != "11" && "$OS_VERSION" != "12" ]]; then
-                log_warning "Debian $OS_VERSION is not officially supported. Recommended: 11 or 12"
-                read -p "Continue anyway? (y/N): " -n 1 -r
-                echo
-                [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
+            if [[ "$OS_MAJOR_VERSION" -lt 12 ]]; then
+                log_error "Debian $OS_VERSION is not supported. Minimum required: Debian 12"
+                exit 1
+            fi
+            ;;
+        centos)
+            if [[ "$OS_MAJOR_VERSION" -lt 9 ]]; then
+                log_error "CentOS $OS_VERSION is not supported. Minimum required: CentOS 9"
+                exit 1
+            fi
+            ;;
+        almalinux)
+            if [[ "$OS_MAJOR_VERSION" -lt 9 ]]; then
+                log_error "AlmaLinux $OS_VERSION is not supported. Minimum required: AlmaLinux 9"
+                exit 1
             fi
             ;;
         *)
             log_error "Unsupported OS: $OS"
-            log_info "Supported: Ubuntu 22.04/24.04 LTS, Debian 11/12"
+            log_info "Supported: Ubuntu 22.04+, Debian 12+, CentOS 9+, AlmaLinux 9+"
             exit 1
             ;;
     esac
@@ -184,32 +195,60 @@ gather_configuration() {
 install_system_dependencies() {
     log_step "Installing System Dependencies"
 
-    export DEBIAN_FRONTEND=noninteractive
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        log_info "Updating package lists..."
+        dnf update -y -q
 
-    log_info "Updating package lists..."
-    apt-get update -qq
+        log_info "Installing EPEL repository..."
+        dnf install -y -q epel-release
 
-    log_info "Installing essential packages..."
-    apt-get install -y -qq \
-        software-properties-common \
-        apt-transport-https \
-        ca-certificates \
-        curl \
-        wget \
-        gnupg \
-        lsb-release \
-        git \
-        unzip \
-        zip \
-        acl \
-        supervisor \
-        cron \
-        logrotate \
-        ufw \
-        fail2ban \
-        htop \
-        vim \
-        nano
+        log_info "Installing essential packages..."
+        dnf install -y -q \
+            ca-certificates \
+            curl \
+            wget \
+            gnupg2 \
+            git \
+            unzip \
+            zip \
+            acl \
+            supervisor \
+            cronie \
+            logrotate \
+            firewalld \
+            fail2ban \
+            htop \
+            vim \
+            nano \
+            policycoreutils-python-utils
+    else
+        export DEBIAN_FRONTEND=noninteractive
+
+        log_info "Updating package lists..."
+        apt-get update -qq
+
+        log_info "Installing essential packages..."
+        apt-get install -y -qq \
+            software-properties-common \
+            apt-transport-https \
+            ca-certificates \
+            curl \
+            wget \
+            gnupg \
+            lsb-release \
+            git \
+            unzip \
+            zip \
+            acl \
+            supervisor \
+            cron \
+            logrotate \
+            ufw \
+            fail2ban \
+            htop \
+            vim \
+            nano
+    fi
 
     log_success "System dependencies installed"
 }
@@ -217,65 +256,114 @@ install_system_dependencies() {
 install_php() {
     log_step "Installing PHP $PHP_VERSION"
 
-    # Add PHP repository
-    if [[ "$OS" == "ubuntu" ]]; then
-        add-apt-repository -y ppa:ondrej/php
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        # RHEL-based: use Remi repository
+        log_info "Installing Remi repository..."
+        dnf install -y -q https://rpms.remirepo.net/enterprise/remi-release-9.rpm
+        dnf module reset php -y -q
+        dnf module enable php:remi-${PHP_VERSION} -y -q
+
+        log_info "Installing PHP packages..."
+        dnf install -y -q \
+            php-fpm \
+            php-cli \
+            php-common \
+            php-mysqlnd \
+            php-pgsql \
+            php-pdo \
+            php-redis \
+            php-xml \
+            php-curl \
+            php-gd \
+            php-imagick \
+            php-mbstring \
+            php-zip \
+            php-bcmath \
+            php-intl \
+            php-soap \
+            php-ldap \
+            php-imap \
+            php-opcache
+
+        # Configure PHP-FPM for RHEL
+        log_info "Configuring PHP-FPM..."
+        PHP_FPM_CONF="/etc/php-fpm.d/www.conf"
+        sed -i "s/^user = .*/user = nginx/" $PHP_FPM_CONF
+        sed -i "s/^group = .*/group = nginx/" $PHP_FPM_CONF
+        sed -i "s/^listen.owner = .*/listen.owner = nginx/" $PHP_FPM_CONF
+        sed -i "s/^listen.group = .*/listen.group = nginx/" $PHP_FPM_CONF
+        sed -i "s|^listen = .*|listen = /run/php-fpm/www.sock|" $PHP_FPM_CONF
+        sed -i "s/^;clear_env = .*/clear_env = no/" $PHP_FPM_CONF
+
+        # PHP config
+        PHP_INI="/etc/php.ini"
+        sed -i "s/^memory_limit = .*/memory_limit = 256M/" $PHP_INI
+        sed -i "s/^max_execution_time = .*/max_execution_time = 300/" $PHP_INI
+        sed -i "s/^upload_max_filesize = .*/upload_max_filesize = 100M/" $PHP_INI
+        sed -i "s/^post_max_size = .*/post_max_size = 100M/" $PHP_INI
+
+        systemctl restart php-fpm
+        systemctl enable php-fpm
     else
-        # Debian - use sury.org
-        curl -sSL https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /usr/share/keyrings/php-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/php-archive-keyring.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
+        # Debian/Ubuntu: use ondrej/sury repository
+        if [[ "$OS" == "ubuntu" ]]; then
+            add-apt-repository -y ppa:ondrej/php
+        else
+            curl -sSL https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /usr/share/keyrings/php-archive-keyring.gpg
+            echo "deb [signed-by=/usr/share/keyrings/php-archive-keyring.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
+        fi
+
+        apt-get update -qq
+
+        log_info "Installing PHP packages..."
+        apt-get install -y -qq \
+            php${PHP_VERSION}-fpm \
+            php${PHP_VERSION}-cli \
+            php${PHP_VERSION}-common \
+            php${PHP_VERSION}-mysql \
+            php${PHP_VERSION}-pgsql \
+            php${PHP_VERSION}-sqlite3 \
+            php${PHP_VERSION}-redis \
+            php${PHP_VERSION}-memcached \
+            php${PHP_VERSION}-xml \
+            php${PHP_VERSION}-curl \
+            php${PHP_VERSION}-gd \
+            php${PHP_VERSION}-imagick \
+            php${PHP_VERSION}-mbstring \
+            php${PHP_VERSION}-zip \
+            php${PHP_VERSION}-bcmath \
+            php${PHP_VERSION}-intl \
+            php${PHP_VERSION}-soap \
+            php${PHP_VERSION}-ldap \
+            php${PHP_VERSION}-imap \
+            php${PHP_VERSION}-opcache
+
+        # Configure PHP-FPM
+        log_info "Configuring PHP-FPM..."
+        PHP_FPM_CONF="/etc/php/${PHP_VERSION}/fpm/pool.d/www.conf"
+        sed -i "s/^user = .*/user = www-data/" $PHP_FPM_CONF
+        sed -i "s/^group = .*/group = www-data/" $PHP_FPM_CONF
+        sed -i "s/^listen.owner = .*/listen.owner = www-data/" $PHP_FPM_CONF
+        sed -i "s/^listen.group = .*/listen.group = www-data/" $PHP_FPM_CONF
+        sed -i "s/^;clear_env = .*/clear_env = no/" $PHP_FPM_CONF
+
+        # PHP CLI config
+        PHP_INI="/etc/php/${PHP_VERSION}/cli/php.ini"
+        sed -i "s/^memory_limit = .*/memory_limit = 512M/" $PHP_INI
+        sed -i "s/^max_execution_time = .*/max_execution_time = 300/" $PHP_INI
+        sed -i "s/^upload_max_filesize = .*/upload_max_filesize = 100M/" $PHP_INI
+        sed -i "s/^post_max_size = .*/post_max_size = 100M/" $PHP_INI
+
+        # PHP-FPM config
+        PHP_FPM_INI="/etc/php/${PHP_VERSION}/fpm/php.ini"
+        sed -i "s/^memory_limit = .*/memory_limit = 256M/" $PHP_FPM_INI
+        sed -i "s/^max_execution_time = .*/max_execution_time = 300/" $PHP_FPM_INI
+        sed -i "s/^upload_max_filesize = .*/upload_max_filesize = 100M/" $PHP_FPM_INI
+        sed -i "s/^post_max_size = .*/post_max_size = 100M/" $PHP_FPM_INI
+
+        systemctl restart php${PHP_VERSION}-fpm
+        systemctl enable php${PHP_VERSION}-fpm
     fi
-
-    apt-get update -qq
-
-    log_info "Installing PHP packages..."
-    apt-get install -y -qq \
-        php${PHP_VERSION}-fpm \
-        php${PHP_VERSION}-cli \
-        php${PHP_VERSION}-common \
-        php${PHP_VERSION}-mysql \
-        php${PHP_VERSION}-pgsql \
-        php${PHP_VERSION}-sqlite3 \
-        php${PHP_VERSION}-redis \
-        php${PHP_VERSION}-memcached \
-        php${PHP_VERSION}-xml \
-        php${PHP_VERSION}-curl \
-        php${PHP_VERSION}-gd \
-        php${PHP_VERSION}-imagick \
-        php${PHP_VERSION}-mbstring \
-        php${PHP_VERSION}-zip \
-        php${PHP_VERSION}-bcmath \
-        php${PHP_VERSION}-intl \
-        php${PHP_VERSION}-soap \
-        php${PHP_VERSION}-ldap \
-        php${PHP_VERSION}-imap \
-        php${PHP_VERSION}-opcache
-
-    # Configure PHP-FPM
-    log_info "Configuring PHP-FPM..."
-    PHP_FPM_CONF="/etc/php/${PHP_VERSION}/fpm/pool.d/www.conf"
-    sed -i "s/^user = .*/user = www-data/" $PHP_FPM_CONF
-    sed -i "s/^group = .*/group = www-data/" $PHP_FPM_CONF
-    sed -i "s/^listen.owner = .*/listen.owner = www-data/" $PHP_FPM_CONF
-    sed -i "s/^listen.group = .*/listen.group = www-data/" $PHP_FPM_CONF
-    sed -i "s/^;clear_env = .*/clear_env = no/" $PHP_FPM_CONF
-
-    # PHP CLI config
-    PHP_INI="/etc/php/${PHP_VERSION}/cli/php.ini"
-    sed -i "s/^memory_limit = .*/memory_limit = 512M/" $PHP_INI
-    sed -i "s/^max_execution_time = .*/max_execution_time = 300/" $PHP_INI
-    sed -i "s/^upload_max_filesize = .*/upload_max_filesize = 100M/" $PHP_INI
-    sed -i "s/^post_max_size = .*/post_max_size = 100M/" $PHP_INI
-
-    # PHP-FPM config
-    PHP_FPM_INI="/etc/php/${PHP_VERSION}/fpm/php.ini"
-    sed -i "s/^memory_limit = .*/memory_limit = 256M/" $PHP_FPM_INI
-    sed -i "s/^max_execution_time = .*/max_execution_time = 300/" $PHP_FPM_INI
-    sed -i "s/^upload_max_filesize = .*/upload_max_filesize = 100M/" $PHP_FPM_INI
-    sed -i "s/^post_max_size = .*/post_max_size = 100M/" $PHP_FPM_INI
-
-    systemctl restart php${PHP_VERSION}-fpm
-    systemctl enable php${PHP_VERSION}-fpm
 
     log_success "PHP $PHP_VERSION installed and configured"
 }
@@ -292,8 +380,13 @@ install_composer() {
 install_nodejs() {
     log_step "Installing Node.js $NODE_VERSION"
 
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-    apt-get install -y -qq nodejs
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        curl -fsSL https://rpm.nodesource.com/setup_${NODE_VERSION}.x | bash -
+        dnf install -y -q nodejs
+    else
+        curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+        apt-get install -y -qq nodejs
+    fi
 
     # Install npm globally
     npm install -g npm@latest
@@ -305,11 +398,15 @@ install_nodejs() {
 install_mysql() {
     log_step "Installing MySQL 8.0"
 
-    apt-get install -y -qq mysql-server mysql-client
-
-    # Start MySQL
-    systemctl start mysql
-    systemctl enable mysql
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        dnf install -y -q mysql-server mysql
+        systemctl start mysqld
+        systemctl enable mysqld
+    else
+        apt-get install -y -qq mysql-server mysql-client
+        systemctl start mysql
+        systemctl enable mysql
+    fi
 
     # Secure MySQL installation
     log_info "Securing MySQL installation..."
@@ -333,15 +430,26 @@ install_mysql() {
 install_redis() {
     log_step "Installing Redis"
 
-    apt-get install -y -qq redis-server
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        dnf install -y -q redis
+        REDIS_CONF="/etc/redis/redis.conf"
+    else
+        apt-get install -y -qq redis-server
+        REDIS_CONF="/etc/redis/redis.conf"
+    fi
 
     # Configure Redis
-    sed -i "s/^supervised .*/supervised systemd/" /etc/redis/redis.conf
-    sed -i "s/^# maxmemory .*/maxmemory 256mb/" /etc/redis/redis.conf
-    sed -i "s/^# maxmemory-policy .*/maxmemory-policy allkeys-lru/" /etc/redis/redis.conf
+    sed -i "s/^supervised .*/supervised systemd/" $REDIS_CONF
+    sed -i "s/^# maxmemory .*/maxmemory 256mb/" $REDIS_CONF
+    sed -i "s/^# maxmemory-policy .*/maxmemory-policy allkeys-lru/" $REDIS_CONF
 
-    systemctl restart redis-server
-    systemctl enable redis-server
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        systemctl restart redis
+        systemctl enable redis
+    else
+        systemctl restart redis-server
+        systemctl enable redis-server
+    fi
 
     log_success "Redis installed and configured"
 }
@@ -349,10 +457,15 @@ install_redis() {
 install_nginx() {
     log_step "Installing Nginx"
 
-    apt-get install -y -qq nginx
-
-    # Remove default site
-    rm -f /etc/nginx/sites-enabled/default
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        dnf install -y -q nginx
+        # SELinux: allow nginx to connect to network
+        setsebool -P httpd_can_network_connect 1 2>/dev/null || true
+    else
+        apt-get install -y -qq nginx
+        # Remove default site
+        rm -f /etc/nginx/sites-enabled/default
+    fi
 
     systemctl start nginx
     systemctl enable nginx
@@ -365,33 +478,60 @@ install_asterisk() {
 
     # Install build dependencies
     log_info "Installing Asterisk build dependencies..."
-    apt-get install -y -qq \
-        build-essential \
-        libncurses5-dev \
-        libjansson-dev \
-        libxml2-dev \
-        libsqlite3-dev \
-        uuid-dev \
-        libssl-dev \
-        libedit-dev \
-        libsrtp2-dev \
-        libspandsp-dev \
-        libcurl4-openssl-dev \
-        libnewt-dev \
-        libogg-dev \
-        libvorbis-dev \
-        libspeex-dev \
-        libspeexdsp-dev \
-        libunbound-dev \
-        unixodbc \
-        unixodbc-dev \
-        odbc-mariadb \
-        libmariadb-dev \
-        libmariadb-dev-compat \
-        freetds-dev \
-        libpq-dev \
-        libopus-dev \
-        libvpb-dev
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        dnf groupinstall -y -q "Development Tools"
+        dnf install -y -q \
+            ncurses-devel \
+            jansson-devel \
+            libxml2-devel \
+            sqlite-devel \
+            libuuid-devel \
+            openssl-devel \
+            libedit-devel \
+            libsrtp-devel \
+            spandsp-devel \
+            libcurl-devel \
+            newt-devel \
+            libogg-devel \
+            libvorbis-devel \
+            speex-devel \
+            unbound-devel \
+            unixODBC \
+            unixODBC-devel \
+            mariadb-connector-odbc \
+            mariadb-devel \
+            freetds-devel \
+            libpq-devel \
+            opus-devel
+    else
+        apt-get install -y -qq \
+            build-essential \
+            libncurses5-dev \
+            libjansson-dev \
+            libxml2-dev \
+            libsqlite3-dev \
+            uuid-dev \
+            libssl-dev \
+            libedit-dev \
+            libsrtp2-dev \
+            libspandsp-dev \
+            libcurl4-openssl-dev \
+            libnewt-dev \
+            libogg-dev \
+            libvorbis-dev \
+            libspeex-dev \
+            libspeexdsp-dev \
+            libunbound-dev \
+            unixodbc \
+            unixodbc-dev \
+            odbc-mariadb \
+            libmariadb-dev \
+            libmariadb-dev-compat \
+            freetds-dev \
+            libpq-dev \
+            libopus-dev \
+            libvpb-dev
+    fi
 
     # Download Asterisk
     log_info "Downloading Asterisk $ASTERISK_VERSION..."
@@ -687,6 +827,13 @@ EOF
 install_application() {
     log_step "Installing rSwitch Application"
 
+    # Determine web user based on OS
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        WEB_USER="nginx"
+    else
+        WEB_USER="www-data"
+    fi
+
     # Create installation directory
     mkdir -p $INSTALL_DIR
     cd $INSTALL_DIR
@@ -702,13 +849,13 @@ install_application() {
     fi
 
     # Set ownership
-    chown -R www-data:www-data $INSTALL_DIR
+    chown -R ${WEB_USER}:${WEB_USER} $INSTALL_DIR
 
     # Install Composer dependencies
     log_info "Installing Composer dependencies..."
     cd $INSTALL_DIR
-    sudo -u www-data composer install --no-dev --optimize-autoloader --no-interaction
-    sudo -u www-data composer dump-autoload
+    sudo -u ${WEB_USER} composer install --no-dev --optimize-autoloader --no-interaction
+    sudo -u ${WEB_USER} composer dump-autoload
 
     # Create .env file
     log_info "Creating environment configuration..."
@@ -745,33 +892,33 @@ AMI_SECRET=${DB_PASS}
 EOF
 
     # Generate application key
-    sudo -u www-data php artisan key:generate --force
+    sudo -u ${WEB_USER} php artisan key:generate --force
 
     # Run migrations
     log_info "Running database migrations..."
-    sudo -u www-data php artisan migrate --force
+    sudo -u ${WEB_USER} php artisan migrate --force
 
     # Seed database
     log_info "Seeding database..."
-    sudo -u www-data php artisan db:seed --force
+    sudo -u ${WEB_USER} php artisan db:seed --force
 
     # Install NPM dependencies and build assets
     log_info "Building frontend assets..."
-    sudo -u www-data npm ci
-    sudo -u www-data npm run build
+    sudo -u ${WEB_USER} npm ci
+    sudo -u ${WEB_USER} npm run build
 
     # Create storage link
-    sudo -u www-data php artisan storage:link
+    sudo -u ${WEB_USER} php artisan storage:link
 
     # Cache configuration
     log_info "Caching configuration..."
-    sudo -u www-data php artisan config:cache
-    sudo -u www-data php artisan route:cache
-    sudo -u www-data php artisan view:cache
+    sudo -u ${WEB_USER} php artisan config:cache
+    sudo -u ${WEB_USER} php artisan route:cache
+    sudo -u ${WEB_USER} php artisan view:cache
 
     # Set permissions
     chmod -R 775 storage bootstrap/cache
-    chown -R www-data:www-data storage bootstrap/cache
+    chown -R ${WEB_USER}:${WEB_USER} storage bootstrap/cache
 
     log_success "rSwitch application installed"
 }
@@ -779,7 +926,18 @@ EOF
 configure_nginx_site() {
     log_step "Configuring Nginx for rSwitch"
 
-    cat > /etc/nginx/sites-available/rswitch << EOF
+    # Determine PHP-FPM socket path and nginx config directory
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        PHP_FPM_SOCK="/run/php-fpm/www.sock"
+        NGINX_CONF_DIR="/etc/nginx/conf.d"
+        NGINX_CONF_FILE="${NGINX_CONF_DIR}/rswitch.conf"
+    else
+        PHP_FPM_SOCK="/var/run/php/php${PHP_VERSION}-fpm.sock"
+        NGINX_CONF_DIR="/etc/nginx/sites-available"
+        NGINX_CONF_FILE="${NGINX_CONF_DIR}/rswitch"
+    fi
+
+    cat > ${NGINX_CONF_FILE} << EOF
 server {
     listen 80;
     listen [::]:80;
@@ -812,7 +970,7 @@ server {
     error_page 404 /index.php;
 
     location ~ \.php$ {
-        fastcgi_pass unix:/var/run/php/php${PHP_VERSION}-fpm.sock;
+        fastcgi_pass unix:${PHP_FPM_SOCK};
         fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
         include fastcgi_params;
         fastcgi_read_timeout 300;
@@ -830,8 +988,10 @@ server {
 }
 EOF
 
-    # Enable site
-    ln -sf /etc/nginx/sites-available/rswitch /etc/nginx/sites-enabled/
+    # Enable site (Debian/Ubuntu only - RHEL uses conf.d which auto-loads)
+    if [[ "$OS" != "centos" && "$OS" != "almalinux" ]]; then
+        ln -sf /etc/nginx/sites-available/rswitch /etc/nginx/sites-enabled/
+    fi
 
     # Test nginx configuration
     nginx -t
@@ -845,7 +1005,18 @@ EOF
 configure_supervisor() {
     log_step "Configuring Supervisor for Queue Workers"
 
-    cat > /etc/supervisor/conf.d/rswitch.conf << EOF
+    # Determine web user based on OS
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        WEB_USER="nginx"
+        SUPERVISOR_CONF_DIR="/etc/supervisord.d"
+    else
+        WEB_USER="www-data"
+        SUPERVISOR_CONF_DIR="/etc/supervisor/conf.d"
+    fi
+
+    mkdir -p $SUPERVISOR_CONF_DIR
+
+    cat > ${SUPERVISOR_CONF_DIR}/rswitch.conf << EOF
 [program:rswitch-worker]
 process_name=%(program_name)s_%(process_num)02d
 command=php ${INSTALL_DIR}/artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
@@ -853,7 +1024,7 @@ autostart=true
 autorestart=true
 stopasgroup=true
 killasgroup=true
-user=www-data
+user=${WEB_USER}
 numprocs=2
 redirect_stderr=true
 stdout_logfile=${INSTALL_DIR}/storage/logs/worker.log
@@ -866,7 +1037,7 @@ autostart=true
 autorestart=true
 stopasgroup=true
 killasgroup=true
-user=www-data
+user=${WEB_USER}
 numprocs=1
 redirect_stderr=true
 stdout_logfile=${INSTALL_DIR}/storage/logs/webhook-worker.log
@@ -878,7 +1049,7 @@ autostart=true
 autorestart=true
 stopasgroup=true
 killasgroup=true
-user=www-data
+user=${WEB_USER}
 numprocs=1
 redirect_stderr=true
 stdout_logfile=${INSTALL_DIR}/storage/logs/agi.log
@@ -888,16 +1059,20 @@ process_name=%(program_name)s
 command=/bin/bash -c "while true; do php ${INSTALL_DIR}/artisan schedule:run >> /dev/null 2>&1; sleep 60; done"
 autostart=true
 autorestart=true
-user=www-data
+user=${WEB_USER}
 numprocs=1
 redirect_stderr=true
 stdout_logfile=${INSTALL_DIR}/storage/logs/scheduler.log
 EOF
 
     # Reload supervisor
-    supervisorctl reread
-    supervisorctl update
-    supervisorctl start all
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        systemctl restart supervisord
+    else
+        supervisorctl reread
+        supervisorctl update
+        supervisorctl start all
+    fi
 
     log_success "Supervisor configured"
 }
@@ -905,26 +1080,50 @@ EOF
 configure_firewall() {
     log_step "Configuring Firewall"
 
-    # Enable UFW
-    ufw --force enable
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        # Enable firewalld
+        systemctl start firewalld
+        systemctl enable firewalld
 
-    # Allow SSH
-    ufw allow ssh
+        # Allow SSH
+        firewall-cmd --permanent --add-service=ssh
 
-    # Allow HTTP/HTTPS
-    ufw allow 80/tcp
-    ufw allow 443/tcp
+        # Allow HTTP/HTTPS
+        firewall-cmd --permanent --add-service=http
+        firewall-cmd --permanent --add-service=https
 
-    # Allow SIP
-    ufw allow 5060/udp
-    ufw allow 5060/tcp
-    ufw allow 5061/tcp
+        # Allow SIP
+        firewall-cmd --permanent --add-port=5060/udp
+        firewall-cmd --permanent --add-port=5060/tcp
+        firewall-cmd --permanent --add-port=5061/tcp
 
-    # Allow RTP
-    ufw allow 10000:20000/udp
+        # Allow RTP
+        firewall-cmd --permanent --add-port=10000-20000/udp
 
-    # Reload firewall
-    ufw reload
+        # Reload firewall
+        firewall-cmd --reload
+    else
+        # Enable UFW
+        ufw --force enable
+
+        # Allow SSH
+        ufw allow ssh
+
+        # Allow HTTP/HTTPS
+        ufw allow 80/tcp
+        ufw allow 443/tcp
+
+        # Allow SIP
+        ufw allow 5060/udp
+        ufw allow 5060/tcp
+        ufw allow 5061/tcp
+
+        # Allow RTP
+        ufw allow 10000:20000/udp
+
+        # Reload firewall
+        ufw reload
+    fi
 
     log_success "Firewall configured"
 }
