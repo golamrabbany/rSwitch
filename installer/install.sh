@@ -16,7 +16,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Version
-INSTALLER_VERSION="1.3.0"
+INSTALLER_VERSION="1.4.0"
 ASTERISK_VERSION="21.4.0"
 PHP_VERSION="8.3"
 NODE_VERSION="20"
@@ -27,6 +27,7 @@ DB_NAME="rswitch"
 DB_USER="rswitch"
 DB_PASS=""
 DOMAIN=""
+SSL_TYPE="letsencrypt"  # letsencrypt, namecheap, or skip
 ADMIN_EMAIL="admin@localhost"
 ADMIN_PASSWORD=""
 
@@ -174,6 +175,30 @@ gather_configuration() {
     read -p "Installation directory [$INSTALL_DIR]: " input_dir
     INSTALL_DIR=${input_dir:-$INSTALL_DIR}
 
+    # SSL Configuration
+    echo ""
+    log_info "SSL Certificate Options:"
+    echo "  1) Let's Encrypt (free, auto-renewal) - Recommended"
+    echo "  2) Commercial SSL (Namecheap, DigiCert, etc.)"
+    echo "  3) Skip SSL (HTTP only, not recommended)"
+    echo ""
+    read -p "Select SSL option [1]: " ssl_choice
+    case "${ssl_choice:-1}" in
+        1)
+            SSL_TYPE="letsencrypt"
+            ;;
+        2)
+            SSL_TYPE="commercial"
+            ;;
+        3)
+            SSL_TYPE="skip"
+            log_warning "SSL will not be configured. Your site will be HTTP only."
+            ;;
+        *)
+            SSL_TYPE="letsencrypt"
+            ;;
+    esac
+
     # Summary
     echo ""
     log_info "Installation Summary:"
@@ -182,6 +207,7 @@ gather_configuration() {
     echo "  Database:         $DB_NAME"
     echo "  Database User:    $DB_USER"
     echo "  Admin Email:      $ADMIN_EMAIL"
+    echo "  SSL Type:         $SSL_TYPE"
     echo "  PHP Version:      $PHP_VERSION"
     echo "  Node Version:     $NODE_VERSION"
     echo "  Asterisk:         $ASTERISK_VERSION"
@@ -1167,15 +1193,212 @@ EOF
     log_success "Fail2Ban configured"
 }
 
-install_certbot() {
-    log_step "Installing Certbot for SSL"
+configure_ssl() {
+    log_step "Configuring SSL Certificate"
 
-    apt-get install -y -qq certbot python3-certbot-nginx
+    case "$SSL_TYPE" in
+        letsencrypt)
+            configure_ssl_letsencrypt
+            ;;
+        commercial)
+            configure_ssl_commercial
+            ;;
+        skip)
+            log_warning "SSL configuration skipped. Site will be HTTP only."
+            log_warning "You can manually configure SSL later."
+            ;;
+    esac
+}
 
-    log_info "To obtain SSL certificate, run:"
-    echo "  certbot --nginx -d ${DOMAIN}"
+configure_ssl_letsencrypt() {
+    log_info "Setting up Let's Encrypt SSL..."
 
-    log_success "Certbot installed"
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        dnf install -y -q certbot python3-certbot-nginx
+    else
+        apt-get install -y -qq certbot python3-certbot-nginx
+    fi
+
+    log_info "Obtaining SSL certificate..."
+    certbot --nginx -d ${DOMAIN} --non-interactive --agree-tos --email ${ADMIN_EMAIL} --redirect || {
+        log_warning "Automatic SSL setup failed. You can manually run:"
+        echo "  certbot --nginx -d ${DOMAIN}"
+        return
+    }
+
+    # Set up auto-renewal cron
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        echo "0 3 * * * root certbot renew --quiet" > /etc/cron.d/certbot-renew
+    fi
+
+    log_success "Let's Encrypt SSL configured with auto-renewal"
+}
+
+configure_ssl_commercial() {
+    log_info "Setting up Commercial SSL Certificate..."
+
+    # Create SSL directory
+    SSL_DIR="/etc/nginx/ssl/${DOMAIN}"
+    mkdir -p ${SSL_DIR}
+
+    # Generate private key
+    log_info "Generating private key..."
+    openssl genrsa -out ${SSL_DIR}/${DOMAIN}.key 2048
+    chmod 600 ${SSL_DIR}/${DOMAIN}.key
+
+    # Generate CSR (Certificate Signing Request)
+    log_info "Generating Certificate Signing Request (CSR)..."
+    openssl req -new -key ${SSL_DIR}/${DOMAIN}.key \
+        -out ${SSL_DIR}/${DOMAIN}.csr \
+        -subj "/C=US/ST=State/L=City/O=Organization/OU=IT/CN=${DOMAIN}"
+
+    # Create a placeholder for the certificate
+    touch ${SSL_DIR}/${DOMAIN}.crt
+    touch ${SSL_DIR}/${DOMAIN}.ca-bundle
+
+    # Display CSR for user
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}  COMMERCIAL SSL CERTIFICATE SETUP${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "${YELLOW}Your Certificate Signing Request (CSR) has been generated.${NC}"
+    echo ""
+    echo "CSR Location: ${SSL_DIR}/${DOMAIN}.csr"
+    echo "Key Location: ${SSL_DIR}/${DOMAIN}.key"
+    echo ""
+    echo -e "${YELLOW}Next Steps:${NC}"
+    echo "  1. Copy the CSR content below"
+    echo "  2. Go to your SSL provider (Namecheap, DigiCert, etc.)"
+    echo "  3. Paste the CSR when purchasing/activating your certificate"
+    echo "  4. Complete domain validation (email, DNS, or file-based)"
+    echo "  5. Download your certificate files"
+    echo "  6. Install the certificate:"
+    echo ""
+    echo -e "${CYAN}Installation Commands:${NC}"
+    echo "  # Copy your certificate to:"
+    echo "  ${SSL_DIR}/${DOMAIN}.crt"
+    echo ""
+    echo "  # Copy your CA bundle to:"
+    echo "  ${SSL_DIR}/${DOMAIN}.ca-bundle"
+    echo ""
+    echo "  # Then run:"
+    echo "  cat ${SSL_DIR}/${DOMAIN}.crt ${SSL_DIR}/${DOMAIN}.ca-bundle > ${SSL_DIR}/${DOMAIN}.chained.crt"
+    echo "  systemctl reload nginx"
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}YOUR CSR (Certificate Signing Request):${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    cat ${SSL_DIR}/${DOMAIN}.csr
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    # Save CSR to credentials file for later reference
+    CSR_CONTENT=$(cat ${SSL_DIR}/${DOMAIN}.csr)
+
+    # Update nginx config for SSL (prepared but using self-signed until commercial cert installed)
+    configure_nginx_ssl_commercial
+
+    log_success "CSR generated. Install your commercial SSL certificate to complete setup."
+}
+
+configure_nginx_ssl_commercial() {
+    # Determine nginx config file
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        PHP_FPM_SOCK="/run/php-fpm/www.sock"
+        NGINX_CONF_FILE="/etc/nginx/conf.d/rswitch.conf"
+    else
+        PHP_FPM_SOCK="/var/run/php/php${PHP_VERSION}-fpm.sock"
+        NGINX_CONF_FILE="/etc/nginx/sites-available/rswitch"
+    fi
+
+    SSL_DIR="/etc/nginx/ssl/${DOMAIN}"
+
+    # Generate temporary self-signed cert until commercial cert is installed
+    log_info "Generating temporary self-signed certificate..."
+    openssl req -x509 -nodes -days 365 \
+        -key ${SSL_DIR}/${DOMAIN}.key \
+        -out ${SSL_DIR}/${DOMAIN}.chained.crt \
+        -subj "/C=US/ST=State/L=City/O=Organization/OU=IT/CN=${DOMAIN}"
+
+    cat > ${NGINX_CONF_FILE} << EOF
+# HTTP - Redirect to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+# HTTPS
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${DOMAIN};
+    root ${INSTALL_DIR}/public;
+
+    # SSL Configuration
+    ssl_certificate ${SSL_DIR}/${DOMAIN}.chained.crt;
+    ssl_certificate_key ${SSL_DIR}/${DOMAIN}.key;
+
+    # SSL Security Settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    # Security Headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    index index.php;
+    charset utf-8;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied expired no-cache no-store private auth;
+    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/javascript application/json;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php\$ {
+        fastcgi_pass unix:${PHP_FPM_SOCK};
+        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_read_timeout 300;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+
+    # Cache static assets
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff|woff2|ttf|svg)\$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+}
+EOF
+
+    # Test and reload nginx
+    nginx -t && systemctl reload nginx
 }
 
 create_admin_user() {
@@ -1262,7 +1485,43 @@ Clear cache:        cd ${INSTALL_DIR} && php artisan optimize:clear
 
 SSL Certificate
 ───────────────
-Run: certbot --nginx -d ${DOMAIN}
+Type: ${SSL_TYPE}
+EOF
+
+    # Add SSL-specific instructions
+    case "$SSL_TYPE" in
+        letsencrypt)
+            cat >> $CREDS_FILE << EOF
+Status: Configured with auto-renewal
+Renew: certbot renew
+EOF
+            ;;
+        commercial)
+            cat >> $CREDS_FILE << EOF
+CSR File:     /etc/nginx/ssl/${DOMAIN}/${DOMAIN}.csr
+Key File:     /etc/nginx/ssl/${DOMAIN}/${DOMAIN}.key
+Cert File:    /etc/nginx/ssl/${DOMAIN}/${DOMAIN}.chained.crt
+
+To install your commercial certificate:
+1. Purchase/activate certificate with your SSL provider
+2. Download certificate files (.crt and CA bundle)
+3. Copy certificate:
+   cat your_cert.crt ca_bundle.crt > /etc/nginx/ssl/${DOMAIN}/${DOMAIN}.chained.crt
+4. Reload nginx:
+   systemctl reload nginx
+EOF
+            ;;
+        skip)
+            cat >> $CREDS_FILE << EOF
+Status: Not configured (HTTP only)
+To add SSL later:
+  apt install certbot python3-certbot-nginx
+  certbot --nginx -d ${DOMAIN}
+EOF
+            ;;
+    esac
+
+    cat >> $CREDS_FILE << EOF
 
 ╔══════════════════════════════════════════════════════════════════╗
 ║  IMPORTANT: Delete this file after saving credentials securely! ║
@@ -1282,16 +1541,43 @@ print_completion() {
     echo -e "${GREEN}║                                                                  ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  ${CYAN}Web Interface:${NC}   https://${DOMAIN}"
+
+    if [[ "$SSL_TYPE" == "skip" ]]; then
+        echo -e "  ${CYAN}Web Interface:${NC}   http://${DOMAIN}"
+    else
+        echo -e "  ${CYAN}Web Interface:${NC}   https://${DOMAIN}"
+    fi
+
     echo -e "  ${CYAN}Admin Email:${NC}     ${ADMIN_EMAIL}"
     echo -e "  ${CYAN}Admin Password:${NC}  ${ADMIN_PASSWORD}"
     echo ""
     echo -e "  ${YELLOW}Credentials saved to:${NC} /root/rswitch-credentials.txt"
     echo ""
     echo -e "  ${CYAN}Next Steps:${NC}"
-    echo "    1. Obtain SSL certificate: certbot --nginx -d ${DOMAIN}"
-    echo "    2. Start Asterisk: systemctl start asterisk"
-    echo "    3. Access web interface and configure your trunks/rates"
+
+    case "$SSL_TYPE" in
+        letsencrypt)
+            echo "    1. SSL is already configured with Let's Encrypt"
+            echo "    2. Start Asterisk: systemctl start asterisk"
+            echo "    3. Access web interface and configure your trunks/rates"
+            ;;
+        commercial)
+            echo "    1. Install your commercial SSL certificate (see CSR above)"
+            echo "    2. Start Asterisk: systemctl start asterisk"
+            echo "    3. Access web interface and configure your trunks/rates"
+            echo ""
+            echo -e "  ${YELLOW}SSL Certificate Files:${NC}"
+            echo "    CSR:  /etc/nginx/ssl/${DOMAIN}/${DOMAIN}.csr"
+            echo "    Key:  /etc/nginx/ssl/${DOMAIN}/${DOMAIN}.key"
+            echo "    Cert: /etc/nginx/ssl/${DOMAIN}/${DOMAIN}.chained.crt"
+            ;;
+        skip)
+            echo "    1. Configure SSL: certbot --nginx -d ${DOMAIN}"
+            echo "    2. Start Asterisk: systemctl start asterisk"
+            echo "    3. Access web interface and configure your trunks/rates"
+            ;;
+    esac
+
     echo ""
     echo -e "  ${YELLOW}IMPORTANT:${NC} Delete /root/rswitch-credentials.txt after saving!"
     echo ""
@@ -1322,7 +1608,7 @@ main() {
     configure_supervisor
     configure_firewall
     configure_fail2ban
-    install_certbot
+    configure_ssl
     create_admin_user
     save_credentials
 
