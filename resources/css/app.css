@@ -1716,4 +1716,118 @@
     .import-tips-list li {
         @apply flex items-start gap-3 text-sm text-gray-600;
     }
+
+    /* ========================================
+       CDR / Call Records Styles
+       ======================================== */
+
+    /* Stats Grid */
+    .cdr-stats-grid {
+        @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6;
+    }
+    .cdr-stat-card {
+        @apply bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4;
+    }
+    .cdr-stat-icon {
+        @apply w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0;
+    }
+    .cdr-stat-content {
+        @apply flex flex-col;
+    }
+    .cdr-stat-value {
+        @apply text-xl font-bold text-gray-900;
+    }
+    .cdr-stat-label {
+        @apply text-xs text-gray-500;
+    }
+
+    /* Stat Card Variants */
+    .cdr-stat-total .cdr-stat-icon {
+        @apply bg-indigo-100 text-indigo-600;
+    }
+    .cdr-stat-answered .cdr-stat-icon {
+        @apply bg-emerald-100 text-emerald-600;
+    }
+    .cdr-stat-answered .cdr-stat-value {
+        @apply text-emerald-600;
+    }
+    .cdr-stat-duration .cdr-stat-icon {
+        @apply bg-blue-100 text-blue-600;
+    }
+    .cdr-stat-billable .cdr-stat-icon {
+        @apply bg-purple-100 text-purple-600;
+    }
+    .cdr-stat-cost .cdr-stat-icon {
+        @apply bg-amber-100 text-amber-600;
+    }
+
+    /* Filter Grid */
+    .cdr-filter-grid {
+        @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4;
+    }
+    .cdr-filter-item {
+        @apply flex flex-col;
+    }
+    .cdr-filter-label {
+        @apply text-xs font-medium text-gray-500 mb-1;
+    }
+    .filter-date {
+        @apply block w-full rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500;
+    }
+
+    /* Table Cell Styles */
+    .cdr-date {
+        @apply flex flex-col;
+    }
+    .cdr-date-main {
+        @apply text-sm font-medium text-gray-900;
+    }
+    .cdr-date-time {
+        @apply text-xs text-gray-500;
+    }
+    .cdr-party {
+        @apply flex flex-col;
+    }
+    .cdr-party-number {
+        @apply text-sm font-mono text-gray-900;
+    }
+    .cdr-party-name {
+        @apply text-xs text-indigo-600 hover:text-indigo-700;
+    }
+
+    /* Technical Details Row */
+    .cdr-tech-row {
+        @apply flex items-start gap-4 py-2 border-b border-gray-100 last:border-0;
+    }
+    .cdr-tech-label {
+        @apply text-sm font-medium text-gray-500 w-28 flex-shrink-0;
+    }
+    .cdr-tech-value {
+        @apply text-sm font-mono text-gray-900 break-all;
+    }
+
+    /* Routing Items */
+    .cdr-routing-item {
+        @apply flex items-start gap-3;
+    }
+    .cdr-routing-icon {
+        @apply w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0;
+    }
+    .cdr-routing-sip {
+        @apply bg-indigo-100 text-indigo-600;
+    }
+    .cdr-routing-trunk-in {
+        @apply bg-emerald-100 text-emerald-600;
+    }
+    .cdr-routing-trunk-out {
+        @apply bg-purple-100 text-purple-600;
+    }
+    .cdr-routing-did {
+        @apply bg-sky-100 text-sky-600;
+    }
+
+    /* Avatar Variants */
+    .avatar-emerald {
+        @apply bg-emerald-100 text-emerald-600;
+    }
 }

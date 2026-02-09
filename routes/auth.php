@@ -9,8 +9,8 @@ Route::middleware(['guest', 'throttle:5,1'])->group(function () {
     Volt::route('register', 'pages.auth.register')
         ->name('register');
 
-    Volt::route('login', 'pages.auth.login')
-        ->name('login');
+    // Redirect /login to admin OTP login
+    Route::get('login', fn () => redirect()->route('admin.login'))->name('login');
 
     Volt::route('forgot-password', 'pages.auth.forgot-password')
         ->name('password.request');

@@ -8,7 +8,7 @@ use App\Http\Controllers\KycSubmissionController;
 use App\Http\Controllers\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome');
+Route::redirect('/', '/admin/login');
 
 // Admin OTP Login (guest routes)
 Route::prefix('admin')->name('admin.')->middleware('guest')->group(function () {
