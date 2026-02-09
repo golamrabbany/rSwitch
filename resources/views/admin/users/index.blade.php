@@ -151,9 +151,13 @@
                     @endif
                     <th>Balance</th>
                     <th>Tariff</th>
-                    <th>Billing Type</th>
-                    <th>Channels</th>
-                    <th>{{ $roleFilter === 'client' ? 'SIP' : 'Clients/SIP' }}</th>
+                    <th>Type</th>
+                    @if($roleFilter === 'client')
+                        <th>Chn/SIP</th>
+                    @else
+                        <th>Channels</th>
+                        <th>Clients/SIP</th>
+                    @endif
                     <th>Status</th>
                     <th class="text-center">Actions</th>
                 </tr>
@@ -192,8 +196,12 @@
                                 <span class="badge badge-purple">Postpaid</span>
                             @endif
                         </td>
-                        <td>{{ $user->max_channels }}</td>
-                        <td>{{ $roleFilter === 'client' ? $user->sip_accounts_count : $user->children_count.'/'.$user->sip_accounts_count }}</td>
+                        @if($roleFilter === 'client')
+                            <td>{{ $user->max_channels }}/{{ $user->sip_accounts_count }}</td>
+                        @else
+                            <td>{{ $user->max_channels }}</td>
+                            <td>{{ $user->children_count }}/{{ $user->sip_accounts_count }}</td>
+                        @endif
                         <td>
                             @if($user->status === 'active')
                                 <span class="badge badge-success">Active</span>
@@ -203,7 +211,7 @@
                                 <span class="badge badge-danger">Disabled</span>
                             @endif
                         </td>
-                        <td class="text-center">
+                        <td class="text-center whitespace-nowrap">
                             <a href="{{ route('admin.users.show', $user) }}" class="action-icon" title="View">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -219,7 +227,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $roleFilter === 'client' ? 9 : 8 }}" class="text-center py-12">
+                        <td colspan="8" class="text-center py-12">
                             <div class="empty-state">
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>

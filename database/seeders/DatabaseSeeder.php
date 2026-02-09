@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\CallRecord;
 use App\Models\Did;
 use App\Models\Invoice;
+use App\Models\KycDocument;
+use App\Models\KycProfile;
 use App\Models\Rate;
 use App\Models\RateGroup;
 use App\Models\SipAccount;
@@ -75,6 +77,183 @@ class DatabaseSeeder extends Seeder
             'rate_group_id' => $rateGroup->id,
         ]);
         $client->assignRole('client');
+
+        // ==========================================
+        // DEMO DATA: KYC Profiles (pending reviews)
+        // ==========================================
+
+        // Create additional users with pending KYC
+        $pendingReseller1 = User::create([
+            'name' => 'Global Telecom Ltd',
+            'email' => 'kyc.reseller1@rswitch.local',
+            'password' => Hash::make('password'),
+            'role' => 'reseller',
+            'parent_id' => $admin->id,
+            'status' => 'active',
+            'kyc_status' => 'pending',
+            'billing_type' => 'prepaid',
+            'balance' => 0,
+        ]);
+        $pendingReseller1->assignRole('reseller');
+
+        KycProfile::create([
+            'user_id' => $pendingReseller1->id,
+            'account_type' => 'company',
+            'full_name' => 'Global Telecom Ltd',
+            'contact_person' => 'John Smith',
+            'phone' => '+1-555-123-4567',
+            'alt_phone' => '+1-555-123-4568',
+            'address_line1' => '100 Business Park Drive',
+            'address_line2' => 'Suite 500',
+            'city' => 'New York',
+            'state' => 'NY',
+            'postal_code' => '10001',
+            'country' => 'US',
+            'id_type' => 'business_license',
+            'id_number' => 'BRN-2024-00123456',
+            'id_expiry_date' => now()->addYears(5),
+            'submitted_at' => now()->subHours(2),
+        ]);
+
+        $pendingReseller2 = User::create([
+            'name' => 'Ahmed Rahman',
+            'email' => 'kyc.reseller2@rswitch.local',
+            'password' => Hash::make('password'),
+            'role' => 'reseller',
+            'parent_id' => $admin->id,
+            'status' => 'active',
+            'kyc_status' => 'pending',
+            'billing_type' => 'prepaid',
+            'balance' => 0,
+        ]);
+        $pendingReseller2->assignRole('reseller');
+
+        KycProfile::create([
+            'user_id' => $pendingReseller2->id,
+            'account_type' => 'individual',
+            'full_name' => 'Ahmed Rahman',
+            'phone' => '+880-1711-123456',
+            'address_line1' => 'House 45, Road 12',
+            'address_line2' => 'Gulshan',
+            'city' => 'Dhaka',
+            'state' => 'Dhaka',
+            'postal_code' => '1212',
+            'country' => 'BD',
+            'id_type' => 'passport',
+            'id_number' => 'BN1234567',
+            'id_expiry_date' => now()->addYears(3),
+            'submitted_at' => now()->subDays(1),
+        ]);
+
+        $pendingClient1 = User::create([
+            'name' => 'Maria Garcia',
+            'email' => 'kyc.client1@rswitch.local',
+            'password' => Hash::make('password'),
+            'role' => 'client',
+            'parent_id' => $reseller->id,
+            'status' => 'active',
+            'kyc_status' => 'pending',
+            'billing_type' => 'prepaid',
+            'balance' => 0,
+        ]);
+        $pendingClient1->assignRole('client');
+
+        KycProfile::create([
+            'user_id' => $pendingClient1->id,
+            'account_type' => 'individual',
+            'full_name' => 'Maria Garcia',
+            'phone' => '+34-612-345-678',
+            'address_line1' => 'Calle Mayor 25',
+            'city' => 'Madrid',
+            'state' => 'Madrid',
+            'postal_code' => '28013',
+            'country' => 'ES',
+            'id_type' => 'national_id',
+            'id_number' => 'ES12345678X',
+            'id_expiry_date' => now()->addYears(8),
+            'submitted_at' => now()->subHours(5),
+        ]);
+
+        // Create user with rejected KYC
+        $rejectedClient = User::create([
+            'name' => 'Test Rejected',
+            'email' => 'kyc.rejected@rswitch.local',
+            'password' => Hash::make('password'),
+            'role' => 'client',
+            'parent_id' => $reseller->id,
+            'status' => 'active',
+            'kyc_status' => 'rejected',
+            'kyc_rejected_reason' => 'ID document is expired',
+            'billing_type' => 'prepaid',
+            'balance' => 0,
+        ]);
+        $rejectedClient->assignRole('client');
+
+        $rejectedKyc = KycProfile::create([
+            'user_id' => $rejectedClient->id,
+            'account_type' => 'individual',
+            'full_name' => 'Test Rejected User',
+            'phone' => '+1-555-000-0000',
+            'address_line1' => '123 Test Street',
+            'city' => 'Test City',
+            'state' => 'TS',
+            'postal_code' => '12345',
+            'country' => 'US',
+            'id_type' => 'driving_license',
+            'id_number' => 'DL-EXPIRED-001',
+            'id_expiry_date' => now()->subMonths(6),
+            'submitted_at' => now()->subDays(3),
+            'reviewed_at' => now()->subDays(2),
+            'reviewed_by' => $admin->id,
+        ]);
+
+        // Add sample KYC documents (without actual files, just metadata)
+        $kycProfiles = KycProfile::all();
+        foreach ($kycProfiles as $profile) {
+            // Add ID document
+            KycDocument::create([
+                'kyc_profile_id' => $profile->id,
+                'document_type' => 'id_front',
+                'original_name' => 'id_document_front.jpg',
+                'file_path' => 'kyc-documents/' . $profile->id . '/id_front.jpg',
+                'file_size' => rand(100000, 500000),
+                'mime_type' => 'image/jpeg',
+                'status' => $profile->user->kyc_status === 'rejected' ? 'rejected' : 'uploaded',
+            ]);
+
+            KycDocument::create([
+                'kyc_profile_id' => $profile->id,
+                'document_type' => 'id_back',
+                'original_name' => 'id_document_back.jpg',
+                'file_path' => 'kyc-documents/' . $profile->id . '/id_back.jpg',
+                'file_size' => rand(100000, 500000),
+                'mime_type' => 'image/jpeg',
+                'status' => $profile->user->kyc_status === 'rejected' ? 'rejected' : 'uploaded',
+            ]);
+
+            // Add proof of address for business accounts
+            if ($profile->account_type === 'company') {
+                KycDocument::create([
+                    'kyc_profile_id' => $profile->id,
+                    'document_type' => 'proof_of_address',
+                    'original_name' => 'utility_bill.pdf',
+                    'file_path' => 'kyc-documents/' . $profile->id . '/utility_bill.pdf',
+                    'file_size' => rand(200000, 800000),
+                    'mime_type' => 'application/pdf',
+                    'status' => 'uploaded',
+                ]);
+
+                KycDocument::create([
+                    'kyc_profile_id' => $profile->id,
+                    'document_type' => 'business_registration',
+                    'original_name' => 'business_certificate.pdf',
+                    'file_path' => 'kyc-documents/' . $profile->id . '/business_certificate.pdf',
+                    'file_size' => rand(300000, 1000000),
+                    'mime_type' => 'application/pdf',
+                    'status' => 'uploaded',
+                ]);
+            }
+        }
 
         // Seed system settings
         SystemSetting::seedDefaults();

@@ -31,12 +31,16 @@ class BalanceController extends Controller
             'user_id' => ['required', 'exists:users,id'],
             'operation' => ['required', Rule::in(['credit', 'debit'])],
             'amount' => ['required', 'numeric', 'gt:0', 'max:999999.99'],
+            'source' => ['nullable', 'string', 'max:50'],
+            'remarks' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
         $user = User::findOrFail($validated['user_id']);
         $amount = number_format((float) $validated['amount'], 4, '.', '');
         $notes = $validated['notes'] ?? '';
+        $source = $validated['source'] ?? null;
+        $remarks = $validated['remarks'] ?? null;
 
         if ($validated['operation'] === 'credit') {
             $transaction = $this->balanceService->credit(
@@ -46,6 +50,8 @@ class BalanceController extends Controller
                 referenceType: 'manual_admin',
                 description: $notes ?: "Admin topup by " . auth()->user()->name,
                 createdBy: auth()->id(),
+                source: $source,
+                remarks: $remarks,
             );
 
             Payment::create([
@@ -77,6 +83,8 @@ class BalanceController extends Controller
             referenceType: 'manual_admin',
             description: $notes ?: "Admin debit by " . auth()->user()->name,
             createdBy: auth()->id(),
+            source: $source,
+            remarks: $remarks,
         );
 
         AuditService::logAction('balance.debit', $user, [

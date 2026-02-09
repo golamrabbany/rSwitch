@@ -37,7 +37,14 @@ class PaymentController extends Controller
 
         $users = User::orderBy('name')->get(['id', 'name', 'email']);
 
-        return view('admin.payments.index', compact('payments', 'users'));
+        $stats = [
+            'completed' => Payment::where('status', 'completed')->count(),
+            'pending' => Payment::where('status', 'pending')->count(),
+            'failed' => Payment::where('status', 'failed')->count(),
+            'total_amount' => Payment::where('status', 'completed')->sum('amount'),
+        ];
+
+        return view('admin.payments.index', compact('payments', 'users', 'stats'));
     }
 
     public function show(Payment $payment)

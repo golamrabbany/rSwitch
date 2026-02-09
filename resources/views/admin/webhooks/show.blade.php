@@ -1,142 +1,218 @@
 <x-admin-layout>
-    <x-slot name="header">Webhook: {{ Str::limit($webhook->url, 50) }}</x-slot>
+    <x-slot name="header">Webhook Details</x-slot>
 
-    <div class="space-y-6">
-        {{-- Details --}}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white shadow sm:rounded-lg p-6 space-y-4">
-                <h3 class="text-base font-semibold text-gray-900">Endpoint Details</h3>
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="page-title">Webhook Endpoint</h2>
+                <p class="page-subtitle break-all">{{ Str::limit($webhook->url, 50) }}</p>
+            </div>
+        </div>
+        <div class="page-actions">
+            <a href="{{ route('admin.webhooks.edit', $webhook) }}" class="btn-action-primary-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Edit
+            </a>
+            <a href="{{ route('admin.webhooks.index') }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back
+            </a>
+        </div>
+    </div>
 
-                <dl class="space-y-3">
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">URL</dt>
-                        <dd class="text-sm text-gray-900 break-all">{{ $webhook->url }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">User</dt>
-                        <dd class="text-sm text-gray-900">
-                            <a href="{{ route('admin.users.show', $webhook->user) }}" class="text-indigo-600 hover:text-indigo-900">{{ $webhook->user->name }}</a>
-                            ({{ $webhook->user->role }})
-                        </dd>
-                    </div>
-                    @if ($webhook->description)
-                        <div>
-                            <dt class="text-xs font-medium text-gray-500">Description</dt>
-                            <dd class="text-sm text-gray-900">{{ $webhook->description }}</dd>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {{-- Main Content --}}
+        <div class="lg:col-span-2 space-y-6">
+            {{-- Endpoint Details --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Endpoint Details</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="detail-grid">
+                        <div class="detail-item col-span-2">
+                            <span class="detail-label">URL</span>
+                            <span class="detail-value text-sm break-all">{{ $webhook->url }}</span>
                         </div>
-                    @endif
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">Status</dt>
-                        <dd>
-                            @if ($webhook->active)
-                                <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">Active</span>
-                            @else
-                                <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">Inactive</span>
-                            @endif
-                        </dd>
+                        @if ($webhook->description)
+                            <div class="detail-item col-span-2">
+                                <span class="detail-label">Description</span>
+                                <span class="detail-value">{{ $webhook->description }}</span>
+                            </div>
+                        @endif
+                        <div class="detail-item">
+                            <span class="detail-label">Status</span>
+                            <span class="detail-value">
+                                @if ($webhook->active)
+                                    <span class="badge badge-success">Active</span>
+                                @else
+                                    <span class="badge badge-danger">Inactive</span>
+                                @endif
+                            </span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Created</span>
+                            <span class="detail-value">{{ $webhook->created_at->format('M j, Y g:ia') }}</span>
+                        </div>
                     </div>
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">Events</dt>
-                        <dd class="mt-1 flex flex-wrap gap-1">
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <span class="detail-label">Events</span>
+                        <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ($webhook->events as $event)
-                                <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">{{ $event }}</span>
+                                <span class="badge badge-purple">{{ $event }}</span>
                             @endforeach
-                        </dd>
+                        </div>
                     </div>
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">Created</dt>
-                        <dd class="text-sm text-gray-900">{{ $webhook->created_at->format('M j, Y g:ia') }}</dd>
-                    </div>
-                </dl>
+                </div>
             </div>
 
-            <div class="bg-white shadow sm:rounded-lg p-6 space-y-4">
-                <h3 class="text-base font-semibold text-gray-900">Health</h3>
-
-                <dl class="space-y-3">
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">Consecutive Failures</dt>
-                        <dd class="text-sm {{ $webhook->failure_count > 0 ? 'text-red-600 font-semibold' : 'text-gray-900' }}">{{ $webhook->failure_count }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">Last Triggered</dt>
-                        <dd class="text-sm text-gray-900">{{ $webhook->last_triggered_at?->format('M j, Y g:ia') ?? 'Never' }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium text-gray-500">Last Failed</dt>
-                        <dd class="text-sm text-gray-900">{{ $webhook->last_failed_at?->format('M j, Y g:ia') ?? 'Never' }}</dd>
-                    </div>
-                </dl>
-
-                <hr class="border-gray-200">
-
-                <h3 class="text-base font-semibold text-gray-900">Secret</h3>
-                <p class="text-xs text-gray-500">The signing secret is used to verify webhook authenticity. It was shown once on creation.</p>
-
-                <form method="POST" action="{{ route('admin.webhooks.regenerate-secret', $webhook) }}">
-                    @csrf
-                    <button type="submit" class="rounded-md bg-yellow-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-yellow-500"
-                            onclick="return confirm('This will invalidate the current secret. Continue?')">
-                        Regenerate Secret
-                    </button>
-                </form>
-
-                <hr class="border-gray-200">
-
-                <div class="flex gap-3">
-                    <a href="{{ route('admin.webhooks.edit', $webhook) }}" class="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500">Edit</a>
-                    <form method="POST" action="{{ route('admin.webhooks.destroy', $webhook) }}">
-                        @csrf @method('DELETE')
-                        <button type="submit" class="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500"
-                                onclick="return confirm('Delete this webhook endpoint?')">Delete</button>
-                    </form>
+            {{-- Health Status --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Health Status</h3>
                 </div>
+                <div class="detail-card-body">
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Consecutive Failures</span>
+                            <span class="detail-value {{ $webhook->failure_count > 0 ? 'text-red-600 font-semibold' : '' }}">
+                                {{ $webhook->failure_count }}
+                            </span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Last Triggered</span>
+                            <span class="detail-value">{{ $webhook->last_triggered_at?->format('M j, Y g:ia') ?? 'Never' }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Last Failed</span>
+                            <span class="detail-value">{{ $webhook->last_failed_at?->format('M j, Y g:ia') ?? 'Never' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Delivery Logs --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Delivery Log</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Event</th>
+                                <th>Status</th>
+                                <th>HTTP</th>
+                                <th>Time (ms)</th>
+                                <th>Attempt</th>
+                                <th>Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($logs as $log)
+                                <tr>
+                                    <td class="text-gray-600 text-sm">{{ $log->created_at->format('M j g:ia') }}</td>
+                                    <td class="text-sm">{{ $log->event }}</td>
+                                    <td>
+                                        @if ($log->status === 'success')
+                                            <span class="badge badge-success">OK</span>
+                                        @elseif ($log->status === 'pending')
+                                            <span class="badge badge-warning">Pending</span>
+                                        @else
+                                            <span class="badge badge-danger">Failed</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-gray-600">{{ $log->response_code ?? '—' }}</td>
+                                    <td class="text-gray-600">{{ $log->response_time_ms ?? '—' }}</td>
+                                    <td class="text-gray-600">{{ $log->attempt }}</td>
+                                    <td class="text-red-600 text-sm max-w-xs truncate">{{ $log->error ?? '—' }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center py-8 text-gray-500">No delivery logs yet</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if($logs->hasPages())
+                    <div class="p-4 border-t border-gray-100">
+                        {{ $logs->links() }}
+                    </div>
+                @endif
             </div>
         </div>
 
-        {{-- Delivery Logs --}}
-        <div class="bg-white shadow sm:rounded-lg overflow-hidden">
-            <div class="px-4 py-3 border-b bg-gray-50">
-                <h3 class="text-base font-semibold text-gray-900">Delivery Log</h3>
+        {{-- Sidebar --}}
+        <div class="space-y-6">
+            {{-- User Info --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">User</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-full flex items-center justify-center text-xl font-semibold flex-shrink-0 bg-indigo-100 text-indigo-700">
+                            {{ strtoupper(substr($webhook->user->name, 0, 1)) }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <a href="{{ route('admin.users.show', $webhook->user) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700">
+                                {{ $webhook->user->name }}
+                            </a>
+                            <p class="text-xs text-gray-500 truncate">{{ $webhook->user->email }}</p>
+                            <span class="badge badge-gray mt-1">{{ ucfirst($webhook->user->role) }}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HTTP</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time (ms)</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attempt</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Error</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    @forelse ($logs as $log)
-                        <tr>
-                            <td class="px-4 py-2 text-sm text-gray-500">{{ $log->created_at->format('M j g:ia') }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-900">{{ $log->event }}</td>
-                            <td class="px-4 py-2">
-                                @if ($log->status === 'success')
-                                    <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">OK</span>
-                                @elseif ($log->status === 'pending')
-                                    <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">Pending</span>
-                                @else
-                                    <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Failed</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-2 text-sm text-gray-500">{{ $log->response_code ?? '-' }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-500">{{ $log->response_time_ms ?? '-' }}</td>
-                            <td class="px-4 py-2 text-sm text-gray-500">{{ $log->attempt }}</td>
-                            <td class="px-4 py-2 text-sm text-red-600 max-w-xs truncate">{{ $log->error ?? '-' }}</td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-gray-500">No delivery logs yet.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
 
-            <div class="px-4 py-3 border-t">{{ $logs->links() }}</div>
+            {{-- Secret --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Signing Secret</h3>
+                </div>
+                <div class="detail-card-body">
+                    <p class="text-sm text-gray-600 mb-4">The signing secret is used to verify webhook authenticity. It was shown once on creation.</p>
+                    <form method="POST" action="{{ route('admin.webhooks.regenerate-secret', $webhook) }}">
+                        @csrf
+                        <button type="submit" class="btn-warning w-full" onclick="return confirm('This will invalidate the current secret. Continue?')">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Regenerate Secret
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            {{-- Danger Zone --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Danger Zone</h3>
+                </div>
+                <div class="detail-card-body">
+                    <form method="POST" action="{{ route('admin.webhooks.destroy', $webhook) }}">
+                        @csrf @method('DELETE')
+                        <button type="submit" class="btn-danger w-full" onclick="return confirm('Delete this webhook endpoint?')">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Delete Endpoint
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </x-admin-layout>

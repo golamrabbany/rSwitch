@@ -38,7 +38,14 @@ class TransactionController extends Controller
 
         $users = User::orderBy('name')->get(['id', 'name', 'email']);
 
-        return view('admin.transactions.index', compact('transactions', 'users'));
+        // Calculate stats
+        $stats = [
+            'total_credits' => Transaction::where('amount', '>=', 0)->sum('amount'),
+            'total_debits' => abs(Transaction::where('amount', '<', 0)->sum('amount')),
+            'total_count' => Transaction::count(),
+        ];
+
+        return view('admin.transactions.index', compact('transactions', 'users', 'stats'));
     }
 
     public function show(Transaction $transaction)

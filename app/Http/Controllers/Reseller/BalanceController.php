@@ -30,6 +30,8 @@ class BalanceController extends Controller
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'amount' => ['required', 'numeric', 'gt:0', 'max:999999.99'],
+            'source' => ['nullable', 'string', 'max:50'],
+            'remarks' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -42,6 +44,8 @@ class BalanceController extends Controller
 
         $amount = number_format((float) $validated['amount'], 4, '.', '');
         $notes = $validated['notes'] ?? '';
+        $source = $validated['source'] ?? null;
+        $remarks = $validated['remarks'] ?? null;
 
         $transaction = $this->balanceService->credit(
             user: $client,
@@ -50,6 +54,8 @@ class BalanceController extends Controller
             referenceType: 'manual_reseller',
             description: $notes ?: "Reseller topup by " . auth()->user()->name,
             createdBy: auth()->id(),
+            source: $source,
+            remarks: $remarks,
         );
 
         Payment::create([

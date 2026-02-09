@@ -37,7 +37,14 @@ class InvoiceController extends Controller
 
         $users = User::whereIn('role', ['reseller', 'client'])->orderBy('name')->get(['id', 'name', 'email']);
 
-        return view('admin.invoices.index', compact('invoices', 'users'));
+        $stats = [
+            'draft' => Invoice::where('status', 'draft')->count(),
+            'issued' => Invoice::where('status', 'issued')->count(),
+            'paid' => Invoice::where('status', 'paid')->count(),
+            'overdue' => Invoice::where('status', 'overdue')->count(),
+        ];
+
+        return view('admin.invoices.index', compact('invoices', 'users', 'stats'));
     }
 
     public function create()

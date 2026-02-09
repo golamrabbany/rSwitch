@@ -21,9 +21,29 @@ class KycController extends Controller
             $query->whereHas('user', fn ($q) => $q->where('kyc_status', $request->status));
         }
 
+        if ($request->filled('account_type')) {
+            $query->where('account_type', $request->account_type);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('id_number', 'like', "%{$search}%")
+                  ->orWhereHas('user', fn ($u) => $u->where('email', 'like', "%{$search}%"));
+            });
+        }
+
         $profiles = $query->orderByDesc('submitted_at')->paginate(20);
 
-        return view('admin.kyc.index', compact('profiles'));
+        // Get stats
+        $stats = [
+            'pending' => User::where('kyc_status', 'pending')->count(),
+            'approved' => User::where('kyc_status', 'approved')->count(),
+            'rejected' => User::where('kyc_status', 'rejected')->count(),
+        ];
+
+        return view('admin.kyc.index', compact('profiles', 'stats'));
     }
 
     public function show(KycProfile $kycProfile)

@@ -23,10 +23,11 @@ class User extends Authenticatable
         'max_channels', 'daily_spend_limit', 'daily_call_limit',
         'destination_whitelist_enabled',
         'two_fa_enabled', 'two_fa_secret', 'two_fa_recovery_codes', 'two_fa_confirmed_at',
+        'otp_code', 'otp_expires_at',
     ];
 
     protected $hidden = [
-        'password', 'remember_token', 'two_fa_secret', 'two_fa_recovery_codes',
+        'password', 'remember_token', 'two_fa_secret', 'two_fa_recovery_codes', 'otp_code',
     ];
 
     protected function casts(): array
@@ -41,6 +42,7 @@ class User extends Authenticatable
             'credit_limit' => 'decimal:4',
             'destination_whitelist_enabled' => 'boolean',
             'two_fa_enabled' => 'boolean',
+            'otp_expires_at' => 'datetime',
         ];
     }
 

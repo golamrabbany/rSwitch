@@ -1,71 +1,186 @@
 <x-admin-layout>
     <x-slot name="header">KYC Review</x-slot>
 
-    {{-- Filters --}}
-    <div class="mb-6">
-        <form method="GET" class="flex items-center gap-3">
-            <select name="status" onchange="this.form.submit()" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div>
+            <h2 class="page-title">KYC Review</h2>
+            <p class="page-subtitle">Review and manage customer verification requests</p>
+        </div>
+        <div class="page-actions">
+            <div class="kyc-stats-row">
+                <div class="kyc-stat-item kyc-stat-pending">
+                    <span class="kyc-stat-count">{{ $stats['pending'] ?? 0 }}</span>
+                    <span class="kyc-stat-label">Pending</span>
+                </div>
+                <div class="kyc-stat-item kyc-stat-approved">
+                    <span class="kyc-stat-count">{{ $stats['approved'] ?? 0 }}</span>
+                    <span class="kyc-stat-label">Approved</span>
+                </div>
+                <div class="kyc-stat-item kyc-stat-rejected">
+                    <span class="kyc-stat-count">{{ $stats['rejected'] ?? 0 }}</span>
+                    <span class="kyc-stat-label">Rejected</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Filter Card --}}
+    <div class="filter-card">
+        <form method="GET" class="filter-row flex-wrap">
+            <div class="filter-search-box">
+                <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name, email, ID number..." class="filter-input">
+            </div>
+
+            <select name="status" class="filter-select">
                 <option value="">All Statuses</option>
                 <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
                 <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
                 <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
             </select>
-            @if(request('status'))
-                <a href="{{ route('admin.kyc.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+
+            <select name="account_type" class="filter-select">
+                <option value="">All Account Types</option>
+                <option value="individual" {{ request('account_type') === 'individual' ? 'selected' : '' }}>Individual</option>
+                <option value="company" {{ request('account_type') === 'company' ? 'selected' : '' }}>Company</option>
+            </select>
+
+            <button type="submit" class="btn-search-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Search
+            </button>
+
+            @if(request()->hasAny(['status', 'account_type', 'search']))
+                <a href="{{ route('admin.kyc.index') }}" class="btn-clear">Clear</a>
             @endif
         </form>
     </div>
 
-    {{-- KYC Profiles Table --}}
-    <div class="overflow-hidden bg-white shadow sm:rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    {{-- Data Table --}}
+    <div class="data-table-container">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account Type</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Type</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KYC Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th>Applicant</th>
+                    <th>Account Type</th>
+                    <th>ID Type</th>
+                    <th>Documents</th>
+                    <th>Status</th>
+                    <th>Submitted</th>
+                    <th class="text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody>
                 @forelse ($profiles as $profile)
+                    @php $kycStatus = $profile->user?->kyc_status ?? 'none'; @endphp
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div>
-                                <div class="text-sm font-medium text-gray-900">{{ $profile->full_name }}</div>
-                                <div class="text-sm text-gray-500">{{ $profile->user?->email }}</div>
+                        <td>
+                            <div class="user-cell">
+                                <div class="avatar avatar-purple">
+                                    {{ strtoupper(substr($profile->full_name, 0, 1)) }}
+                                </div>
+                                <div>
+                                    <div class="user-name">{{ $profile->full_name }}</div>
+                                    <div class="user-email">{{ $profile->user?->email }}</div>
+                                </div>
                             </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ ucfirst($profile->account_type) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ str_replace('_', ' ', ucfirst($profile->id_type)) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $profile->documents->count() }} file(s)</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            @php $kycStatus = $profile->user?->kyc_status ?? 'none'; @endphp
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $kycStatus === 'approved' ? 'bg-green-100 text-green-800' : ($kycStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' : ($kycStatus === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800')) }}">
-                                {{ ucfirst($kycStatus) }}
+                        <td>
+                            <span class="badge {{ $profile->account_type === 'company' ? 'badge-blue' : 'badge-gray' }}">
+                                {{ ucfirst($profile->account_type) }}
                             </span>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ $profile->submitted_at?->format('M d, Y') ?? '-' }}
+                        <td class="text-gray-700">
+                            {{ str_replace('_', ' ', ucfirst($profile->id_type)) }}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <a href="{{ route('admin.kyc.show', $profile) }}" class="text-indigo-600 hover:text-indigo-900">Review</a>
+                        <td>
+                            <div class="kyc-docs-count">
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                <span>{{ $profile->documents->count() }} file(s)</span>
+                            </div>
+                        </td>
+                        <td>
+                            @if ($kycStatus === 'approved')
+                                <span class="badge badge-success">
+                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Approved
+                                </span>
+                            @elseif ($kycStatus === 'pending')
+                                <span class="badge badge-warning">
+                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Pending
+                                </span>
+                            @elseif ($kycStatus === 'rejected')
+                                <span class="badge badge-danger">
+                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Rejected
+                                </span>
+                            @else
+                                <span class="badge badge-gray">None</span>
+                            @endif
+                        </td>
+                        <td class="text-gray-500 text-sm">
+                            @if($profile->submitted_at)
+                                <div>{{ $profile->submitted_at->format('M d, Y') }}</div>
+                                <div class="text-xs text-gray-400">{{ $profile->submitted_at->diffForHumans() }}</div>
+                            @else
+                                <span class="text-gray-400">—</span>
+                            @endif
+                        </td>
+                        <td>
+                            <div class="flex items-center justify-center gap-1">
+                                <a href="{{ route('admin.kyc.show', $profile) }}" class="action-icon" title="Review">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </a>
+                                @if($kycStatus === 'pending')
+                                    <form method="POST" action="{{ route('admin.kyc.approve', $profile) }}" class="inline">
+                                        @csrf
+                                        <button type="submit" class="action-icon action-approve" title="Quick Approve">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-500">No KYC submissions found.</td>
+                        <td colspan="7" class="text-center py-12">
+                            <div class="empty-state">
+                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                                </svg>
+                                <p class="empty-text">No KYC submissions found</p>
+                                <p class="text-sm text-gray-400">KYC submissions from resellers and clients will appear here</p>
+                            </div>
+                        </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="mt-4">
-        {{ $profiles->withQueryString()->links() }}
-    </div>
+    @if($profiles->hasPages())
+        <div class="mt-6">
+            {{ $profiles->withQueryString()->links() }}
+        </div>
+    @endif
 </x-admin-layout>

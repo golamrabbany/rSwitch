@@ -1,105 +1,216 @@
 <x-admin-layout>
     <x-slot name="header">Payments</x-slot>
 
-    {{-- Filters --}}
-    <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
-        <form method="GET" action="{{ route('admin.payments.index') }}">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <div>
-                    <label for="user_id" class="block text-xs font-medium text-gray-500 mb-1">User</label>
-                    <select id="user_id" name="user_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">All Users</option>
-                        @foreach ($users as $user)
-                            <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>{{ $user->name }} ({{ $user->email }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="status" class="block text-xs font-medium text-gray-500 mb-1">Status</label>
-                    <select id="status" name="status" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">All Statuses</option>
-                        @foreach (['pending', 'completed', 'failed', 'refunded'] as $s)
-                            <option value="{{ $s }}" {{ request('status') === $s ? 'selected' : '' }}>{{ ucfirst($s) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="payment_method" class="block text-xs font-medium text-gray-500 mb-1">Method</label>
-                    <select id="payment_method" name="payment_method" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">All Methods</option>
-                        @foreach (['manual_admin', 'manual_reseller', 'stripe', 'paypal', 'bank_transfer'] as $m)
-                            <option value="{{ $m }}" {{ request('payment_method') === $m ? 'selected' : '' }}>{{ ucfirst(str_replace('_', ' ', $m)) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="date_from" class="block text-xs font-medium text-gray-500 mb-1">Date From</label>
-                    <input type="date" id="date_from" name="date_from" value="{{ request('date_from') }}"
-                           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                </div>
-                <div>
-                    <label for="date_to" class="block text-xs font-medium text-gray-500 mb-1">Date To</label>
-                    <input type="date" id="date_to" name="date_to" value="{{ request('date_to') }}"
-                           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                </div>
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
             </div>
-            <div class="flex items-center gap-3 mt-4">
-                <button type="submit" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">Filter</button>
-                <a href="{{ route('admin.payments.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+            <div>
+                <h2 class="page-title">Payments</h2>
+                <p class="page-subtitle">Track all payment transactions</p>
             </div>
+        </div>
+    </div>
+
+    {{-- Stats Cards --}}
+    <div class="payment-stats-grid">
+        <div class="payment-stat-card payment-stat-completed">
+            <div class="payment-stat-icon">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="payment-stat-content">
+                <span class="payment-stat-value">{{ $stats['completed'] ?? 0 }}</span>
+                <span class="payment-stat-label">Completed</span>
+            </div>
+        </div>
+        <div class="payment-stat-card payment-stat-pending">
+            <div class="payment-stat-icon">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="payment-stat-content">
+                <span class="payment-stat-value">{{ $stats['pending'] ?? 0 }}</span>
+                <span class="payment-stat-label">Pending</span>
+            </div>
+        </div>
+        <div class="payment-stat-card payment-stat-failed">
+            <div class="payment-stat-icon">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="payment-stat-content">
+                <span class="payment-stat-value">{{ $stats['failed'] ?? 0 }}</span>
+                <span class="payment-stat-label">Failed</span>
+            </div>
+        </div>
+        <div class="payment-stat-card payment-stat-total">
+            <div class="payment-stat-icon">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="payment-stat-content">
+                <span class="payment-stat-value">{{ format_currency($stats['total_amount'] ?? 0) }}</span>
+                <span class="payment-stat-label">Total Amount</span>
+            </div>
+        </div>
+    </div>
+
+    {{-- Filter Card --}}
+    <div class="filter-card">
+        <form method="GET" action="{{ route('admin.payments.index') }}" class="filter-row flex-wrap">
+            <select name="user_id" class="filter-select">
+                <option value="">All Users</option>
+                @foreach ($users as $user)
+                    <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>{{ $user->name }}</option>
+                @endforeach
+            </select>
+
+            <select name="status" class="filter-select">
+                <option value="">All Statuses</option>
+                @foreach (['pending', 'completed', 'failed', 'refunded'] as $s)
+                    <option value="{{ $s }}" {{ request('status') === $s ? 'selected' : '' }}>{{ ucfirst($s) }}</option>
+                @endforeach
+            </select>
+
+            <select name="payment_method" class="filter-select">
+                <option value="">All Methods</option>
+                @foreach (['manual_admin', 'manual_reseller', 'stripe', 'paypal', 'bank_transfer'] as $m)
+                    <option value="{{ $m }}" {{ request('payment_method') === $m ? 'selected' : '' }}>{{ ucfirst(str_replace('_', ' ', $m)) }}</option>
+                @endforeach
+            </select>
+
+            <input type="date" name="date_from" value="{{ request('date_from') }}" class="filter-date" placeholder="From">
+            <input type="date" name="date_to" value="{{ request('date_to') }}" class="filter-date" placeholder="To">
+
+            <button type="submit" class="btn-search-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                </svg>
+                Filter
+            </button>
+
+            @if(request()->hasAny(['user_id', 'status', 'payment_method', 'date_from', 'date_to']))
+                <a href="{{ route('admin.payments.index') }}" class="btn-clear">Clear</a>
+            @endif
         </form>
     </div>
 
-    {{-- Table --}}
-    <div class="bg-white shadow sm:rounded-lg overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    {{-- Data Table --}}
+    <div class="data-table-container">
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                    <th>Date</th>
+                    <th>User</th>
+                    <th class="text-right">Amount</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th>Invoice</th>
+                    <th class="text-center">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody>
                 @forelse ($payments as $payment)
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{{ $payment->created_at->format('M d, Y H:i') }}</td>
-                        <td class="px-4 py-3 text-sm whitespace-nowrap">
-                            <a href="{{ route('admin.users.show', $payment->user_id) }}" class="text-indigo-600 hover:text-indigo-500">{{ $payment->user?->name ?? '—' }}</a>
+                    <tr>
+                        <td>
+                            <div class="txn-date">
+                                <span class="txn-date-main">{{ $payment->created_at->format('M d, Y') }}</span>
+                                <span class="txn-date-time">{{ $payment->created_at->format('H:i') }}</span>
+                            </div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums">{{ format_currency($payment->amount) }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-500">{{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</td>
-                        <td class="px-4 py-3 text-sm">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                {{ $payment->status === 'completed' ? 'bg-green-100 text-green-800' : ($payment->status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
+                        <td>
+                            <div class="user-cell">
+                                <div class="avatar {{ $payment->user?->role === 'reseller' ? 'avatar-emerald' : 'avatar-sky' }}">
+                                    {{ strtoupper(substr($payment->user?->name ?? '?', 0, 1)) }}
+                                </div>
+                                <div>
+                                    <a href="{{ route('admin.users.show', $payment->user_id) }}" class="user-name text-indigo-600 hover:text-indigo-700">
+                                        {{ $payment->user?->name ?? '—' }}
+                                    </a>
+                                    <div class="user-email">{{ ucfirst($payment->user?->role ?? '') }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-right">
+                            <span class="font-semibold text-gray-900">{{ format_currency($payment->amount) }}</span>
+                        </td>
+                        <td>
+                            @php
+                                $methodClass = match($payment->payment_method) {
+                                    'stripe' => 'badge-purple',
+                                    'paypal' => 'badge-blue',
+                                    'manual_admin' => 'badge-info',
+                                    'manual_reseller' => 'badge-success',
+                                    'bank_transfer' => 'badge-gray',
+                                    default => 'badge-gray'
+                                };
+                            @endphp
+                            <span class="badge {{ $methodClass }}">
+                                {{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}
+                            </span>
+                        </td>
+                        <td>
+                            @php
+                                $statusClass = match($payment->status) {
+                                    'completed' => 'badge-success',
+                                    'pending' => 'badge-warning',
+                                    'failed' => 'badge-danger',
+                                    'refunded' => 'badge-info',
+                                    default => 'badge-gray'
+                                };
+                            @endphp
+                            <span class="badge {{ $statusClass }}">
                                 {{ ucfirst($payment->status) }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-sm">
+                        <td>
                             @if($payment->invoice)
-                                <a href="{{ route('admin.invoices.show', $payment->invoice) }}" class="text-indigo-600 hover:text-indigo-500">{{ $payment->invoice->invoice_number }}</a>
+                                <a href="{{ route('admin.invoices.show', $payment->invoice) }}" class="text-indigo-600 hover:text-indigo-700 font-mono text-sm">
+                                    {{ $payment->invoice->invoice_number }}
+                                </a>
                             @else
                                 <span class="text-gray-400">—</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-sm text-right">
-                            <a href="{{ route('admin.payments.show', $payment) }}" class="text-indigo-600 hover:text-indigo-500">View</a>
+                        <td>
+                            <div class="flex items-center justify-center">
+                                <a href="{{ route('admin.payments.show', $payment) }}" class="action-icon" title="View">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-500">No payments found.</td>
+                        <td colspan="7" class="text-center py-12">
+                            <div class="empty-state">
+                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                                <p class="empty-text">No payments found</p>
+                            </div>
+                        </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    @if ($payments->hasPages())
-        <div class="mt-4">{{ $payments->withQueryString()->links() }}</div>
+    @if($payments->hasPages())
+        <div class="mt-6">
+            {{ $payments->withQueryString()->links() }}
+        </div>
     @endif
 </x-admin-layout>

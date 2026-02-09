@@ -10,6 +10,16 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
 
+// Admin OTP Login (guest routes)
+Route::prefix('admin')->name('admin.')->middleware('guest')->group(function () {
+    Route::get('login', [Admin\AdminOtpLoginController::class, 'showLoginForm'])->name('login');
+    Route::post('login', [Admin\AdminOtpLoginController::class, 'login'])->middleware('throttle:5,1')->name('login.submit');
+    Route::get('login/verify', [Admin\AdminOtpLoginController::class, 'showOtpForm'])->name('otp.verify.form');
+    Route::post('login/verify', [Admin\AdminOtpLoginController::class, 'verifyOtp'])->middleware('throttle:5,1')->name('otp.verify');
+    Route::post('login/regenerate', [Admin\AdminOtpLoginController::class, 'regenerateOtp'])->name('otp.regenerate');
+});
+Route::post('admin/logout', [Admin\AdminOtpLoginController::class, 'logout'])->middleware('auth')->name('admin.logout');
+
 // Role-based dashboard redirect
 Route::get('dashboard', function () {
     return match (auth()->user()->role) {

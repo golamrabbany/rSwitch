@@ -906,4 +906,814 @@
     .flash-error .flash-close {
         @apply text-red-500 hover:text-red-700;
     }
+
+    /* ========================================
+       KYC Review Styles
+       ======================================== */
+    .kyc-stats-row {
+        @apply flex items-center gap-3;
+    }
+    .kyc-stat-item {
+        @apply flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium;
+    }
+    .kyc-stat-pending {
+        @apply bg-amber-50 text-amber-700;
+    }
+    .kyc-stat-approved {
+        @apply bg-emerald-50 text-emerald-700;
+    }
+    .kyc-stat-rejected {
+        @apply bg-red-50 text-red-700;
+    }
+    .kyc-stat-count {
+        @apply text-lg font-bold;
+    }
+    .kyc-stat-label {
+        @apply text-xs opacity-80;
+    }
+
+    .kyc-docs-count {
+        @apply flex items-center gap-1.5 text-sm text-gray-600;
+    }
+
+    .action-approve {
+        @apply text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50;
+    }
+
+    /* KYC Status Banner */
+    .kyc-status-banner {
+        @apply flex items-center justify-between p-4 rounded-lg border;
+    }
+    .kyc-status-banner-content {
+        @apply flex items-center gap-3;
+    }
+    .kyc-status-banner-icon {
+        @apply w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0;
+    }
+    .kyc-status-banner-text {
+        @apply flex flex-col;
+    }
+    .kyc-status-banner-title {
+        @apply font-semibold;
+    }
+    .kyc-status-banner-reason {
+        @apply text-sm mt-0.5;
+    }
+    .kyc-status-banner-meta {
+        @apply text-xs opacity-70 mt-1;
+    }
+    .kyc-status-banner-actions {
+        @apply flex items-center gap-3;
+    }
+
+    .kyc-status-pending {
+        @apply bg-amber-50 border-amber-200;
+    }
+    .kyc-status-pending .kyc-status-banner-icon {
+        @apply bg-amber-100 text-amber-600;
+    }
+    .kyc-status-pending .kyc-status-banner-title,
+    .kyc-status-pending .kyc-status-banner-reason {
+        @apply text-amber-800;
+    }
+
+    .kyc-status-approved {
+        @apply bg-emerald-50 border-emerald-200;
+    }
+    .kyc-status-approved .kyc-status-banner-icon {
+        @apply bg-emerald-100 text-emerald-600;
+    }
+    .kyc-status-approved .kyc-status-banner-title,
+    .kyc-status-approved .kyc-status-banner-reason {
+        @apply text-emerald-800;
+    }
+
+    .kyc-status-rejected {
+        @apply bg-red-50 border-red-200;
+    }
+    .kyc-status-rejected .kyc-status-banner-icon {
+        @apply bg-red-100 text-red-600;
+    }
+    .kyc-status-rejected .kyc-status-banner-title,
+    .kyc-status-rejected .kyc-status-banner-reason {
+        @apply text-red-800;
+    }
+
+    .kyc-status-none {
+        @apply bg-gray-50 border-gray-200;
+    }
+    .kyc-status-none .kyc-status-banner-icon {
+        @apply bg-gray-100 text-gray-500;
+    }
+
+    .btn-reject-toggle {
+        @apply border-red-200 text-red-600 hover:bg-red-50;
+    }
+
+    .kyc-reject-form {
+        @apply absolute right-0 mt-2 p-3 bg-white rounded-lg shadow-lg border border-gray-200 z-10;
+    }
+    .kyc-reject-form-inner {
+        @apply flex items-center gap-2;
+    }
+
+    .btn-danger-sm {
+        @apply inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors;
+    }
+
+    /* KYC Address Section */
+    .kyc-address-section {
+        @apply mt-6 pt-6 border-t border-gray-100;
+    }
+    .kyc-address-box {
+        @apply mt-2 p-4 bg-gray-50 rounded-lg text-sm text-gray-700 space-y-1;
+    }
+
+    /* KYC Documents Grid */
+    .kyc-documents-grid {
+        @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5;
+    }
+    .kyc-document-card {
+        @apply flex items-start gap-3 p-4 bg-gray-50 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors;
+    }
+    .kyc-document-icon {
+        @apply flex-shrink-0;
+    }
+    .kyc-document-info {
+        @apply flex-1 min-w-0;
+    }
+    .kyc-document-type {
+        @apply text-sm font-medium text-gray-900;
+    }
+    .kyc-document-name {
+        @apply text-xs text-gray-500 truncate mt-0.5;
+    }
+    .kyc-document-meta {
+        @apply text-xs text-gray-400 mt-1;
+    }
+    .kyc-document-status {
+        @apply flex-shrink-0;
+    }
+
+    /* ========================================
+       Transaction Styles
+       ======================================== */
+    .txn-stats-grid {
+        @apply grid grid-cols-1 md:grid-cols-3 gap-4 mb-6;
+    }
+    .txn-stat-card {
+        @apply flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200;
+    }
+    .txn-stat-icon {
+        @apply w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0;
+    }
+    .txn-stat-credit .txn-stat-icon {
+        @apply bg-emerald-50 text-emerald-600;
+    }
+    .txn-stat-debit .txn-stat-icon {
+        @apply bg-red-50 text-red-600;
+    }
+    .txn-stat-count .txn-stat-icon {
+        @apply bg-indigo-50 text-indigo-600;
+    }
+    .txn-stat-content {
+        @apply flex flex-col;
+    }
+    .txn-stat-value {
+        @apply text-xl font-bold text-gray-900;
+    }
+    .txn-stat-label {
+        @apply text-xs text-gray-500;
+    }
+
+    /* Transaction Date Cell */
+    .txn-date {
+        @apply flex flex-col;
+    }
+    .txn-date-main {
+        @apply text-sm font-medium text-gray-900;
+    }
+    .txn-date-time {
+        @apply text-xs text-gray-400;
+    }
+
+    /* Transaction Amount */
+    .txn-amount {
+        @apply font-semibold;
+    }
+    .txn-amount-credit {
+        @apply text-emerald-600;
+    }
+    .txn-amount-debit {
+        @apply text-red-600;
+    }
+
+    /* Transaction Amount Banner (Show Page) */
+    .txn-amount-banner {
+        @apply flex items-center justify-between p-5 rounded-lg border mb-6;
+    }
+    .txn-amount-banner-credit {
+        @apply bg-emerald-50 border-emerald-200;
+    }
+    .txn-amount-banner-debit {
+        @apply bg-red-50 border-red-200;
+    }
+    .txn-amount-banner-content {
+        @apply flex items-center gap-4;
+    }
+    .txn-amount-banner-icon {
+        @apply w-12 h-12 rounded-full flex items-center justify-center;
+    }
+    .txn-amount-banner-credit .txn-amount-banner-icon {
+        @apply bg-emerald-100 text-emerald-600;
+    }
+    .txn-amount-banner-debit .txn-amount-banner-icon {
+        @apply bg-red-100 text-red-600;
+    }
+    .txn-amount-banner-text {
+        @apply flex flex-col;
+    }
+    .txn-amount-banner-label {
+        @apply text-sm font-medium;
+    }
+    .txn-amount-banner-credit .txn-amount-banner-label {
+        @apply text-emerald-700;
+    }
+    .txn-amount-banner-debit .txn-amount-banner-label {
+        @apply text-red-700;
+    }
+    .txn-amount-banner-value {
+        @apply text-2xl font-bold;
+    }
+    .txn-amount-banner-credit .txn-amount-banner-value {
+        @apply text-emerald-800;
+    }
+    .txn-amount-banner-debit .txn-amount-banner-value {
+        @apply text-red-800;
+    }
+    .txn-amount-banner-meta {
+        @apply flex items-center gap-2;
+    }
+
+    /* Transaction Detail Grid */
+    .txn-detail-grid {
+        @apply grid grid-cols-2 gap-4;
+    }
+    .txn-detail-item {
+        @apply flex flex-col;
+    }
+    .txn-detail-label {
+        @apply text-xs font-medium text-gray-500 uppercase tracking-wider mb-1;
+    }
+    .txn-detail-value {
+        @apply text-sm text-gray-900;
+    }
+
+    /* Transaction Description */
+    .txn-description-section {
+        @apply mt-6 pt-4 border-t border-gray-100;
+    }
+    .txn-description-text {
+        @apply mt-1 text-sm text-gray-700 bg-gray-50 rounded-lg p-3;
+    }
+
+    /* Transaction User Card */
+    .txn-user-card {
+        @apply flex items-center gap-4;
+    }
+    .txn-user-info {
+        @apply flex flex-col;
+    }
+    .txn-user-name {
+        @apply text-sm font-semibold text-indigo-600 hover:text-indigo-700;
+    }
+    .txn-user-email {
+        @apply text-xs text-gray-500;
+    }
+    .txn-empty-user {
+        @apply flex items-center gap-3 text-gray-400;
+    }
+
+    /* Transaction System Badge */
+    .txn-system-badge {
+        @apply flex items-center gap-3;
+    }
+    .txn-system-icon {
+        @apply w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500;
+    }
+
+    /* ========================================
+       Balance Adjustment Styles
+       ======================================== */
+    .balance-user-card {
+        @apply flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200;
+    }
+    .balance-user-avatar {
+        @apply w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold flex-shrink-0;
+    }
+    .balance-user-avatar-reseller {
+        @apply bg-emerald-100 text-emerald-700;
+    }
+    .balance-user-avatar-client {
+        @apply bg-sky-100 text-sky-700;
+    }
+    .balance-user-info {
+        @apply flex flex-col flex-1 min-w-0;
+    }
+    .balance-user-name {
+        @apply text-sm font-semibold text-gray-900;
+    }
+    .balance-user-email {
+        @apply text-xs text-gray-500 truncate;
+    }
+    .balance-user-balance {
+        @apply flex flex-col items-end;
+    }
+    .balance-user-balance-label {
+        @apply text-xs text-gray-500;
+    }
+    .balance-user-balance-value {
+        @apply text-lg font-bold text-gray-900;
+    }
+
+    /* Operation Type Grid */
+    .balance-operation-grid {
+        @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+    }
+    .balance-operation-option {
+        @apply flex items-center gap-4 p-4 rounded-lg border-2 border-gray-200 cursor-pointer transition-all hover:border-gray-300;
+    }
+    .balance-operation-credit-active {
+        @apply border-emerald-500 bg-emerald-50;
+    }
+    .balance-operation-debit-active {
+        @apply border-red-500 bg-red-50;
+    }
+    .balance-operation-icon {
+        @apply w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0;
+    }
+    .balance-operation-icon-credit {
+        @apply bg-emerald-100 text-emerald-600;
+    }
+    .balance-operation-icon-debit {
+        @apply bg-red-100 text-red-600;
+    }
+    .balance-operation-text {
+        @apply flex flex-col flex-1;
+    }
+    .balance-operation-title {
+        @apply text-sm font-semibold text-gray-900;
+    }
+    .balance-operation-desc {
+        @apply text-xs text-gray-500;
+    }
+    .balance-operation-check {
+        @apply flex-shrink-0;
+    }
+
+    /* Balance Preview */
+    .balance-preview {
+        @apply flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed h-full min-h-[80px];
+    }
+    .balance-preview-credit {
+        @apply border-emerald-300 bg-emerald-50;
+    }
+    .balance-preview-debit {
+        @apply border-red-300 bg-red-50;
+    }
+    .balance-preview-label {
+        @apply text-xs text-gray-500;
+    }
+    .balance-preview-value {
+        @apply text-xl font-bold;
+    }
+    .balance-preview-credit .balance-preview-value {
+        @apply text-emerald-700;
+    }
+    .balance-preview-debit .balance-preview-value {
+        @apply text-red-700;
+    }
+
+    /* ========================================
+       Invoice Styles
+       ======================================== */
+    .invoice-stats-grid {
+        @apply grid grid-cols-2 md:grid-cols-4 gap-4 mb-6;
+    }
+    .invoice-stat-card {
+        @apply flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200;
+    }
+    .invoice-stat-icon {
+        @apply w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0;
+    }
+    .invoice-stat-content {
+        @apply flex flex-col;
+    }
+    .invoice-stat-value {
+        @apply text-xl font-bold text-gray-900;
+    }
+    .invoice-stat-label {
+        @apply text-xs text-gray-500;
+    }
+
+    /* Invoice Status Variants */
+    .invoice-stat-draft .invoice-stat-icon {
+        @apply bg-gray-100 text-gray-600;
+    }
+    .invoice-stat-issued .invoice-stat-icon {
+        @apply bg-blue-50 text-blue-600;
+    }
+    .invoice-stat-paid .invoice-stat-icon {
+        @apply bg-emerald-50 text-emerald-600;
+    }
+    .invoice-stat-overdue .invoice-stat-icon {
+        @apply bg-red-50 text-red-600;
+    }
+
+    /* Invoice Status Banner */
+    .invoice-status-banner {
+        @apply flex items-center justify-between p-5 rounded-lg border;
+    }
+    .invoice-status-banner-content {
+        @apply flex items-center gap-4;
+    }
+    .invoice-status-banner-icon {
+        @apply w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0;
+    }
+    .invoice-status-banner-text {
+        @apply flex flex-col;
+    }
+    .invoice-status-banner-title {
+        @apply text-lg font-semibold;
+    }
+    .invoice-status-banner-meta {
+        @apply text-sm mt-0.5;
+    }
+    .invoice-status-banner-actions {
+        @apply flex items-center gap-3;
+    }
+
+    /* Invoice Status Banner Variants */
+    .invoice-status-draft {
+        @apply bg-gray-50 border-gray-200;
+    }
+    .invoice-status-draft .invoice-status-banner-icon {
+        @apply bg-gray-100 text-gray-600;
+    }
+    .invoice-status-draft .invoice-status-banner-title,
+    .invoice-status-draft .invoice-status-banner-meta {
+        @apply text-gray-800;
+    }
+
+    .invoice-status-issued {
+        @apply bg-blue-50 border-blue-200;
+    }
+    .invoice-status-issued .invoice-status-banner-icon {
+        @apply bg-blue-100 text-blue-600;
+    }
+    .invoice-status-issued .invoice-status-banner-title,
+    .invoice-status-issued .invoice-status-banner-meta {
+        @apply text-blue-800;
+    }
+
+    .invoice-status-paid {
+        @apply bg-emerald-50 border-emerald-200;
+    }
+    .invoice-status-paid .invoice-status-banner-icon {
+        @apply bg-emerald-100 text-emerald-600;
+    }
+    .invoice-status-paid .invoice-status-banner-title,
+    .invoice-status-paid .invoice-status-banner-meta {
+        @apply text-emerald-800;
+    }
+
+    .invoice-status-overdue {
+        @apply bg-red-50 border-red-200;
+    }
+    .invoice-status-overdue .invoice-status-banner-icon {
+        @apply bg-red-100 text-red-600;
+    }
+    .invoice-status-overdue .invoice-status-banner-title,
+    .invoice-status-overdue .invoice-status-banner-meta {
+        @apply text-red-800;
+    }
+
+    .invoice-status-cancelled {
+        @apply bg-gray-50 border-gray-300;
+    }
+    .invoice-status-cancelled .invoice-status-banner-icon {
+        @apply bg-gray-200 text-gray-500;
+    }
+    .invoice-status-cancelled .invoice-status-banner-title,
+    .invoice-status-cancelled .invoice-status-banner-meta {
+        @apply text-gray-600;
+    }
+
+    /* ========================================
+       Payment Styles
+       ======================================== */
+    .payment-stats-grid {
+        @apply grid grid-cols-2 md:grid-cols-4 gap-4 mb-6;
+    }
+    .payment-stat-card {
+        @apply flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200;
+    }
+    .payment-stat-icon {
+        @apply w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0;
+    }
+    .payment-stat-content {
+        @apply flex flex-col;
+    }
+    .payment-stat-value {
+        @apply text-xl font-bold text-gray-900;
+    }
+    .payment-stat-label {
+        @apply text-xs text-gray-500;
+    }
+
+    /* Payment Status Variants */
+    .payment-stat-completed .payment-stat-icon {
+        @apply bg-emerald-50 text-emerald-600;
+    }
+    .payment-stat-pending .payment-stat-icon {
+        @apply bg-amber-50 text-amber-600;
+    }
+    .payment-stat-failed .payment-stat-icon {
+        @apply bg-red-50 text-red-600;
+    }
+    .payment-stat-total .payment-stat-icon {
+        @apply bg-indigo-50 text-indigo-600;
+    }
+
+    /* Payment Status Banner */
+    .payment-status-banner {
+        @apply flex items-center justify-between p-5 rounded-lg border;
+    }
+    .payment-status-banner-content {
+        @apply flex items-center gap-4;
+    }
+    .payment-status-banner-icon {
+        @apply w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0;
+    }
+    .payment-status-banner-text {
+        @apply flex flex-col;
+    }
+    .payment-status-banner-title {
+        @apply text-lg font-semibold;
+    }
+    .payment-status-banner-meta {
+        @apply text-sm mt-0.5;
+    }
+    .payment-status-banner-amount {
+        @apply flex flex-col items-end;
+    }
+    .payment-status-banner-amount-label {
+        @apply text-xs text-gray-500;
+    }
+    .payment-status-banner-amount-value {
+        @apply text-2xl font-bold text-gray-900;
+    }
+
+    /* Payment Status Banner Variants */
+    .payment-status-completed {
+        @apply bg-emerald-50 border-emerald-200;
+    }
+    .payment-status-completed .payment-status-banner-icon {
+        @apply bg-emerald-100 text-emerald-600;
+    }
+    .payment-status-completed .payment-status-banner-title,
+    .payment-status-completed .payment-status-banner-meta {
+        @apply text-emerald-800;
+    }
+
+    .payment-status-pending {
+        @apply bg-amber-50 border-amber-200;
+    }
+    .payment-status-pending .payment-status-banner-icon {
+        @apply bg-amber-100 text-amber-600;
+    }
+    .payment-status-pending .payment-status-banner-title,
+    .payment-status-pending .payment-status-banner-meta {
+        @apply text-amber-800;
+    }
+
+    .payment-status-failed {
+        @apply bg-red-50 border-red-200;
+    }
+    .payment-status-failed .payment-status-banner-icon {
+        @apply bg-red-100 text-red-600;
+    }
+    .payment-status-failed .payment-status-banner-title,
+    .payment-status-failed .payment-status-banner-meta {
+        @apply text-red-800;
+    }
+
+    .payment-status-refunded {
+        @apply bg-blue-50 border-blue-200;
+    }
+    .payment-status-refunded .payment-status-banner-icon {
+        @apply bg-blue-100 text-blue-600;
+    }
+    .payment-status-refunded .payment-status-banner-title,
+    .payment-status-refunded .payment-status-banner-meta {
+        @apply text-blue-800;
+    }
+
+    /* ========================================
+       Audit Log Styles
+       ======================================== */
+    .audit-diff-card {
+        @apply bg-white rounded-lg border border-gray-200 overflow-hidden;
+    }
+    .audit-diff-header {
+        @apply px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-2;
+    }
+    .audit-diff-header-old {
+        @apply bg-red-50 border-red-100;
+    }
+    .audit-diff-header-new {
+        @apply bg-emerald-50 border-emerald-100;
+    }
+    .audit-diff-title {
+        @apply text-sm font-semibold;
+    }
+    .audit-diff-header-old .audit-diff-title {
+        @apply text-red-700;
+    }
+    .audit-diff-header-new .audit-diff-title {
+        @apply text-emerald-700;
+    }
+    .audit-diff-body {
+        @apply p-4;
+    }
+    .audit-diff-empty {
+        @apply text-sm text-gray-400 italic;
+    }
+    .audit-diff-grid {
+        @apply space-y-2;
+    }
+    .audit-diff-row {
+        @apply flex items-start gap-2 text-sm;
+    }
+    .audit-diff-key {
+        @apply font-medium text-gray-600 min-w-[120px];
+    }
+    .audit-diff-value {
+        @apply text-gray-900 break-all;
+    }
+
+    /* Audit Action Badges */
+    .audit-action-created {
+        @apply bg-emerald-50 text-emerald-700;
+    }
+    .audit-action-updated {
+        @apply bg-blue-50 text-blue-700;
+    }
+    .audit-action-deleted {
+        @apply bg-red-50 text-red-700;
+    }
+
+    /* ========================================
+       Blacklist/Whitelist Styles
+       ======================================== */
+    .blacklist-scope-global-active {
+        @apply border-red-500 bg-red-50;
+    }
+    .blacklist-scope-user-active {
+        @apply border-indigo-500 bg-indigo-50;
+    }
+    .blacklist-scope-icon-global {
+        @apply bg-red-100 text-red-600;
+    }
+    .blacklist-scope-icon-user {
+        @apply bg-indigo-100 text-indigo-600;
+    }
+
+    /* Blacklist Prefix Badge */
+    .blacklist-prefix {
+        @apply inline-flex items-center px-3 py-1 rounded-lg bg-gray-100 text-gray-800 font-mono text-sm;
+    }
+
+    /* ========================================
+       Webhook Styles
+       ======================================== */
+    .webhook-event-option {
+        @apply flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer transition-all hover:border-indigo-300 hover:bg-indigo-50;
+    }
+    .webhook-event-option:has(.webhook-event-checkbox:checked) {
+        @apply border-indigo-500 bg-indigo-50;
+    }
+    .webhook-event-checkbox {
+        @apply w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500;
+    }
+    .webhook-event-label {
+        @apply text-sm text-gray-700;
+    }
+
+    /* ========================================
+       Bulk Import Styles
+       ======================================== */
+    .import-warning-card {
+        @apply bg-amber-50 border border-amber-200 rounded-lg overflow-hidden;
+    }
+    .import-warning-header {
+        @apply flex items-center gap-3 px-5 py-4 bg-amber-100/50;
+    }
+    .import-warning-icon {
+        @apply w-10 h-10 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center flex-shrink-0;
+    }
+    .import-warning-title {
+        @apply text-sm font-semibold text-amber-800;
+    }
+    .import-warning-subtitle {
+        @apply text-xs text-amber-600;
+    }
+    .import-warning-body {
+        @apply px-5 py-4;
+    }
+    .import-warning-list {
+        @apply list-disc list-inside text-sm text-amber-700 space-y-1 max-h-48 overflow-y-auto;
+    }
+
+    /* Import Card */
+    .import-card {
+        @apply bg-white rounded-lg border border-gray-200 overflow-hidden;
+    }
+    .import-card-header {
+        @apply flex items-center gap-4 px-5 py-4 bg-gray-50 border-b border-gray-100;
+    }
+    .import-card-icon {
+        @apply w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0;
+    }
+    .import-card-icon-users {
+        @apply bg-indigo-100 text-indigo-600;
+    }
+    .import-card-icon-sip {
+        @apply bg-emerald-100 text-emerald-600;
+    }
+    .import-card-icon-dids {
+        @apply bg-purple-100 text-purple-600;
+    }
+    .import-card-header-text {
+        @apply flex flex-col;
+    }
+    .import-card-title {
+        @apply text-sm font-semibold text-gray-900;
+    }
+    .import-card-subtitle {
+        @apply text-xs text-gray-500;
+    }
+    .import-card-body {
+        @apply p-5 space-y-4;
+    }
+
+    /* Import Columns Hint */
+    .import-columns-hint {
+        @apply flex flex-wrap items-center gap-2;
+    }
+    .import-columns-label {
+        @apply text-xs font-medium text-gray-500;
+    }
+    .import-columns-list {
+        @apply flex flex-wrap gap-1.5;
+    }
+    .import-columns-list code {
+        @apply px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded;
+    }
+
+    /* Import Form */
+    .import-form {
+        @apply flex items-end gap-3;
+    }
+    .import-file-input {
+        @apply flex-1;
+    }
+    .import-file {
+        @apply block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 file:cursor-pointer file:transition-colors;
+    }
+
+    /* Import Example */
+    .import-example {
+        @apply text-sm text-gray-500;
+    }
+    .import-example-toggle {
+        @apply flex items-center gap-2 cursor-pointer hover:text-gray-700 transition-colors;
+    }
+    .import-example-toggle svg {
+        @apply transition-transform;
+    }
+    .import-example[open] .import-example-toggle svg {
+        @apply rotate-90;
+    }
+    .import-example-code {
+        @apply mt-3 p-4 bg-gray-50 rounded-lg text-xs font-mono overflow-x-auto border border-gray-100;
+    }
+
+    /* Import Tips */
+    .import-tips-list {
+        @apply space-y-3;
+    }
+    .import-tips-list li {
+        @apply flex items-start gap-3 text-sm text-gray-600;
+    }
 }
