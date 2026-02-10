@@ -68,8 +68,13 @@
                         @endunless
 
                         <div class="form-group" x-show="role === 'client'" x-cloak>
-                            <label for="parent_id" class="form-label">Parent Reseller</label>
-                            <select id="parent_id" name="parent_id" class="form-input">
+                            <label for="parent_id" class="form-label">
+                                Parent Reseller
+                                @unless(auth()->user()->isSuperAdmin())
+                                    <span class="text-red-500">*</span>
+                                @endunless
+                            </label>
+                            <select id="parent_id" name="parent_id" class="form-input" {{ auth()->user()->isSuperAdmin() ? '' : 'required' }}>
                                 <option value="">Select Reseller</option>
                                 @foreach ($resellers as $reseller)
                                     <option value="{{ $reseller->id }}" {{ old('parent_id') == $reseller->id ? 'selected' : '' }}>
@@ -77,6 +82,9 @@
                                     </option>
                                 @endforeach
                             </select>
+                            @unless(auth()->user()->isSuperAdmin())
+                                <p class="form-hint text-amber-600">Required: You must assign clients to one of your resellers</p>
+                            @endunless
                             <x-input-error :messages="$errors->get('parent_id')" class="mt-2" />
                         </div>
 

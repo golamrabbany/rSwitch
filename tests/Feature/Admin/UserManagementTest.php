@@ -12,6 +12,7 @@ class UserManagementTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+    private User $reseller;
 
     protected function setUp(): void
     {
@@ -22,8 +23,14 @@ class UserManagementTest extends TestCase
         Role::create(['name' => 'reseller']);
         Role::create(['name' => 'client']);
 
+        // Create admin
         $this->admin = User::factory()->admin()->create();
         $this->admin->assignRole('admin');
+
+        // Create reseller and assign to admin
+        $this->reseller = User::factory()->reseller()->create();
+        $this->reseller->assignRole('reseller');
+        $this->admin->assignedResellers()->attach($this->reseller->id);
     }
 
     public function test_admin_can_view_users_index(): void
@@ -45,6 +52,7 @@ class UserManagementTest extends TestCase
                 'password' => 'SecurePass123!',
                 'password_confirmation' => 'SecurePass123!',
                 'role' => 'client',
+                'parent_id' => $this->reseller->id,
                 'status' => 'active',
                 'billing_type' => 'prepaid',
             ]);
@@ -55,13 +63,30 @@ class UserManagementTest extends TestCase
 
     public function test_admin_can_toggle_user_status(): void
     {
-        $user = User::factory()->create(['status' => 'active']);
+        // Create a client under the assigned reseller
+        $client = User::factory()->client()->create([
+            'parent_id' => $this->reseller->id,
+            'status' => 'active',
+        ]);
+        $client->assignRole('client');
 
         $response = $this->actingAs($this->admin)
-            ->post(route('admin.users.toggle-status', $user));
+            ->post(route('admin.users.toggle-status', $client));
 
         $response->assertRedirect();
-        $this->assertEquals('suspended', $user->fresh()->status);
+        $this->assertEquals('suspended', $client->fresh()->status);
+    }
+
+    public function test_admin_cannot_toggle_unassigned_user_status(): void
+    {
+        // Create another reseller NOT assigned to admin
+        $otherReseller = User::factory()->reseller()->create();
+        $otherReseller->assignRole('reseller');
+
+        $response = $this->actingAs($this->admin)
+            ->post(route('admin.users.toggle-status', $otherReseller));
+
+        $response->assertForbidden();
     }
 
     public function test_non_admin_cannot_access_admin_routes(): void

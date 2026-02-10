@@ -52,6 +52,18 @@ class DatabaseSeeder extends Seeder
         ]);
         $admin->assignRole('admin');
 
+        // Create recharge admin
+        $rechargeAdmin = User::create([
+            'name' => 'Recharge Admin',
+            'email' => 'recharge@rswitch.local',
+            'password' => Hash::make('password'),
+            'role' => 'recharge_admin',
+            'status' => 'active',
+            'kyc_status' => 'approved',
+            'billing_type' => 'postpaid',
+        ]);
+        $rechargeAdmin->assignRole('recharge_admin');
+
         // Create default rate group
         $rateGroup = RateGroup::create([
             'name' => 'Default',
@@ -60,214 +72,107 @@ class DatabaseSeeder extends Seeder
             'created_by' => $superAdmin->id,
         ]);
 
-        // Create demo reseller (parent is super_admin)
-        $reseller = User::create([
-            'name' => 'Demo Reseller',
-            'email' => 'reseller@rswitch.local',
-            'password' => Hash::make('password'),
-            'role' => 'reseller',
-            'parent_id' => $superAdmin->id,
-            'status' => 'active',
-            'kyc_status' => 'approved',
-            'billing_type' => 'prepaid',
-            'balance' => 1000.0000,
-            'rate_group_id' => $rateGroup->id,
-        ]);
-        $reseller->assignRole('reseller');
-
-        // Assign the demo reseller to the regular admin
-        $admin->assignedResellers()->attach($reseller->id);
-
-        // Create demo client under reseller
-        $client = User::create([
-            'name' => 'Demo Client',
-            'email' => 'client@rswitch.local',
-            'password' => Hash::make('password'),
-            'role' => 'client',
-            'parent_id' => $reseller->id,
-            'status' => 'active',
-            'kyc_status' => 'approved',
-            'billing_type' => 'prepaid',
-            'balance' => 100.0000,
-            'rate_group_id' => $rateGroup->id,
-        ]);
-        $client->assignRole('client');
-
         // ==========================================
-        // DEMO DATA: KYC Profiles (pending reviews)
+        // DEMO DATA: 10 Resellers
         // ==========================================
+        $resellerNames = [
+            ['name' => 'Global Telecom Solutions', 'email' => 'reseller1@rswitch.local', 'balance' => 5000],
+            ['name' => 'Voice Connect Ltd', 'email' => 'reseller2@rswitch.local', 'balance' => 3500],
+            ['name' => 'TeleCom Partners', 'email' => 'reseller3@rswitch.local', 'balance' => 2800],
+            ['name' => 'Quick Dial Services', 'email' => 'reseller4@rswitch.local', 'balance' => 4200],
+            ['name' => 'Star Communications', 'email' => 'reseller5@rswitch.local', 'balance' => 1500],
+            ['name' => 'Prime Voice Networks', 'email' => 'reseller6@rswitch.local', 'balance' => 6000],
+            ['name' => 'Connect Plus Inc', 'email' => 'reseller7@rswitch.local', 'balance' => 2200],
+            ['name' => 'Swift Telecom', 'email' => 'reseller8@rswitch.local', 'balance' => 3800],
+            ['name' => 'Digital Voice Co', 'email' => 'reseller9@rswitch.local', 'balance' => 4500],
+            ['name' => 'Metro Dial Services', 'email' => 'reseller10@rswitch.local', 'balance' => 2900],
+        ];
 
-        // Create additional users with pending KYC
-        $pendingReseller1 = User::create([
-            'name' => 'Global Telecom Ltd',
-            'email' => 'kyc.reseller1@rswitch.local',
-            'password' => Hash::make('password'),
-            'role' => 'reseller',
-            'parent_id' => $superAdmin->id,
-            'status' => 'active',
-            'kyc_status' => 'pending',
-            'billing_type' => 'prepaid',
-            'balance' => 0,
-        ]);
-        $pendingReseller1->assignRole('reseller');
-
-        KycProfile::create([
-            'user_id' => $pendingReseller1->id,
-            'account_type' => 'company',
-            'full_name' => 'Global Telecom Ltd',
-            'contact_person' => 'John Smith',
-            'phone' => '+1-555-123-4567',
-            'alt_phone' => '+1-555-123-4568',
-            'address_line1' => '100 Business Park Drive',
-            'address_line2' => 'Suite 500',
-            'city' => 'New York',
-            'state' => 'NY',
-            'postal_code' => '10001',
-            'country' => 'US',
-            'id_type' => 'business_license',
-            'id_number' => 'BRN-2024-00123456',
-            'id_expiry_date' => now()->addYears(5),
-            'submitted_at' => now()->subHours(2),
-        ]);
-
-        $pendingReseller2 = User::create([
-            'name' => 'Ahmed Rahman',
-            'email' => 'kyc.reseller2@rswitch.local',
-            'password' => Hash::make('password'),
-            'role' => 'reseller',
-            'parent_id' => $superAdmin->id,
-            'status' => 'active',
-            'kyc_status' => 'pending',
-            'billing_type' => 'prepaid',
-            'balance' => 0,
-        ]);
-        $pendingReseller2->assignRole('reseller');
-
-        KycProfile::create([
-            'user_id' => $pendingReseller2->id,
-            'account_type' => 'individual',
-            'full_name' => 'Ahmed Rahman',
-            'phone' => '+880-1711-123456',
-            'address_line1' => 'House 45, Road 12',
-            'address_line2' => 'Gulshan',
-            'city' => 'Dhaka',
-            'state' => 'Dhaka',
-            'postal_code' => '1212',
-            'country' => 'BD',
-            'id_type' => 'passport',
-            'id_number' => 'BN1234567',
-            'id_expiry_date' => now()->addYears(3),
-            'submitted_at' => now()->subDays(1),
-        ]);
-
-        $pendingClient1 = User::create([
-            'name' => 'Maria Garcia',
-            'email' => 'kyc.client1@rswitch.local',
-            'password' => Hash::make('password'),
-            'role' => 'client',
-            'parent_id' => $reseller->id,
-            'status' => 'active',
-            'kyc_status' => 'pending',
-            'billing_type' => 'prepaid',
-            'balance' => 0,
-        ]);
-        $pendingClient1->assignRole('client');
-
-        KycProfile::create([
-            'user_id' => $pendingClient1->id,
-            'account_type' => 'individual',
-            'full_name' => 'Maria Garcia',
-            'phone' => '+34-612-345-678',
-            'address_line1' => 'Calle Mayor 25',
-            'city' => 'Madrid',
-            'state' => 'Madrid',
-            'postal_code' => '28013',
-            'country' => 'ES',
-            'id_type' => 'national_id',
-            'id_number' => 'ES12345678X',
-            'id_expiry_date' => now()->addYears(8),
-            'submitted_at' => now()->subHours(5),
-        ]);
-
-        // Create user with rejected KYC
-        $rejectedClient = User::create([
-            'name' => 'Test Rejected',
-            'email' => 'kyc.rejected@rswitch.local',
-            'password' => Hash::make('password'),
-            'role' => 'client',
-            'parent_id' => $reseller->id,
-            'status' => 'active',
-            'kyc_status' => 'rejected',
-            'kyc_rejected_reason' => 'ID document is expired',
-            'billing_type' => 'prepaid',
-            'balance' => 0,
-        ]);
-        $rejectedClient->assignRole('client');
-
-        $rejectedKyc = KycProfile::create([
-            'user_id' => $rejectedClient->id,
-            'account_type' => 'individual',
-            'full_name' => 'Test Rejected User',
-            'phone' => '+1-555-000-0000',
-            'address_line1' => '123 Test Street',
-            'city' => 'Test City',
-            'state' => 'TS',
-            'postal_code' => '12345',
-            'country' => 'US',
-            'id_type' => 'driving_license',
-            'id_number' => 'DL-EXPIRED-001',
-            'id_expiry_date' => now()->subMonths(6),
-            'submitted_at' => now()->subDays(3),
-            'reviewed_at' => now()->subDays(2),
-            'reviewed_by' => $superAdmin->id,
-        ]);
-
-        // Add sample KYC documents (without actual files, just metadata)
-        $kycProfiles = KycProfile::all();
-        foreach ($kycProfiles as $profile) {
-            // Add ID document
-            KycDocument::create([
-                'kyc_profile_id' => $profile->id,
-                'document_type' => 'id_front',
-                'original_name' => 'id_document_front.jpg',
-                'file_path' => 'kyc-documents/' . $profile->id . '/id_front.jpg',
-                'file_size' => rand(100000, 500000),
-                'mime_type' => 'image/jpeg',
-                'status' => $profile->user->kyc_status === 'rejected' ? 'rejected' : 'uploaded',
+        $resellers = [];
+        foreach ($resellerNames as $index => $data) {
+            $reseller = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make('password'),
+                'role' => 'reseller',
+                'status' => 'active',
+                'kyc_status' => 'approved',
+                'billing_type' => 'prepaid',
+                'balance' => $data['balance'],
+                'rate_group_id' => $rateGroup->id,
+                'max_channels' => rand(20, 50),
             ]);
+            $reseller->assignRole('reseller');
+            $resellers[] = $reseller;
 
-            KycDocument::create([
-                'kyc_profile_id' => $profile->id,
-                'document_type' => 'id_back',
-                'original_name' => 'id_document_back.jpg',
-                'file_path' => 'kyc-documents/' . $profile->id . '/id_back.jpg',
-                'file_size' => rand(100000, 500000),
-                'mime_type' => 'image/jpeg',
-                'status' => $profile->user->kyc_status === 'rejected' ? 'rejected' : 'uploaded',
-            ]);
-
-            // Add proof of address for business accounts
-            if ($profile->account_type === 'company') {
-                KycDocument::create([
-                    'kyc_profile_id' => $profile->id,
-                    'document_type' => 'proof_of_address',
-                    'original_name' => 'utility_bill.pdf',
-                    'file_path' => 'kyc-documents/' . $profile->id . '/utility_bill.pdf',
-                    'file_size' => rand(200000, 800000),
-                    'mime_type' => 'application/pdf',
-                    'status' => 'uploaded',
-                ]);
-
-                KycDocument::create([
-                    'kyc_profile_id' => $profile->id,
-                    'document_type' => 'business_registration',
-                    'original_name' => 'business_certificate.pdf',
-                    'file_path' => 'kyc-documents/' . $profile->id . '/business_certificate.pdf',
-                    'file_size' => rand(300000, 1000000),
-                    'mime_type' => 'application/pdf',
-                    'status' => 'uploaded',
-                ]);
+            // Assign first 5 resellers to regular admin, next 5 to recharge admin
+            if ($index < 5) {
+                $admin->assignedResellers()->attach($reseller->id);
+            } else {
+                $rechargeAdmin->assignedResellers()->attach($reseller->id);
             }
+        }
+
+        // ==========================================
+        // DEMO DATA: 30 Clients (distributed among resellers)
+        // ==========================================
+        $clientNames = [
+            'Acme Corporation', 'Tech Innovators', 'Business Solutions LLC', 'Global Enterprises',
+            'Smart Office Inc', 'Digital Dynamics', 'Cloud Nine Systems', 'Alpha Communications',
+            'Beta Services', 'Gamma Tech', 'Delta Solutions', 'Epsilon Group',
+            'Zeta Consulting', 'Eta Ventures', 'Theta Corp', 'Iota Industries',
+            'Kappa Networks', 'Lambda Labs', 'Mu Media', 'Nu Technologies',
+            'Xi Enterprises', 'Omicron Office', 'Pi Partners', 'Rho Resources',
+            'Sigma Systems', 'Tau Trading', 'Upsilon Unified', 'Phi Finance',
+            'Chi Consulting', 'Psi Productions',
+        ];
+
+        $clients = [];
+        foreach ($clientNames as $index => $name) {
+            // Distribute clients among resellers (3 clients per reseller)
+            $parentReseller = $resellers[$index % count($resellers)];
+
+            $client = User::create([
+                'name' => $name,
+                'email' => 'client' . ($index + 1) . '@rswitch.local',
+                'password' => Hash::make('password'),
+                'role' => 'client',
+                'parent_id' => $parentReseller->id,
+                'status' => 'active',
+                'kyc_status' => $index < 25 ? 'approved' : 'pending', // Last 5 have pending KYC
+                'billing_type' => $index % 3 === 0 ? 'postpaid' : 'prepaid',
+                'balance' => rand(50, 500),
+                'credit_limit' => $index % 3 === 0 ? rand(100, 500) : 0,
+                'rate_group_id' => $rateGroup->id,
+                'max_channels' => rand(5, 20),
+            ]);
+            $client->assignRole('client');
+            $clients[] = $client;
+        }
+
+        // ==========================================
+        // DEMO DATA: KYC Profiles for pending clients
+        // ==========================================
+        $pendingClients = array_slice($clients, 25, 5);
+        $countries = ['US', 'UK', 'DE', 'FR', 'AU'];
+
+        foreach ($pendingClients as $index => $client) {
+            KycProfile::create([
+                'user_id' => $client->id,
+                'account_type' => $index % 2 === 0 ? 'company' : 'individual',
+                'full_name' => $client->name,
+                'contact_person' => $index % 2 === 0 ? 'John Contact' : null,
+                'phone' => '+1-555-' . rand(100, 999) . '-' . rand(1000, 9999),
+                'address_line1' => rand(100, 999) . ' Business Ave',
+                'city' => 'Metro City',
+                'state' => 'State',
+                'postal_code' => rand(10000, 99999),
+                'country' => $countries[$index],
+                'id_type' => 'business_license',
+                'id_number' => 'BRN-' . rand(100000, 999999),
+                'id_expiry_date' => now()->addYears(rand(2, 5)),
+                'submitted_at' => now()->subHours(rand(1, 72)),
+            ]);
         }
 
         // Seed system settings
@@ -290,15 +195,23 @@ class DatabaseSeeder extends Seeder
             ['prefix' => '1', 'destination' => 'USA/Canada', 'rate_per_minute' => '0.0100'],
             ['prefix' => '1212', 'destination' => 'USA - New York', 'rate_per_minute' => '0.0080'],
             ['prefix' => '1310', 'destination' => 'USA - Los Angeles', 'rate_per_minute' => '0.0080'],
+            ['prefix' => '1415', 'destination' => 'USA - San Francisco', 'rate_per_minute' => '0.0085'],
+            ['prefix' => '1305', 'destination' => 'USA - Miami', 'rate_per_minute' => '0.0090'],
             ['prefix' => '44', 'destination' => 'United Kingdom', 'rate_per_minute' => '0.0150'],
+            ['prefix' => '4420', 'destination' => 'UK - London', 'rate_per_minute' => '0.0120'],
             ['prefix' => '49', 'destination' => 'Germany', 'rate_per_minute' => '0.0180'],
             ['prefix' => '33', 'destination' => 'France', 'rate_per_minute' => '0.0170'],
+            ['prefix' => '34', 'destination' => 'Spain', 'rate_per_minute' => '0.0160'],
+            ['prefix' => '39', 'destination' => 'Italy', 'rate_per_minute' => '0.0175'],
             ['prefix' => '61', 'destination' => 'Australia', 'rate_per_minute' => '0.0200'],
             ['prefix' => '81', 'destination' => 'Japan', 'rate_per_minute' => '0.0250'],
             ['prefix' => '86', 'destination' => 'China', 'rate_per_minute' => '0.0150'],
             ['prefix' => '91', 'destination' => 'India', 'rate_per_minute' => '0.0120'],
+            ['prefix' => '92', 'destination' => 'Pakistan', 'rate_per_minute' => '0.0180'],
             ['prefix' => '880', 'destination' => 'Bangladesh', 'rate_per_minute' => '0.0200'],
             ['prefix' => '971', 'destination' => 'UAE', 'rate_per_minute' => '0.0300'],
+            ['prefix' => '966', 'destination' => 'Saudi Arabia', 'rate_per_minute' => '0.0280'],
+            ['prefix' => '65', 'destination' => 'Singapore', 'rate_per_minute' => '0.0220'],
         ];
 
         foreach ($rates as $rate) {
@@ -331,6 +244,19 @@ class DatabaseSeeder extends Seeder
             'codec_allow' => 'ulaw,alaw,g729',
         ]);
 
+        $outboundTrunk2 = Trunk::create([
+            'name' => 'Secondary Outbound',
+            'provider' => 'Carrier Three',
+            'host' => 'sip.carrier3.com',
+            'port' => 5060,
+            'transport' => 'udp',
+            'direction' => 'outgoing',
+            'max_channels' => 50,
+            'status' => 'active',
+            'cli_mode' => 'passthrough',
+            'codec_allow' => 'ulaw,alaw',
+        ]);
+
         $inboundTrunk = Trunk::create([
             'name' => 'Primary Inbound',
             'provider' => 'Carrier Two',
@@ -356,6 +282,14 @@ class DatabaseSeeder extends Seeder
         ]);
 
         TrunkRoute::create([
+            'trunk_id' => $outboundTrunk2->id,
+            'prefix' => '1',
+            'priority' => 2,
+            'weight' => 50,
+            'status' => 'active',
+        ]);
+
+        TrunkRoute::create([
             'trunk_id' => $outboundTrunk->id,
             'prefix' => '44',
             'priority' => 1,
@@ -363,108 +297,111 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        // ==========================================
-        // DEMO DATA: SIP Accounts
-        // ==========================================
-        $sipReseller = SipAccount::create([
-            'user_id' => $reseller->id,
-            'username' => '100001',
-            'password' => Str::random(16),
-            'auth_type' => 'password',
-            'caller_id_number' => '15551000001',
-            'caller_id_name' => 'Demo Reseller',
-            'max_channels' => 10,
-            'codec_allow' => 'ulaw,alaw,g729',
+        TrunkRoute::create([
+            'trunk_id' => $outboundTrunk->id,
+            'prefix' => '49',
+            'priority' => 1,
+            'weight' => 100,
             'status' => 'active',
         ]);
 
-        $sipClient1 = SipAccount::create([
-            'user_id' => $client->id,
-            'username' => '200001',
-            'password' => Str::random(16),
-            'auth_type' => 'password',
-            'caller_id_number' => '15552000001',
-            'caller_id_name' => 'Demo Client',
-            'max_channels' => 5,
-            'codec_allow' => 'ulaw,alaw,g729',
-            'status' => 'active',
-        ]);
+        // ==========================================
+        // DEMO DATA: 100 SIP Accounts
+        // ==========================================
+        $sipAccounts = [];
+        $sipCounter = 100000;
+        $allUsers = array_merge($resellers, $clients);
 
-        $sipClient2 = SipAccount::create([
-            'user_id' => $client->id,
-            'username' => '200002',
-            'password' => Str::random(16),
-            'auth_type' => 'password',
-            'caller_id_number' => '15552000002',
-            'caller_id_name' => 'Demo Client 2',
-            'max_channels' => 5,
-            'codec_allow' => 'ulaw,alaw',
-            'status' => 'active',
-        ]);
+        // Create ~2-3 SIP accounts per user to reach 100
+        foreach ($allUsers as $user) {
+            $numSipAccounts = $user->role === 'reseller' ? rand(3, 5) : rand(2, 3);
+
+            for ($i = 0; $i < $numSipAccounts; $i++) {
+                $sipCounter++;
+
+                $authType = ['password', 'password', 'password', 'ip', 'both'][array_rand(['password', 'password', 'password', 'ip', 'both'])];
+
+                $sip = SipAccount::create([
+                    'user_id' => $user->id,
+                    'username' => (string) $sipCounter,
+                    'password' => Str::random(16), // Always generate password
+                    'auth_type' => $authType,
+                    'allowed_ips' => $authType !== 'password' ? '192.168.' . rand(1, 254) . '.' . rand(1, 254) : null,
+                    'caller_id_number' => '1555' . rand(1000000, 9999999),
+                    'caller_id_name' => $user->name . ' Line ' . ($i + 1),
+                    'max_channels' => rand(2, 10),
+                    'codec_allow' => ['ulaw,alaw,g729', 'ulaw,alaw', 'g729,ulaw'][array_rand(['ulaw,alaw,g729', 'ulaw,alaw', 'g729,ulaw'])],
+                    'status' => rand(1, 10) > 1 ? 'active' : 'suspended', // 90% active
+                ]);
+
+                $sipAccounts[] = $sip;
+
+                // Stop after 100 SIP accounts
+                if (count($sipAccounts) >= 100) {
+                    break 2;
+                }
+            }
+        }
 
         // ==========================================
         // DEMO DATA: DIDs
         // ==========================================
-        Did::create([
-            'number' => '18005551234',
-            'provider' => 'Carrier Two',
-            'trunk_id' => $inboundTrunk->id,
-            'assigned_to_user_id' => $reseller->id,
-            'destination_type' => 'sip_account',
-            'destination_id' => $sipReseller->id,
-            'monthly_cost' => '1.5000',
-            'monthly_price' => '3.0000',
-            'status' => 'active',
-        ]);
+        $didNumbers = [
+            '18005551001', '18005551002', '18005551003', '18005551004', '18005551005',
+            '18005552001', '18005552002', '18005552003', '18005552004', '18005552005',
+            '18005553001', '18005553002', '18005553003', '18005553004', '18005553005',
+            '18005554001', '18005554002', '18005554003', '18005554004', '18005554005',
+        ];
 
-        Did::create([
-            'number' => '18005555678',
-            'provider' => 'Carrier Two',
-            'trunk_id' => $inboundTrunk->id,
-            'assigned_to_user_id' => $client->id,
-            'destination_type' => 'sip_account',
-            'destination_id' => $sipClient1->id,
-            'monthly_cost' => '1.5000',
-            'monthly_price' => '2.5000',
-            'status' => 'active',
-        ]);
+        $didIndex = 0;
+        foreach ($didNumbers as $number) {
+            $assignedUser = $didIndex < 15 ? $allUsers[$didIndex % count($allUsers)] : null;
+            $destinationSip = $assignedUser ? $sipAccounts[$didIndex % count($sipAccounts)] : null;
 
-        Did::create([
-            'number' => '18005559999',
-            'provider' => 'Carrier Two',
-            'trunk_id' => $inboundTrunk->id,
-            'assigned_to_user_id' => null,
-            'destination_type' => 'external',
-            'destination_number' => '+15559999999',
-            'monthly_cost' => '1.0000',
-            'monthly_price' => '2.0000',
-            'status' => 'unassigned',
-        ]);
+            Did::create([
+                'number' => $number,
+                'provider' => 'Carrier Two',
+                'trunk_id' => $inboundTrunk->id,
+                'assigned_to_user_id' => $assignedUser?->id,
+                'destination_type' => $assignedUser ? 'sip_account' : 'external',
+                'destination_id' => $destinationSip?->id,
+                'destination_number' => $assignedUser ? null : '+1555' . rand(1000000, 9999999),
+                'monthly_cost' => rand(100, 200) / 100,
+                'monthly_price' => rand(200, 400) / 100,
+                'status' => $assignedUser ? 'active' : 'unassigned',
+            ]);
+            $didIndex++;
+        }
 
         // ==========================================
-        // DEMO DATA: Call Records (last 7 days)
+        // DEMO DATA: Call Records (last 14 days)
         // ==========================================
-        $dispositions = ['ANSWERED', 'ANSWERED', 'ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED'];
-        $prefixes = ['1212', '1310', '44', '49', '91', '880'];
+        $dispositions = ['ANSWERED', 'ANSWERED', 'ANSWERED', 'ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED'];
+        $prefixes = ['1212', '1310', '1415', '44', '4420', '49', '91', '880', '86', '65'];
+        $rateModels = Rate::all()->keyBy('prefix');
 
-        for ($i = 0; $i < 50; $i++) {
-            $callStart = now()->subDays(rand(0, 6))->subHours(rand(0, 23))->subMinutes(rand(0, 59));
+        for ($i = 0; $i < 500; $i++) {
+            $callStart = now()->subDays(rand(0, 13))->subHours(rand(0, 23))->subMinutes(rand(0, 59));
             $disposition = $dispositions[array_rand($dispositions)];
-            $duration = $disposition === 'ANSWERED' ? rand(30, 600) : 0;
+            $duration = $disposition === 'ANSWERED' ? rand(30, 900) : 0;
             $billsec = $disposition === 'ANSWERED' ? max(0, $duration - rand(5, 15)) : 0;
             $prefix = $prefixes[array_rand($prefixes)];
             $calledNumber = $prefix . rand(1000000, 9999999);
 
-            $rate = Rate::where('prefix', $prefix)->first();
+            $randomUser = $allUsers[array_rand($allUsers)];
+            $userSipAccounts = array_filter($sipAccounts, fn($s) => $s->user_id === $randomUser->id);
+            $randomSip = !empty($userSipAccounts) ? $userSipAccounts[array_rand($userSipAccounts)] : $sipAccounts[0];
+
+            $rate = $rateModels->get($prefix);
             $cost = $billsec > 0 && $rate ? bcmul(bcdiv((string) $billsec, '60', 6), $rate->rate_per_minute, 4) : '0.0000';
 
             CallRecord::create([
                 'uuid' => Str::uuid(),
-                'user_id' => $i % 3 === 0 ? $reseller->id : $client->id,
-                'sip_account_id' => $i % 3 === 0 ? $sipReseller->id : $sipClient1->id,
-                'outgoing_trunk_id' => $outboundTrunk->id,
+                'user_id' => $randomUser->id,
+                'sip_account_id' => $randomSip->id,
+                'outgoing_trunk_id' => rand(0, 1) ? $outboundTrunk->id : $outboundTrunk2->id,
                 'caller' => '1555' . rand(1000000, 9999999),
-                'caller_id' => 'Demo Caller',
+                'caller_id' => $randomUser->name,
                 'callee' => $calledNumber,
                 'destination' => $rate ? $rate->destination : 'Unknown',
                 'matched_prefix' => $prefix,
@@ -487,65 +424,51 @@ class DatabaseSeeder extends Seeder
         // ==========================================
         // DEMO DATA: Transactions
         // ==========================================
-        Transaction::create([
-            'user_id' => $reseller->id,
-            'type' => 'topup',
-            'amount' => '500.0000',
-            'balance_after' => '500.0000',
-            'description' => 'Initial top-up',
-            'created_by' => $superAdmin->id,
-            'created_at' => now()->subDays(30),
-        ]);
+        foreach ($resellers as $reseller) {
+            // Initial top-up
+            Transaction::create([
+                'user_id' => $reseller->id,
+                'type' => 'topup',
+                'amount' => rand(500, 2000) . '.0000',
+                'balance_after' => $reseller->balance,
+                'description' => 'Initial top-up',
+                'source' => 'bank_transfer',
+                'created_by' => $superAdmin->id,
+                'created_at' => now()->subDays(rand(20, 60)),
+            ]);
+        }
 
-        Transaction::create([
-            'user_id' => $reseller->id,
-            'type' => 'topup',
-            'amount' => '500.0000',
-            'balance_after' => '1000.0000',
-            'description' => 'Monthly top-up',
-            'created_by' => $superAdmin->id,
-            'created_at' => now()->subDays(15),
-        ]);
-
-        Transaction::create([
-            'user_id' => $client->id,
-            'type' => 'topup',
-            'amount' => '100.0000',
-            'balance_after' => '100.0000',
-            'description' => 'Initial balance',
-            'created_by' => $reseller->id,
-            'created_at' => now()->subDays(20),
-        ]);
+        foreach (array_slice($clients, 0, 15) as $client) {
+            Transaction::create([
+                'user_id' => $client->id,
+                'type' => 'topup',
+                'amount' => rand(50, 300) . '.0000',
+                'balance_after' => $client->balance,
+                'description' => 'Balance top-up',
+                'source' => 'manual_reseller',
+                'created_by' => $client->parent_id,
+                'created_at' => now()->subDays(rand(5, 30)),
+            ]);
+        }
 
         // ==========================================
         // DEMO DATA: Invoices
         // ==========================================
-        Invoice::create([
-            'invoice_number' => 'INV-' . now()->subMonth()->format('Ymd') . '-00001',
-            'user_id' => $reseller->id,
-            'period_start' => now()->subMonth()->startOfMonth(),
-            'period_end' => now()->subMonth()->endOfMonth(),
-            'call_charges' => '45.2500',
-            'did_charges' => '3.0000',
-            'tax_amount' => '0.0000',
-            'total_amount' => '48.2500',
-            'status' => 'paid',
-            'due_date' => now()->subDays(15),
-            'paid_at' => now()->subDays(10),
-        ]);
-
-        Invoice::create([
-            'invoice_number' => 'INV-' . now()->format('Ymd') . '-00001',
-            'user_id' => $client->id,
-            'period_start' => now()->startOfMonth(),
-            'period_end' => now(),
-            'call_charges' => '12.7500',
-            'did_charges' => '2.5000',
-            'tax_amount' => '0.0000',
-            'total_amount' => '15.2500',
-            'status' => 'issued',
-            'due_date' => now()->addDays(30),
-        ]);
+        foreach (array_slice($resellers, 0, 5) as $index => $reseller) {
+            Invoice::create([
+                'invoice_number' => 'INV-' . now()->subMonth()->format('Ymd') . '-' . str_pad($index + 1, 5, '0', STR_PAD_LEFT),
+                'user_id' => $reseller->id,
+                'period_start' => now()->subMonth()->startOfMonth(),
+                'period_end' => now()->subMonth()->endOfMonth(),
+                'call_charges' => rand(50, 500) . '.' . rand(10, 99),
+                'did_charges' => rand(5, 30) . '.00',
+                'tax_amount' => '0.0000',
+                'total_amount' => rand(60, 530) . '.' . rand(10, 99),
+                'status' => ['paid', 'paid', 'issued', 'draft'][array_rand(['paid', 'paid', 'issued', 'draft'])],
+                'due_date' => now()->subDays(rand(-15, 15)),
+                'paid_at' => rand(0, 1) ? now()->subDays(rand(1, 10)) : null,
+            ]);
+        }
 
         // ==========================================
         // Populate CDR Summary (for dashboard stats)
@@ -573,5 +496,10 @@ class DatabaseSeeder extends Seeder
                 total_reseller_cost = VALUES(total_reseller_cost),
                 updated_at = NOW()
         ");
+
+        $this->command->info('Seeded: ' . User::where('role', 'reseller')->count() . ' resellers');
+        $this->command->info('Seeded: ' . User::where('role', 'client')->count() . ' clients');
+        $this->command->info('Seeded: ' . SipAccount::count() . ' SIP accounts');
+        $this->command->info('Seeded: ' . CallRecord::count() . ' call records');
     }
 }

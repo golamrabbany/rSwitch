@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Traits\HasAuthorization;
+use App\Models\Traits\HasHierarchy;
+use App\Models\Traits\HasRoleHelpers;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -15,9 +18,10 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, HasRoles, Notifiable;
+    use HasRoleHelpers, HasHierarchy, HasAuthorization;
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'parent_id', 'status',
+        'name', 'email', 'password', 'role', 'parent_id', 'hierarchy_path', 'status',
         'kyc_status', 'kyc_verified_at', 'kyc_rejected_reason',
         'billing_type', 'credit_limit', 'balance', 'currency', 'rate_group_id',
         'min_balance_for_calls', 'low_balance_threshold',
@@ -146,11 +150,10 @@ class User extends Authenticatable
         }
 
         if ($user->isRegularAdmin() || $user->isRechargeAdmin()) {
-            // Admin/Recharge Admin sees only assigned resellers and their clients
-            $assignedResellerIds = $user->assignedResellers()->pluck('users.id')->toArray();
+            // Use cached assigned reseller IDs
+            $assignedResellerIds = $user->getCachedAssignedResellerIds();
 
             if (empty($assignedResellerIds)) {
-                // No assigned resellers - sees nothing except themselves
                 return $query->where('id', $user->id);
             }
 
@@ -168,198 +171,5 @@ class User extends Authenticatable
         }
 
         return $query->where('id', $user->id);
-    }
-
-    // --- Helpers ---
-
-    public function isSuperAdmin(): bool
-    {
-        return $this->role === 'super_admin';
-    }
-
-    /**
-     * Check if user has admin-level access (super_admin or admin).
-     */
-    public function isAdmin(): bool
-    {
-        return in_array($this->role, ['super_admin', 'admin']);
-    }
-
-    /**
-     * Check if user is a regular admin (not super admin).
-     */
-    public function isRegularAdmin(): bool
-    {
-        return $this->role === 'admin';
-    }
-
-    public function isReseller(): bool
-    {
-        return $this->role === 'reseller';
-    }
-
-    public function isClient(): bool
-    {
-        return $this->role === 'client';
-    }
-
-    public function isRechargeAdmin(): bool
-    {
-        return $this->role === 'recharge_admin';
-    }
-
-    public function isPrepaid(): bool
-    {
-        return $this->billing_type === 'prepaid';
-    }
-
-    /**
-     * Get all user IDs in this user's subtree.
-     * Super Admin: all users
-     * Admin/Recharge Admin: assigned resellers + their clients
-     * Reseller: self + clients
-     * Client: self only
-     */
-    public function descendantIds(): array
-    {
-        if ($this->isSuperAdmin()) {
-            return User::pluck('id')->all();
-        }
-
-        if ($this->isRegularAdmin() || $this->isRechargeAdmin()) {
-            $resellerIds = $this->assignedResellers()->pluck('users.id')->toArray();
-
-            if (empty($resellerIds)) {
-                return [$this->id];
-            }
-
-            $clientIds = User::whereIn('parent_id', $resellerIds)->pluck('id')->all();
-            return array_merge([$this->id], $resellerIds, $clientIds);
-        }
-
-        $ids = [$this->id];
-
-        if ($this->isReseller()) {
-            $clientIds = User::where('parent_id', $this->id)->pluck('id')->all();
-            $ids = array_merge($ids, $clientIds);
-        }
-
-        return $ids;
-    }
-
-    /**
-     * Get only client IDs (excludes self).
-     * Super Admin: all clients
-     * Admin/Recharge Admin: clients under assigned resellers
-     * Reseller: own clients
-     */
-    public function clientIds(): array
-    {
-        if ($this->isSuperAdmin()) {
-            return User::where('role', 'client')->pluck('id')->all();
-        }
-
-        if ($this->isRegularAdmin() || $this->isRechargeAdmin()) {
-            $resellerIds = $this->assignedResellers()->pluck('users.id')->toArray();
-
-            if (empty($resellerIds)) {
-                return [];
-            }
-
-            return User::whereIn('parent_id', $resellerIds)->where('role', 'client')->pluck('id')->all();
-        }
-
-        if ($this->isReseller()) {
-            return User::where('parent_id', $this->id)->where('role', 'client')->pluck('id')->all();
-        }
-
-        return [];
-    }
-
-    /**
-     * Check if this user can manage the given user.
-     * Super Admin: can manage anyone
-     * Admin: can manage assigned resellers and their clients
-     * Reseller: can manage own clients
-     * Client: can only manage self
-     */
-    public function canManage(User $target): bool
-    {
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
-
-        if ($this->isRegularAdmin()) {
-            // Cannot manage super admins or other admins
-            if ($target->isSuperAdmin() || $target->isRegularAdmin()) {
-                return false;
-            }
-
-            $assignedResellerIds = $this->assignedResellers()->pluck('users.id')->toArray();
-
-            // Can manage assigned resellers
-            if ($target->isReseller()) {
-                return in_array($target->id, $assignedResellerIds);
-            }
-
-            // Can manage clients under assigned resellers
-            if ($target->isClient()) {
-                return in_array($target->parent_id, $assignedResellerIds);
-            }
-
-            return false;
-        }
-
-        if ($this->isReseller() && $target->parent_id === $this->id) {
-            return true;
-        }
-
-        return $this->id === $target->id;
-    }
-
-    /**
-     * Check if this user can perform balance recharge/adjustment on the target user.
-     * Super Admin / Admin: same as canManage()
-     * Recharge Admin: can only recharge assigned resellers and their clients
-     */
-    public function canRechargeBalance(User $target): bool
-    {
-        if ($this->isSuperAdmin() || $this->isRegularAdmin()) {
-            return $this->canManage($target);
-        }
-
-        if ($this->isRechargeAdmin()) {
-            $assignedResellerIds = $this->assignedResellers()->pluck('users.id')->toArray();
-
-            if ($target->isReseller()) {
-                return in_array($target->id, $assignedResellerIds);
-            }
-
-            if ($target->isClient()) {
-                return in_array($target->parent_id, $assignedResellerIds);
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Get reseller IDs that this user can manage (for admin scoping).
-     */
-    public function managedResellerIds(): array
-    {
-        if ($this->isSuperAdmin()) {
-            return User::where('role', 'reseller')->pluck('id')->all();
-        }
-
-        if ($this->isRegularAdmin() || $this->isRechargeAdmin()) {
-            return $this->assignedResellers()->pluck('users.id')->toArray();
-        }
-
-        if ($this->isReseller()) {
-            return [$this->id];
-        }
-
-        return [];
     }
 }

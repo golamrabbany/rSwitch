@@ -17,7 +17,7 @@ class AdminOtpLoginController extends Controller
      */
     public function showLoginForm()
     {
-        if (Auth::check() && Auth::user()->role === 'admin') {
+        if (Auth::check() && Auth::user()->isAnyAdmin()) {
             return redirect()->route('admin.dashboard');
         }
 
@@ -44,7 +44,7 @@ class AdminOtpLoginController extends Controller
         }
 
         $user = User::where('email', $request->email)
-            ->where('role', 'admin')
+            ->whereIn('role', ['super_admin', 'admin', 'recharge_admin'])
             ->where('status', 'active')
             ->first();
 

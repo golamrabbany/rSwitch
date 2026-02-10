@@ -97,15 +97,14 @@ class UserController extends Controller
             'max_channels' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        // For non-super admins: validate they can create resellers/clients
+        // For non-super admins (Regular Admin): enforce scoping rules
         if (!$authUser->isSuperAdmin()) {
-            // Regular admins cannot create new resellers (they can only manage assigned ones)
-            if ($validated['role'] === 'reseller') {
-                abort(403, 'You can only manage existing assigned resellers.');
-            }
+            // For clients: parent_id (reseller) is REQUIRED and must be within assigned resellers
+            if ($validated['role'] === 'client') {
+                if (empty($validated['parent_id'])) {
+                    return back()->withErrors(['parent_id' => 'You must select a parent reseller for the client.'])->withInput();
+                }
 
-            // For clients, validate parent_id is within their assigned resellers
-            if ($validated['role'] === 'client' && !empty($validated['parent_id'])) {
                 $managedResellerIds = $authUser->managedResellerIds();
                 if (!in_array($validated['parent_id'], $managedResellerIds)) {
                     abort(403, 'You can only create clients under your assigned resellers.');
@@ -115,7 +114,7 @@ class UserController extends Controller
 
         // Super Admin is parent for resellers, selected reseller is parent for clients
         if ($validated['role'] === 'reseller') {
-            $validated['parent_id'] = auth()->id();
+            $validated['parent_id'] = null; // Resellers have no parent
         }
 
         $user = User::create([
@@ -133,6 +132,12 @@ class UserController extends Controller
         ]);
 
         $user->assignRole($validated['role']);
+
+        // Auto-assign newly created reseller to the Regular Admin who created them
+        if ($validated['role'] === 'reseller' && $authUser->isRegularAdmin()) {
+            $authUser->assignedResellers()->attach($user->id);
+            $authUser->clearHierarchyCache(); // Clear cache so new reseller is visible immediately
+        }
 
         AuditService::logCreated($user, 'user.created');
 
