@@ -99,6 +99,9 @@
     .nav-text {
         @apply text-gray-600;
     }
+    .nav-chevron {
+        @apply w-4 h-4 text-gray-400 transition-transform duration-200;
+    }
 
     /* Reseller theme (emerald) */
     .theme-reseller .nav-item:hover {
@@ -411,6 +414,9 @@
     .avatar-purple {
         @apply bg-purple-100 text-purple-700;
     }
+    .avatar-amber {
+        @apply bg-amber-100 text-amber-700;
+    }
     .user-name {
         @apply font-medium text-gray-900;
     }
@@ -439,6 +445,9 @@
     }
     .badge-blue {
         @apply bg-blue-50 text-blue-700;
+    }
+    .badge-amber {
+        @apply bg-amber-50 text-amber-700;
     }
 
     /* Action buttons in table */

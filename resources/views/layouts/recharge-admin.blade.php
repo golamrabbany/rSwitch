@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{{ config('app.name', 'rSwitch') }} - Recharge Admin</title>
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700&display=swap" rel="stylesheet" />
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+<body class="font-sans antialiased bg-gray-50">
+    <div class="min-h-screen flex">
+        <!-- Sidebar -->
+        <aside class="fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 -translate-x-full flex flex-col" id="sidebar">
+            <!-- Logo -->
+            <div class="flex items-center h-16 px-5 border-b border-gray-100">
+                <a href="{{ route('recharge-admin.dashboard') }}" class="flex items-center">
+                    <div class="w-9 h-9 bg-amber-600 rounded-lg flex items-center justify-center mr-3">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="text-lg font-bold text-gray-800">r<span class="text-amber-600">Switch</span></span>
+                        <p class="text-[10px] text-gray-400 -mt-1">Recharge Admin</p>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 px-3 py-4 overflow-y-auto">
+                <!-- Dashboard -->
+                <a href="{{ route('recharge-admin.dashboard') }}" class="nav-item {{ request()->routeIs('recharge-admin.dashboard') ? 'active' : 'text-gray-600' }}">
+                    <svg class="nav-icon {{ request()->routeIs('recharge-admin.dashboard') ? 'text-amber-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                    </svg>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+
+                <div class="my-3 border-t border-gray-100"></div>
+
+                <!-- Balance Adjustment (Main Feature) -->
+                <a href="{{ route('recharge-admin.balance.create') }}" class="nav-item {{ request()->routeIs('recharge-admin.balance.*') ? 'active bg-amber-50' : 'text-gray-600' }}">
+                    <svg class="nav-icon {{ request()->routeIs('recharge-admin.balance.*') ? 'text-amber-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                    <span class="nav-text font-medium">Balance Adjustment</span>
+                </a>
+
+                <div class="my-3 border-t border-gray-100"></div>
+
+                <p class="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">View Only</p>
+
+                <!-- Users -->
+                <a href="{{ route('recharge-admin.users.index') }}" class="nav-item {{ request()->routeIs('recharge-admin.users.*') ? 'active' : 'text-gray-600' }}">
+                    <svg class="nav-icon {{ request()->routeIs('recharge-admin.users.*') ? 'text-amber-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    <span class="nav-text">Users</span>
+                </a>
+
+                <!-- SIP Accounts -->
+                <a href="{{ route('recharge-admin.sip-accounts.index') }}" class="nav-item {{ request()->routeIs('recharge-admin.sip-accounts.*') ? 'active' : 'text-gray-600' }}">
+                    <svg class="nav-icon {{ request()->routeIs('recharge-admin.sip-accounts.*') ? 'text-amber-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                    </svg>
+                    <span class="nav-text">SIP Accounts</span>
+                </a>
+
+                <!-- DIDs -->
+                <a href="{{ route('recharge-admin.dids.index') }}" class="nav-item {{ request()->routeIs('recharge-admin.dids.*') ? 'active' : 'text-gray-600' }}">
+                    <svg class="nav-icon {{ request()->routeIs('recharge-admin.dids.*') ? 'text-amber-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                    </svg>
+                    <span class="nav-text">DIDs</span>
+                </a>
+
+                <!-- CDR -->
+                <a href="{{ route('recharge-admin.cdr.index') }}" class="nav-item {{ request()->routeIs('recharge-admin.cdr.*') ? 'active' : 'text-gray-600' }}">
+                    <svg class="nav-icon {{ request()->routeIs('recharge-admin.cdr.*') ? 'text-amber-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span class="nav-text">CDR / Reports</span>
+                </a>
+
+                <!-- Transactions -->
+                <a href="{{ route('recharge-admin.transactions.index') }}" class="nav-item {{ request()->routeIs('recharge-admin.transactions.*') ? 'active' : 'text-gray-600' }}">
+                    <svg class="nav-icon {{ request()->routeIs('recharge-admin.transactions.*') ? 'text-amber-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                    </svg>
+                    <span class="nav-text">Transactions</span>
+                </a>
+            </nav>
+
+            <!-- Sidebar Footer -->
+            <div class="p-4 border-t border-gray-100">
+                <div class="flex items-center px-2 py-2 text-xs text-gray-400">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Recharge Admin Panel
+                </div>
+            </div>
+        </aside>
+
+        <!-- Mobile Overlay -->
+        <div class="fixed inset-0 bg-black/50 z-40 lg:hidden hidden" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+        <!-- Main Content -->
+        <div class="flex-1 lg:ml-64">
+            <!-- Top Header -->
+            <header class="sticky top-0 z-30 bg-white border-b border-gray-200">
+                <div class="flex items-center justify-between h-16 px-4 lg:px-6">
+                    <!-- Left Side -->
+                    <div class="flex items-center">
+                        <button class="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 mr-3" onclick="toggleSidebar()">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            </svg>
+                        </button>
+                        @if (isset($header))
+                            <h2 class="text-lg font-semibold text-gray-800">{{ $header }}</h2>
+                        @endif
+                    </div>
+
+                    <!-- Right Side -->
+                    <div class="flex items-center space-x-3">
+                        <!-- User Dropdown -->
+                        <div class="relative" x-data="{ open: false }">
+                            <button @click="open = !open" class="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                                <div class="w-8 h-8 rounded-full bg-amber-600 flex items-center justify-center">
+                                    <span class="text-white font-semibold text-sm">{{ substr(auth()->user()->name, 0, 1) }}</span>
+                                </div>
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div x-show="open"
+                                 @click.away="open = false"
+                                 x-transition:enter="transition ease-out duration-100"
+                                 x-transition:enter-start="transform opacity-0 scale-95"
+                                 x-transition:enter-end="transform opacity-100 scale-100"
+                                 x-transition:leave="transition ease-in duration-75"
+                                 x-transition:leave-start="transform opacity-100 scale-100"
+                                 x-transition:leave-end="transform opacity-0 scale-95"
+                                 class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                                <div class="px-4 py-3 border-b border-gray-100">
+                                    <p class="text-sm font-medium text-gray-800">{{ auth()->user()->name }}</p>
+                                    <p class="text-xs text-gray-500">{{ auth()->user()->email }}</p>
+                                    <span class="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                        Recharge Admin
+                                    </span>
+                                </div>
+                                <a href="{{ route('profile') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <svg class="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                    My Profile
+                                </a>
+                                <div class="border-t border-gray-100 mt-2 pt-2">
+                                    <form method="POST" action="{{ route('logout') }}">
+                                        @csrf
+                                        <button type="submit" class="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                            </svg>
+                                            Logout
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <main class="p-4 lg:p-6">
+                @if(session('success'))
+                    <div class="mb-6 flash-message flash-success" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" x-transition>
+                        <div class="flash-icon">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </div>
+                        <div class="flash-content">
+                            <p class="flash-title">Success</p>
+                            <p class="flash-text">{{ session('success') }}</p>
+                        </div>
+                        <button @click="show = false" class="flash-close">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                @endif
+
+                @if(session('error'))
+                    <div class="mb-6 flash-message flash-error" x-data="{ show: true }" x-show="show" x-transition>
+                        <div class="flash-icon">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </div>
+                        <div class="flash-content">
+                            <p class="flash-title">Error</p>
+                            <p class="flash-text">{{ session('error') }}</p>
+                        </div>
+                        <button @click="show = false" class="flash-close">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                @endif
+
+                @if($errors->any())
+                    <div class="mb-6 flash-message flash-error" x-data="{ show: true }" x-show="show" x-transition>
+                        <div class="flash-icon">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div class="flash-content flex-1">
+                            <p class="flash-title">Please fix the following errors</p>
+                            <ul class="flash-list">
+                                @foreach($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        <button @click="show = false" class="flash-close">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                @endif
+
+                {{ $slot }}
+            </main>
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hidden');
+        }
+    </script>
+</body>
+</html>

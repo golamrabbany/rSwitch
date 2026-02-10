@@ -40,6 +40,38 @@
 
                 <div class="my-3 border-t border-gray-100"></div>
 
+                @php $isSuperAdmin = auth()->user()->isSuperAdmin(); @endphp
+
+                <!-- Admin Management Menu (Super Admin Only) -->
+                @if($isSuperAdmin)
+                    @php
+                        $adminMgmtActive = request()->routeIs('admin.super-admins.*', 'admin.admins.*', 'admin.recharge-admins.*');
+                        $isSuperAdminSection = request()->routeIs('admin.super-admins.*');
+                        $isAdminSection = request()->routeIs('admin.admins.*');
+                        $isRechargeAdminSection = request()->routeIs('admin.recharge-admins.*');
+                    @endphp
+                    <div x-data="{ open: {{ $adminMgmtActive ? 'true' : 'false' }} }" class="mb-1">
+                        <button @click="open = !open" class="nav-parent {{ $adminMgmtActive ? 'has-active' : 'text-gray-600' }}">
+                            <div class="flex items-center">
+                                <svg class="nav-icon {{ $adminMgmtActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                                </svg>
+                                <span class="nav-text">Admin Management</span>
+                            </div>
+                            <svg class="nav-chevron" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div x-show="open" x-collapse class="nav-children">
+                            <a href="{{ route('admin.super-admins.index') }}" class="nav-child {{ $isSuperAdminSection ? 'active' : 'text-gray-500' }}">Super Admins</a>
+                            <a href="{{ route('admin.admins.index') }}" class="nav-child {{ $isAdminSection ? 'active' : 'text-gray-500' }}">Regular Admins</a>
+                            <a href="{{ route('admin.recharge-admins.index') }}" class="nav-child {{ $isRechargeAdminSection ? 'active' : 'text-gray-500' }}">Recharge Admins</a>
+                        </div>
+                    </div>
+
+                    <div class="my-3 border-t border-gray-100"></div>
+                @endif
+
                 <!-- Accounts Menu -->
                 @php
                     $usersActive = request()->routeIs('admin.users.*', 'admin.kyc.*');
@@ -74,7 +106,12 @@
                 </div>
 
                 <!-- Telecom Menu -->
-                @php $telecomActive = request()->routeIs('admin.sip-accounts.*', 'admin.trunks.*', 'admin.trunk-routes.*', 'admin.dids.*', 'admin.ring-groups.*', 'admin.rate-groups.*'); @endphp
+                @php
+                    $telecomActive = request()->routeIs('admin.sip-accounts.*', 'admin.dids.*', 'admin.ring-groups.*');
+                    if ($isSuperAdmin) {
+                        $telecomActive = $telecomActive || request()->routeIs('admin.trunks.*', 'admin.trunk-routes.*', 'admin.rate-groups.*');
+                    }
+                @endphp
                 <div x-data="{ open: {{ $telecomActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $telecomActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
@@ -89,11 +126,15 @@
                     </button>
                     <div x-show="open" x-collapse class="nav-children">
                         <a href="{{ route('admin.sip-accounts.index') }}" class="nav-child {{ request()->routeIs('admin.sip-accounts.*') ? 'active' : 'text-gray-500' }}">SIP Accounts</a>
-                        <a href="{{ route('admin.trunks.index') }}" class="nav-child {{ request()->routeIs('admin.trunks.*') ? 'active' : 'text-gray-500' }}">Trunks</a>
-                        <a href="{{ route('admin.trunk-routes.index') }}" class="nav-child {{ request()->routeIs('admin.trunk-routes.*') ? 'active' : 'text-gray-500' }}">Routing Rules</a>
+                        @if($isSuperAdmin)
+                            <a href="{{ route('admin.trunks.index') }}" class="nav-child {{ request()->routeIs('admin.trunks.*') ? 'active' : 'text-gray-500' }}">Trunks</a>
+                            <a href="{{ route('admin.trunk-routes.index') }}" class="nav-child {{ request()->routeIs('admin.trunk-routes.*') ? 'active' : 'text-gray-500' }}">Routing Rules</a>
+                        @endif
                         <a href="{{ route('admin.dids.index') }}" class="nav-child {{ request()->routeIs('admin.dids.*') ? 'active' : 'text-gray-500' }}">DIDs</a>
                         <a href="{{ route('admin.ring-groups.index') }}" class="nav-child {{ request()->routeIs('admin.ring-groups.*') ? 'active' : 'text-gray-500' }}">Ring Groups</a>
-                        <a href="{{ route('admin.rate-groups.index') }}" class="nav-child {{ request()->routeIs('admin.rate-groups.*') ? 'active' : 'text-gray-500' }}">Rates</a>
+                        @if($isSuperAdmin)
+                            <a href="{{ route('admin.rate-groups.index') }}" class="nav-child {{ request()->routeIs('admin.rate-groups.*') ? 'active' : 'text-gray-500' }}">Rates</a>
+                        @endif
                     </div>
                 </div>
 
@@ -152,29 +193,31 @@
                     </div>
                 </div>
 
-                <!-- System Menu -->
-                @php $systemActive = request()->routeIs('admin.audit-logs.*', 'admin.blacklist.*', 'admin.whitelist.*', 'admin.webhooks.*', 'admin.settings.*', 'admin.bulk-import.*'); @endphp
-                <div x-data="{ open: {{ $systemActive ? 'true' : 'false' }} }" class="mb-1">
-                    <button @click="open = !open" class="nav-parent {{ $systemActive ? 'has-active' : 'text-gray-600' }}">
-                        <div class="flex items-center">
-                            <svg class="nav-icon {{ $systemActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <!-- System Menu (Super Admin Only) -->
+                @if($isSuperAdmin)
+                    @php $systemActive = request()->routeIs('admin.audit-logs.*', 'admin.blacklist.*', 'admin.whitelist.*', 'admin.webhooks.*', 'admin.settings.*', 'admin.bulk-import.*', 'admin.transfer-logs.*', 'admin.rate-imports.*'); @endphp
+                    <div x-data="{ open: {{ $systemActive ? 'true' : 'false' }} }" class="mb-1">
+                        <button @click="open = !open" class="nav-parent {{ $systemActive ? 'has-active' : 'text-gray-600' }}">
+                            <div class="flex items-center">
+                                <svg class="nav-icon {{ $systemActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                <span class="nav-text">System</span>
+                            </div>
+                            <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
-                            <span class="nav-text">System</span>
+                        </button>
+                        <div x-show="open" x-collapse class="nav-children">
+                            <a href="{{ route('admin.audit-logs.index') }}" class="nav-child {{ request()->routeIs('admin.audit-logs.*') ? 'active' : 'text-gray-500' }}">Audit Logs</a>
+                            <a href="{{ route('admin.blacklist.index') }}" class="nav-child {{ request()->routeIs('admin.blacklist.*') ? 'active' : 'text-gray-500' }}">Destination Lists</a>
+                            <a href="{{ route('admin.webhooks.index') }}" class="nav-child {{ request()->routeIs('admin.webhooks.*') ? 'active' : 'text-gray-500' }}">Webhooks</a>
+                            <a href="{{ route('admin.bulk-import.index') }}" class="nav-child {{ request()->routeIs('admin.bulk-import.*') ? 'active' : 'text-gray-500' }}">Bulk Import</a>
+                            <a href="{{ route('admin.settings.index') }}" class="nav-child {{ request()->routeIs('admin.settings.*') ? 'active' : 'text-gray-500' }}">System Settings</a>
                         </div>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </button>
-                    <div x-show="open" x-collapse class="nav-children">
-                        <a href="{{ route('admin.audit-logs.index') }}" class="nav-child {{ request()->routeIs('admin.audit-logs.*') ? 'active' : 'text-gray-500' }}">Audit Logs</a>
-                        <a href="{{ route('admin.blacklist.index') }}" class="nav-child {{ request()->routeIs('admin.blacklist.*') ? 'active' : 'text-gray-500' }}">Destination Lists</a>
-                        <a href="{{ route('admin.webhooks.index') }}" class="nav-child {{ request()->routeIs('admin.webhooks.*') ? 'active' : 'text-gray-500' }}">Webhooks</a>
-                        <a href="{{ route('admin.bulk-import.index') }}" class="nav-child {{ request()->routeIs('admin.bulk-import.*') ? 'active' : 'text-gray-500' }}">Bulk Import</a>
-                        <a href="{{ route('admin.settings.index') }}" class="nav-child {{ request()->routeIs('admin.settings.*') ? 'active' : 'text-gray-500' }}">System Settings</a>
                     </div>
-                </div>
+                @endif
             </nav>
 
             <!-- Sidebar Footer -->

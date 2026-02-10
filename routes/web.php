@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\Client;
+use App\Http\Controllers\RechargeAdmin;
 use App\Http\Controllers\Reseller;
 use App\Http\Controllers\Webhook;
 use App\Http\Controllers\KycSubmissionController;
@@ -23,7 +24,8 @@ Route::post('admin/logout', [Admin\AdminOtpLoginController::class, 'logout'])->m
 // Role-based dashboard redirect
 Route::get('dashboard', function () {
     return match (auth()->user()->role) {
-        'admin' => redirect()->route('admin.dashboard'),
+        'super_admin', 'admin' => redirect()->route('admin.dashboard'),
+        'recharge_admin' => redirect()->route('recharge-admin.dashboard'),
         'reseller' => redirect()->route('reseller.dashboard'),
         'client' => redirect()->route('client.dashboard'),
     };
@@ -33,62 +35,28 @@ Route::view('profile', 'profile')
     ->middleware(['auth'])
     ->name('profile');
 
-// Admin routes
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->group(function () {
-    Route::get('dashboard', Admin\DashboardController::class)->name('dashboard');
+// Super Admin ONLY routes (global system features)
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:super_admin'])->group(function () {
+    // Super Admin Management
+    Route::resource('super-admins', Admin\SuperAdminController::class);
 
-    Route::resource('users', Admin\UserController::class);
-    Route::post('users/{user}/toggle-status', [Admin\UserController::class, 'toggleStatus'])->name('users.toggle-status');
-    Route::post('users/{user}/adjust-balance', [Admin\UserController::class, 'adjustBalance'])->name('users.adjust-balance');
+    // Regular Admin Management
+    Route::resource('admins', Admin\AdminAssignmentController::class);
 
-    Route::get('kyc', [Admin\KycController::class, 'index'])->name('kyc.index');
-    Route::get('kyc/{kycProfile}', [Admin\KycController::class, 'show'])->name('kyc.show');
-    Route::post('kyc/{kycProfile}/approve', [Admin\KycController::class, 'approve'])->name('kyc.approve');
-    Route::post('kyc/{kycProfile}/reject', [Admin\KycController::class, 'reject'])->name('kyc.reject');
+    // Recharge Admin Management
+    Route::resource('recharge-admins', Admin\RechargeAdminController::class);
 
-    Route::resource('sip-accounts', Admin\SipAccountController::class);
-    Route::post('sip-accounts/{sip_account}/reprovision', [Admin\SipAccountController::class, 'reprovision'])->name('sip-accounts.reprovision');
-    Route::get('sip-accounts-export', [Admin\SipAccountController::class, 'export'])->name('sip-accounts.export');
-    Route::get('sip-accounts-import', [Admin\SipAccountController::class, 'importForm'])->name('sip-accounts.import-form');
-    Route::post('sip-accounts-import', [Admin\SipAccountController::class, 'import'])->name('sip-accounts.import');
-
+    // Trunks & Routing (global system)
     Route::resource('trunks', Admin\TrunkController::class);
     Route::post('trunks/{trunk}/reprovision', [Admin\TrunkController::class, 'reprovision'])->name('trunks.reprovision');
-
     Route::post('trunk-routes/test', [Admin\TrunkRouteController::class, 'testRoute'])->name('trunk-routes.test');
     Route::resource('trunk-routes', Admin\TrunkRouteController::class)->except(['show']);
 
-    Route::resource('ring-groups', Admin\RingGroupController::class);
-    Route::resource('dids', Admin\DidController::class);
-
+    // Rate Groups & Rates (global system)
     Route::resource('rate-groups', Admin\RateGroupController::class);
     Route::get('rate-groups/{rate_group}/export', [Admin\RateGroupController::class, 'exportCsv'])->name('rate-groups.export');
     Route::post('rate-groups/{rate_group}/import', [Admin\RateGroupController::class, 'importCsv'])->name('rate-groups.import');
     Route::resource('rate-groups.rates', Admin\RateController::class)->except(['index']);
-
-    Route::get('cdr', [Admin\CdrController::class, 'index'])->name('cdr.index');
-    Route::get('cdr/export', [Admin\CdrController::class, 'export'])->name('cdr.export');
-    Route::get('cdr/{uuid}', [Admin\CdrController::class, 'show'])->name('cdr.show');
-
-    // Operational Reports
-    Route::get('operational-reports', [Admin\OperationalReportController::class, 'index'])->name('operational-reports.index');
-    Route::get('operational-reports/active', [Admin\OperationalReportController::class, 'activeCalls'])->name('operational-reports.active');
-    Route::get('operational-reports/inbound', [Admin\OperationalReportController::class, 'inboundCalls'])->name('operational-reports.inbound');
-    Route::get('operational-reports/outbound', [Admin\OperationalReportController::class, 'outboundCalls'])->name('operational-reports.outbound');
-    Route::get('operational-reports/summary', [Admin\OperationalReportController::class, 'summaryCalls'])->name('operational-reports.summary');
-
-    // Financial management
-    Route::get('transactions', [Admin\TransactionController::class, 'index'])->name('transactions.index');
-    Route::get('transactions/{transaction}', [Admin\TransactionController::class, 'show'])->name('transactions.show');
-
-    Route::get('balance/create', [Admin\BalanceController::class, 'create'])->name('balance.create');
-    Route::post('balance', [Admin\BalanceController::class, 'store'])->middleware('throttle:30,1')->name('balance.store');
-
-    Route::resource('invoices', Admin\InvoiceController::class)->only(['index', 'create', 'store', 'show', 'update']);
-    Route::get('invoices/{invoice}/pdf', [Admin\InvoiceController::class, 'pdf'])->name('invoices.pdf');
-
-    Route::get('payments', [Admin\PaymentController::class, 'index'])->name('payments.index');
-    Route::get('payments/{payment}', [Admin\PaymentController::class, 'show'])->name('payments.show');
 
     // Audit logs
     Route::get('audit-logs', [Admin\AuditLogController::class, 'index'])->name('audit-logs.index');
@@ -119,6 +87,78 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::post('bulk-import/users', [Admin\BulkImportController::class, 'importUsers'])->name('bulk-import.users');
     Route::post('bulk-import/sip-accounts', [Admin\BulkImportController::class, 'importSipAccounts'])->name('bulk-import.sip-accounts');
     Route::post('bulk-import/dids', [Admin\BulkImportController::class, 'importDids'])->name('bulk-import.dids');
+});
+
+// Admin routes (both super_admin and admin) - scoped to assigned resellers for regular admins
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->group(function () {
+    Route::get('dashboard', Admin\DashboardController::class)->name('dashboard');
+
+    Route::resource('users', Admin\UserController::class);
+    Route::post('users/{user}/toggle-status', [Admin\UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::post('users/{user}/adjust-balance', [Admin\UserController::class, 'adjustBalance'])->name('users.adjust-balance');
+
+    Route::get('kyc', [Admin\KycController::class, 'index'])->name('kyc.index');
+    Route::get('kyc/{kycProfile}', [Admin\KycController::class, 'show'])->name('kyc.show');
+    Route::post('kyc/{kycProfile}/approve', [Admin\KycController::class, 'approve'])->name('kyc.approve');
+    Route::post('kyc/{kycProfile}/reject', [Admin\KycController::class, 'reject'])->name('kyc.reject');
+
+    Route::resource('sip-accounts', Admin\SipAccountController::class);
+    Route::post('sip-accounts/{sip_account}/reprovision', [Admin\SipAccountController::class, 'reprovision'])->name('sip-accounts.reprovision');
+    Route::get('sip-accounts-export', [Admin\SipAccountController::class, 'export'])->name('sip-accounts.export');
+    Route::get('sip-accounts-import', [Admin\SipAccountController::class, 'importForm'])->name('sip-accounts.import-form');
+    Route::post('sip-accounts-import', [Admin\SipAccountController::class, 'import'])->name('sip-accounts.import');
+
+    Route::resource('ring-groups', Admin\RingGroupController::class);
+    Route::resource('dids', Admin\DidController::class);
+
+    Route::get('cdr', [Admin\CdrController::class, 'index'])->name('cdr.index');
+    Route::get('cdr/export', [Admin\CdrController::class, 'export'])->name('cdr.export');
+    Route::get('cdr/{uuid}', [Admin\CdrController::class, 'show'])->name('cdr.show');
+
+    // Operational Reports
+    Route::get('operational-reports', [Admin\OperationalReportController::class, 'index'])->name('operational-reports.index');
+    Route::get('operational-reports/active', [Admin\OperationalReportController::class, 'activeCalls'])->name('operational-reports.active');
+    Route::get('operational-reports/inbound', [Admin\OperationalReportController::class, 'inboundCalls'])->name('operational-reports.inbound');
+    Route::get('operational-reports/outbound', [Admin\OperationalReportController::class, 'outboundCalls'])->name('operational-reports.outbound');
+    Route::get('operational-reports/summary', [Admin\OperationalReportController::class, 'summaryCalls'])->name('operational-reports.summary');
+
+    // Financial management (scoped)
+    Route::get('transactions', [Admin\TransactionController::class, 'index'])->name('transactions.index');
+    Route::get('transactions/{transaction}', [Admin\TransactionController::class, 'show'])->name('transactions.show');
+
+    Route::get('balance/create', [Admin\BalanceController::class, 'create'])->name('balance.create');
+    Route::post('balance', [Admin\BalanceController::class, 'store'])->middleware('throttle:30,1')->name('balance.store');
+
+    Route::resource('invoices', Admin\InvoiceController::class)->only(['index', 'create', 'store', 'show', 'update']);
+    Route::get('invoices/{invoice}/pdf', [Admin\InvoiceController::class, 'pdf'])->name('invoices.pdf');
+
+    Route::get('payments', [Admin\PaymentController::class, 'index'])->name('payments.index');
+    Route::get('payments/{payment}', [Admin\PaymentController::class, 'show'])->name('payments.show');
+});
+
+// Recharge Admin routes (view-only access + balance operations)
+Route::prefix('recharge-admin')->name('recharge-admin.')->middleware(['auth', 'role:recharge_admin'])->group(function () {
+    Route::get('dashboard', RechargeAdmin\DashboardController::class)->name('dashboard');
+
+    // Balance operations - THE ONLY WRITE OPERATIONS for recharge admin
+    Route::get('balance/create', [RechargeAdmin\BalanceController::class, 'create'])->name('balance.create');
+    Route::post('balance', [RechargeAdmin\BalanceController::class, 'store'])->name('balance.store');
+
+    // View-only routes (GET only)
+    Route::get('users', [RechargeAdmin\UserController::class, 'index'])->name('users.index');
+    Route::get('users/{user}', [RechargeAdmin\UserController::class, 'show'])->name('users.show');
+
+    Route::get('sip-accounts', [RechargeAdmin\SipAccountController::class, 'index'])->name('sip-accounts.index');
+    Route::get('sip-accounts/{sipAccount}', [RechargeAdmin\SipAccountController::class, 'show'])->name('sip-accounts.show');
+
+    Route::get('dids', [RechargeAdmin\DidController::class, 'index'])->name('dids.index');
+    Route::get('dids/{did}', [RechargeAdmin\DidController::class, 'show'])->name('dids.show');
+
+    Route::get('cdr', [RechargeAdmin\CdrController::class, 'index'])->name('cdr.index');
+    Route::get('cdr/{uuid}', [RechargeAdmin\CdrController::class, 'show'])->name('cdr.show');
+
+    Route::get('transactions', [RechargeAdmin\TransactionController::class, 'index'])->name('transactions.index');
+    Route::get('transactions/{transaction}', [RechargeAdmin\TransactionController::class, 'show'])->name('transactions.show');
 });
 
 // Reseller routes

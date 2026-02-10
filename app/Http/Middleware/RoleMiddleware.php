@@ -10,7 +10,19 @@ class RoleMiddleware
 {
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        if (! $request->user() || ! in_array($request->user()->role, $roles)) {
+        $user = $request->user();
+
+        if (! $user) {
+            abort(403, 'Unauthorized.');
+        }
+
+        // Super admin can access any admin-level routes
+        if ($user->isSuperAdmin() && in_array('admin', $roles)) {
+            return $next($request);
+        }
+
+        // Check if user's role matches any of the allowed roles
+        if (! in_array($user->role, $roles)) {
             abort(403, 'Unauthorized.');
         }
 

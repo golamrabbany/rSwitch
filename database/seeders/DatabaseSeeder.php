@@ -28,7 +28,19 @@ class DatabaseSeeder extends Seeder
         // Seed roles and permissions first
         $this->call(RolePermissionSeeder::class);
 
-        // Create admin user
+        // Create super admin user (full system access)
+        $superAdmin = User::create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@rswitch.local',
+            'password' => Hash::make('password'),
+            'role' => 'super_admin',
+            'status' => 'active',
+            'kyc_status' => 'approved',
+            'billing_type' => 'postpaid',
+        ]);
+        $superAdmin->assignRole('super_admin');
+
+        // Create regular admin user (for demo - limited to assigned resellers)
         $admin = User::create([
             'name' => 'Admin',
             'email' => 'admin@rswitch.local',
@@ -45,16 +57,16 @@ class DatabaseSeeder extends Seeder
             'name' => 'Default',
             'description' => 'Default rate group',
             'type' => 'admin',
-            'created_by' => $admin->id,
+            'created_by' => $superAdmin->id,
         ]);
 
-        // Create demo reseller
+        // Create demo reseller (parent is super_admin)
         $reseller = User::create([
             'name' => 'Demo Reseller',
             'email' => 'reseller@rswitch.local',
             'password' => Hash::make('password'),
             'role' => 'reseller',
-            'parent_id' => $admin->id,
+            'parent_id' => $superAdmin->id,
             'status' => 'active',
             'kyc_status' => 'approved',
             'billing_type' => 'prepaid',
@@ -62,6 +74,9 @@ class DatabaseSeeder extends Seeder
             'rate_group_id' => $rateGroup->id,
         ]);
         $reseller->assignRole('reseller');
+
+        // Assign the demo reseller to the regular admin
+        $admin->assignedResellers()->attach($reseller->id);
 
         // Create demo client under reseller
         $client = User::create([
@@ -88,7 +103,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'kyc.reseller1@rswitch.local',
             'password' => Hash::make('password'),
             'role' => 'reseller',
-            'parent_id' => $admin->id,
+            'parent_id' => $superAdmin->id,
             'status' => 'active',
             'kyc_status' => 'pending',
             'billing_type' => 'prepaid',
@@ -120,7 +135,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'kyc.reseller2@rswitch.local',
             'password' => Hash::make('password'),
             'role' => 'reseller',
-            'parent_id' => $admin->id,
+            'parent_id' => $superAdmin->id,
             'status' => 'active',
             'kyc_status' => 'pending',
             'billing_type' => 'prepaid',
@@ -204,7 +219,7 @@ class DatabaseSeeder extends Seeder
             'id_expiry_date' => now()->subMonths(6),
             'submitted_at' => now()->subDays(3),
             'reviewed_at' => now()->subDays(2),
-            'reviewed_by' => $admin->id,
+            'reviewed_by' => $superAdmin->id,
         ]);
 
         // Add sample KYC documents (without actual files, just metadata)
@@ -258,9 +273,9 @@ class DatabaseSeeder extends Seeder
         // Seed system settings
         SystemSetting::seedDefaults();
 
-        // Create sample webhook endpoint for admin
+        // Create sample webhook endpoint for super admin
         WebhookEndpoint::create([
-            'user_id' => $admin->id,
+            'user_id' => $superAdmin->id,
             'url' => 'https://example.com/webhooks/rswitch',
             'secret' => Str::random(32),
             'events' => ['call.completed', 'call.failed', 'payment.received', 'balance.low'],
@@ -478,7 +493,7 @@ class DatabaseSeeder extends Seeder
             'amount' => '500.0000',
             'balance_after' => '500.0000',
             'description' => 'Initial top-up',
-            'created_by' => $admin->id,
+            'created_by' => $superAdmin->id,
             'created_at' => now()->subDays(30),
         ]);
 
@@ -488,7 +503,7 @@ class DatabaseSeeder extends Seeder
             'amount' => '500.0000',
             'balance_after' => '1000.0000',
             'description' => 'Monthly top-up',
-            'created_by' => $admin->id,
+            'created_by' => $superAdmin->id,
             'created_at' => now()->subDays(15),
         ]);
 

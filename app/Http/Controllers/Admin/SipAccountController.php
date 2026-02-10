@@ -18,11 +18,21 @@ class SipAccountController extends Controller
 
     public function index(Request $request)
     {
+        $authUser = auth()->user();
         $query = SipAccount::with('user');
+
+        // Apply scoping for non-super admins
+        if (!$authUser->isSuperAdmin()) {
+            $query->whereIn('user_id', $authUser->descendantIds());
+        }
 
         // Filter by reseller (show SIP accounts of reseller and their clients)
         if ($request->filled('reseller_id')) {
             $resellerId = $request->reseller_id;
+            // Validate reseller is within scope for non-super admins
+            if (!$authUser->isSuperAdmin() && !in_array($resellerId, $authUser->managedResellerIds())) {
+                abort(403);
+            }
             $clientIds = User::where('parent_id', $resellerId)->pluck('id')->toArray();
             $query->whereIn('user_id', array_merge([$resellerId], $clientIds));
         }
@@ -47,20 +57,29 @@ class SipAccountController extends Controller
 
         $sipAccounts = $query->orderByDesc('created_at')->paginate(20);
 
-        // Get resellers and clients for filters
-        $resellers = User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email']);
-        $clients = User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email', 'parent_id']);
+        // Get resellers and clients for filters (scoped for non-super admins)
+        $resellerQuery = User::where('role', 'reseller')->orderBy('name');
+        $clientQuery = User::where('role', 'client')->orderBy('name');
+        if (!$authUser->isSuperAdmin()) {
+            $resellerQuery->whereIn('id', $authUser->managedResellerIds());
+            $clientQuery->whereIn('id', $authUser->clientIds());
+        }
+        $resellers = $resellerQuery->get(['id', 'name', 'email']);
+        $clients = $clientQuery->get(['id', 'name', 'email', 'parent_id']);
 
         return view('admin.sip-accounts.index', compact('sipAccounts', 'resellers', 'clients'));
     }
 
     public function create(Request $request)
     {
-        // Only clients can have SIP accounts, not resellers
-        $users = User::where('role', 'client')
-            ->active()
-            ->orderBy('name')
-            ->get();
+        $authUser = auth()->user();
+
+        // Only clients can have SIP accounts (scoped for non-super admins)
+        $userQuery = User::where('role', 'client')->active()->orderBy('name');
+        if (!$authUser->isSuperAdmin()) {
+            $userQuery->whereIn('id', $authUser->clientIds());
+        }
+        $users = $userQuery->get();
 
         $selectedUserId = $request->query('user_id');
 
@@ -69,8 +88,14 @@ class SipAccountController extends Controller
 
     public function store(Request $request)
     {
-        // Get only client IDs for validation
-        $clientIds = User::where('role', 'client')->pluck('id')->toArray();
+        $authUser = auth()->user();
+
+        // Get only client IDs for validation (scoped for non-super admins)
+        $clientQuery = User::where('role', 'client');
+        if (!$authUser->isSuperAdmin()) {
+            $clientQuery->whereIn('id', $authUser->clientIds());
+        }
+        $clientIds = $clientQuery->pluck('id')->toArray();
 
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
@@ -97,6 +122,8 @@ class SipAccountController extends Controller
 
     public function show(SipAccount $sipAccount)
     {
+        $this->authorizeAccess($sipAccount);
+
         $sipAccount->load('user');
 
         // Check if provisioned in Asterisk
@@ -107,19 +134,32 @@ class SipAccountController extends Controller
 
     public function edit(SipAccount $sipAccount)
     {
-        // Only clients can own SIP accounts
-        $users = User::where('role', 'client')
-            ->active()
-            ->orderBy('name')
-            ->get();
+        $this->authorizeAccess($sipAccount);
+
+        $authUser = auth()->user();
+
+        // Only clients can own SIP accounts (scoped for non-super admins)
+        $userQuery = User::where('role', 'client')->active()->orderBy('name');
+        if (!$authUser->isSuperAdmin()) {
+            $userQuery->whereIn('id', $authUser->clientIds());
+        }
+        $users = $userQuery->get();
 
         return view('admin.sip-accounts.edit', compact('sipAccount', 'users'));
     }
 
     public function update(Request $request, SipAccount $sipAccount)
     {
-        // Get only client IDs for validation
-        $clientIds = User::where('role', 'client')->pluck('id')->toArray();
+        $this->authorizeAccess($sipAccount);
+
+        $authUser = auth()->user();
+
+        // Get only client IDs for validation (scoped for non-super admins)
+        $clientQuery = User::where('role', 'client');
+        if (!$authUser->isSuperAdmin()) {
+            $clientQuery->whereIn('id', $authUser->clientIds());
+        }
+        $clientIds = $clientQuery->pluck('id')->toArray();
 
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
@@ -157,6 +197,8 @@ class SipAccountController extends Controller
 
     public function destroy(SipAccount $sipAccount)
     {
+        $this->authorizeAccess($sipAccount);
+
         $username = $sipAccount->username;
 
         // Deprovision from Asterisk first
@@ -168,6 +210,24 @@ class SipAccountController extends Controller
 
         return redirect()->route('admin.sip-accounts.index')
             ->with('success', "SIP account {$username} deleted and deprovisioned.");
+    }
+
+    /**
+     * Authorize access to a SIP account for non-super admins.
+     */
+    private function authorizeAccess(SipAccount $sipAccount): void
+    {
+        $authUser = auth()->user();
+
+        if ($authUser->isSuperAdmin()) {
+            return;
+        }
+
+        // Check if the SIP account's owner is within the admin's scope
+        $allowedIds = $authUser->descendantIds();
+        if (!in_array($sipAccount->user_id, $allowedIds)) {
+            abort(403);
+        }
     }
 
     /**

@@ -12,17 +12,20 @@ class DashboardController extends Controller
         $user = auth()->user();
         $service = new DashboardStatsService();
 
+        // Super admin sees global stats, regular admin sees scoped stats
+        $scopeIds = $user->isSuperAdmin() ? null : $user->descendantIds();
+
         $entityCounts = $service->getEntityCounts($user);
-        $weekStats = $service->getCallStats(null, 7);
-        $prevWeekStats = $service->getPreviousPeriodStats(null, 7);
-        $todayStats = $service->getTodayCallStats(null);
-        $recentCalls = $service->getRecentCalls(null, 10);
-        $dailyData = $service->getDailyCallData(null, 7);
-        $hourlyData = $service->getHourlyCallData(null);
-        $topDestinations = $service->getTopDestinations(null, 5);
-        $activeCalls = $service->getActiveCallsCount(null);
+        $weekStats = $service->getCallStats($scopeIds, 7);
+        $prevWeekStats = $service->getPreviousPeriodStats($scopeIds, 7);
+        $todayStats = $service->getTodayCallStats($scopeIds);
+        $recentCalls = $service->getRecentCalls($scopeIds, 10);
+        $dailyData = $service->getDailyCallData($scopeIds, 7);
+        $hourlyData = $service->getHourlyCallData($scopeIds);
+        $topDestinations = $service->getTopDestinations($scopeIds, 5);
+        $activeCalls = $service->getActiveCallsCount($scopeIds);
         $systemHealth = $service->getSystemHealth();
-        $financialSummary = $service->getFinancialSummary();
+        $financialSummary = $service->getFinancialSummary($scopeIds);
 
         return view('admin.dashboard', compact(
             'entityCounts',

@@ -241,30 +241,42 @@ class DashboardStatsService
     /**
      * Get financial summary for admin dashboard.
      */
-    public function getFinancialSummary(): array
+    public function getFinancialSummary(?array $userIds = null): array
     {
         $thisMonth = Carbon::now()->startOfMonth()->toDateString();
         $lastMonth = Carbon::now()->subMonth()->startOfMonth()->toDateString();
         $lastMonthEnd = Carbon::now()->subMonth()->endOfMonth()->toDateString();
 
         // This month's revenue
-        $thisMonthRevenue = DB::table('cdr_summary_daily')
-            ->where('date', '>=', $thisMonth)
-            ->sum('total_cost');
+        $thisMonthQuery = DB::table('cdr_summary_daily')
+            ->where('date', '>=', $thisMonth);
+        if ($userIds !== null) {
+            $thisMonthQuery->whereIn('user_id', $userIds);
+        }
+        $thisMonthRevenue = $thisMonthQuery->sum('total_cost');
 
         // Last month's revenue
-        $lastMonthRevenue = DB::table('cdr_summary_daily')
-            ->whereBetween('date', [$lastMonth, $lastMonthEnd])
-            ->sum('total_cost');
+        $lastMonthQuery = DB::table('cdr_summary_daily')
+            ->whereBetween('date', [$lastMonth, $lastMonthEnd]);
+        if ($userIds !== null) {
+            $lastMonthQuery->whereIn('user_id', $userIds);
+        }
+        $lastMonthRevenue = $lastMonthQuery->sum('total_cost');
 
         // Total outstanding balance (unpaid invoices)
-        $outstandingBalance = Invoice::whereIn('status', ['issued'])
-            ->sum('total_amount');
+        $invoiceQuery = Invoice::whereIn('status', ['issued']);
+        if ($userIds !== null) {
+            $invoiceQuery->whereIn('user_id', $userIds);
+        }
+        $outstandingBalance = $invoiceQuery->sum('total_amount');
 
         // Total user balances
-        $totalUserBalance = User::whereIn('role', ['reseller', 'client'])
-            ->where('balance', '>', 0)
-            ->sum('balance');
+        $balanceQuery = User::whereIn('role', ['reseller', 'client'])
+            ->where('balance', '>', 0);
+        if ($userIds !== null) {
+            $balanceQuery->whereIn('id', $userIds);
+        }
+        $totalUserBalance = $balanceQuery->sum('balance');
 
         return [
             'this_month_revenue' => (float) $thisMonthRevenue,
@@ -359,7 +371,8 @@ class DashboardStatsService
      */
     public function getEntityCounts(User $user): array
     {
-        if ($user->isAdmin()) {
+        // Super Admin sees global counts
+        if ($user->isSuperAdmin()) {
             return [
                 'resellers' => User::where('role', 'reseller')->count(),
                 'clients' => User::where('role', 'client')->count(),
@@ -367,6 +380,22 @@ class DashboardStatsService
                 'active_trunks' => Trunk::where('status', 'active')->count(),
                 'active_dids' => Did::where('status', 'active')->count(),
                 'pending_kyc' => User::where('kyc_status', 'pending')->count(),
+            ];
+        }
+
+        // Regular Admin sees scoped counts (assigned resellers and their clients)
+        if ($user->isRegularAdmin()) {
+            $resellerIds = $user->managedResellerIds();
+            $clientIds = User::whereIn('parent_id', $resellerIds)->pluck('id')->toArray();
+            $allUserIds = array_merge($resellerIds, $clientIds);
+
+            return [
+                'resellers' => count($resellerIds),
+                'clients' => count($clientIds),
+                'sip_accounts' => SipAccount::whereIn('user_id', $allUserIds)->count(),
+                'active_trunks' => null, // Regular admins don't manage trunks
+                'active_dids' => Did::whereIn('assigned_to_user_id', $allUserIds)->where('status', 'active')->count(),
+                'pending_kyc' => User::whereIn('id', $allUserIds)->where('kyc_status', 'pending')->count(),
             ];
         }
 

@@ -17,8 +17,17 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
+        $authUser = auth()->user();
         $query = User::with('parent', 'rateGroup')
             ->withCount(['children', 'sipAccounts']);
+
+        // Apply scoping for non-super admins
+        if (!$authUser->isSuperAdmin()) {
+            $query->visibleTo($authUser);
+        }
+
+        // Don't show super_admin or admin users in this list (they're managed in Admin Management)
+        $query->whereNotIn('role', ['super_admin', 'admin']);
 
         if ($request->filled('role')) {
             $query->where('role', $request->role);
@@ -42,24 +51,39 @@ class UserController extends Controller
 
         $users = $query->orderBy('created_at', 'desc')->paginate(20);
 
-        // Get resellers for the filter dropdown (only needed for client view)
-        $resellers = $request->role === 'client'
-            ? User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email'])
-            : collect();
+        // Get resellers for the filter dropdown (scoped for non-super admins)
+        if ($request->role === 'client') {
+            $resellerQuery = User::where('role', 'reseller')->orderBy('name');
+            if (!$authUser->isSuperAdmin()) {
+                $resellerQuery->whereIn('id', $authUser->managedResellerIds());
+            }
+            $resellers = $resellerQuery->get(['id', 'name', 'email']);
+        } else {
+            $resellers = collect();
+        }
 
         return view('admin.users.index', compact('users', 'resellers'));
     }
 
     public function create()
     {
+        $authUser = auth()->user();
         $rateGroups = RateGroup::where('type', 'admin')->get();
-        $resellers = User::where('role', 'reseller')->active()->get();
+
+        // Scope resellers for non-super admins
+        $resellerQuery = User::where('role', 'reseller')->active();
+        if (!$authUser->isSuperAdmin()) {
+            $resellerQuery->whereIn('id', $authUser->managedResellerIds());
+        }
+        $resellers = $resellerQuery->get();
 
         return view('admin.users.create', compact('rateGroups', 'resellers'));
     }
 
     public function store(Request $request)
     {
+        $authUser = auth()->user();
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
@@ -73,7 +97,23 @@ class UserController extends Controller
             'max_channels' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        // Admin is parent for resellers, selected reseller is parent for clients
+        // For non-super admins: validate they can create resellers/clients
+        if (!$authUser->isSuperAdmin()) {
+            // Regular admins cannot create new resellers (they can only manage assigned ones)
+            if ($validated['role'] === 'reseller') {
+                abort(403, 'You can only manage existing assigned resellers.');
+            }
+
+            // For clients, validate parent_id is within their assigned resellers
+            if ($validated['role'] === 'client' && !empty($validated['parent_id'])) {
+                $managedResellerIds = $authUser->managedResellerIds();
+                if (!in_array($validated['parent_id'], $managedResellerIds)) {
+                    abort(403, 'You can only create clients under your assigned resellers.');
+                }
+            }
+        }
+
+        // Super Admin is parent for resellers, selected reseller is parent for clients
         if ($validated['role'] === 'reseller') {
             $validated['parent_id'] = auth()->id();
         }
@@ -102,6 +142,9 @@ class UserController extends Controller
 
     public function show(User $user)
     {
+        // Check authorization for non-super admins
+        abort_unless(auth()->user()->canManage($user), 403);
+
         $user->load('parent', 'rateGroup', 'children', 'sipAccounts', 'kycProfile', 'dids');
 
         // Get last 15 transactions for balance history
@@ -118,6 +161,8 @@ class UserController extends Controller
      */
     public function adjustBalance(Request $request, User $user, BalanceService $balanceService)
     {
+        abort_unless(auth()->user()->canManage($user), 403);
+
         $validated = $request->validate([
             'operation' => ['required', 'in:credit,debit'],
             'amount' => ['required', 'numeric', 'gt:0', 'max:999999.99'],
@@ -191,14 +236,25 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
+        abort_unless(auth()->user()->canManage($user), 403);
+
+        $authUser = auth()->user();
         $rateGroups = RateGroup::where('type', 'admin')->get();
-        $resellers = User::where('role', 'reseller')->active()->get();
+
+        // Scope resellers for non-super admins
+        $resellerQuery = User::where('role', 'reseller')->active();
+        if (!$authUser->isSuperAdmin()) {
+            $resellerQuery->whereIn('id', $authUser->managedResellerIds());
+        }
+        $resellers = $resellerQuery->get();
 
         return view('admin.users.edit', compact('user', 'rateGroups', 'resellers'));
     }
 
     public function update(Request $request, User $user)
     {
+        abort_unless(auth()->user()->canManage($user), 403);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
@@ -245,6 +301,8 @@ class UserController extends Controller
 
     public function toggleStatus(User $user)
     {
+        abort_unless(auth()->user()->canManage($user), 403);
+
         $original = $user->getAttributes();
         $user->status = $user->status === 'active' ? 'suspended' : 'active';
         $user->save();

@@ -66,9 +66,40 @@ class RolePermissionSeeder extends Seeder
             Permission::create(['name' => $permission]);
         }
 
-        // Admin — gets everything
+        // Super Admin — gets everything, manages global system features
+        $superAdminRole = Role::create(['name' => 'super_admin']);
+        $superAdminRole->givePermissionTo(Permission::all());
+
+        // Admin — manages assigned resellers and their clients (no global system access)
         $adminRole = Role::create(['name' => 'admin']);
-        $adminRole->givePermissionTo(Permission::all());
+        $adminRole->givePermissionTo([
+            // User management (scoped to assigned resellers)
+            'users.view', 'users.create', 'users.update', 'users.delete', 'users.suspend',
+
+            // KYC
+            'kyc.review', 'kyc.approve', 'kyc.reject',
+
+            // SIP accounts (scoped)
+            'sip_accounts.view', 'sip_accounts.create', 'sip_accounts.update', 'sip_accounts.delete',
+
+            // DIDs (scoped)
+            'dids.view', 'dids.create', 'dids.update', 'dids.delete', 'dids.assign',
+
+            // Billing (scoped)
+            'billing.view', 'billing.recharge', 'billing.adjust',
+            'invoices.view', 'invoices.create',
+            'transactions.view',
+            'payments.view', 'payments.create',
+
+            // CDR (scoped)
+            'cdr.view', 'cdr.export',
+
+            // Dashboard
+            'dashboard.admin',
+
+            // Transfers (scoped)
+            'transfers.execute', 'transfers.view',
+        ]);
 
         // Reseller — manages own clients, SIP accounts, rates, billing
         $resellerRole = Role::create(['name' => 'reseller']);
@@ -99,6 +130,18 @@ class RolePermissionSeeder extends Seeder
             'payments.view', 'payments.create',
             'cdr.view', 'cdr.export',
             'dashboard.client',
+        ]);
+
+        // Recharge Admin — view-only access + balance operations for assigned resellers
+        $rechargeAdminRole = Role::create(['name' => 'recharge_admin']);
+        $rechargeAdminRole->givePermissionTo([
+            'users.view',
+            'sip_accounts.view',
+            'dids.view',
+            'cdr.view',
+            'transactions.view',
+            'billing.view',
+            'billing.recharge',  // Only balance operation allowed
         ]);
     }
 }

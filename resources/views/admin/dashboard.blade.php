@@ -345,15 +345,17 @@
                             <p class="text-xs text-gray-500">SIP Accounts</p>
                         </a>
 
-                        <a href="{{ route('admin.trunks.index') }}" class="group p-4 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50 transition-all">
-                            <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mb-3 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                </svg>
-                            </div>
-                            <p class="text-2xl font-bold text-gray-900">{{ number_format($entityCounts['active_trunks']) }}</p>
-                            <p class="text-xs text-gray-500">Active Trunks</p>
-                        </a>
+                        @if(auth()->user()->isSuperAdmin())
+                            <a href="{{ route('admin.trunks.index') }}" class="group p-4 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50 transition-all">
+                                <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mb-3 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                </div>
+                                <p class="text-2xl font-bold text-gray-900">{{ number_format($entityCounts['active_trunks']) }}</p>
+                                <p class="text-xs text-gray-500">Active Trunks</p>
+                            </a>
+                        @endif
 
                         <a href="{{ route('admin.dids.index') }}" class="group p-4 rounded-lg border border-gray-100 hover:border-cyan-200 hover:bg-cyan-50/50 transition-all">
                             <div class="w-10 h-10 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center mb-3 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
@@ -365,18 +367,20 @@
                             <p class="text-xs text-gray-500">Active DIDs</p>
                         </a>
 
-                        <a href="{{ route('admin.trunk-routes.index') }}" class="group p-4 rounded-lg border border-gray-100 hover:border-rose-200 hover:bg-rose-50/50 transition-all">
-                            <div class="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center mb-3 group-hover:bg-rose-500 group-hover:text-white transition-colors">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-                                </svg>
-                            </div>
-                            @php
-                                $routeCount = \App\Models\TrunkRoute::where('status', 'active')->count();
-                            @endphp
-                            <p class="text-2xl font-bold text-gray-900">{{ number_format($routeCount) }}</p>
-                            <p class="text-xs text-gray-500">Routes</p>
-                        </a>
+                        @if(auth()->user()->isSuperAdmin())
+                            <a href="{{ route('admin.trunk-routes.index') }}" class="group p-4 rounded-lg border border-gray-100 hover:border-rose-200 hover:bg-rose-50/50 transition-all">
+                                <div class="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center mb-3 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                                    </svg>
+                                </div>
+                                @php
+                                    $routeCount = \App\Models\TrunkRoute::where('status', 'active')->count();
+                                @endphp
+                                <p class="text-2xl font-bold text-gray-900">{{ number_format($routeCount) }}</p>
+                                <p class="text-xs text-gray-500">Routes</p>
+                            </a>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -587,35 +591,37 @@
                         </svg>
                     </a>
 
-                    <a href="{{ route('admin.rate-groups.index') }}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
-                        <div class="w-9 h-9 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center group-hover:bg-violet-500 group-hover:text-white transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    @if(auth()->user()->isSuperAdmin())
+                        <a href="{{ route('admin.rate-groups.index') }}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
+                            <div class="w-9 h-9 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center group-hover:bg-violet-500 group-hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold text-gray-900">Manage Rates</p>
+                                <p class="text-xs text-gray-500">Rate groups & pricing</p>
+                            </div>
+                            <svg class="w-4 h-4 text-gray-300 group-hover:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                             </svg>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm font-semibold text-gray-900">Manage Rates</p>
-                            <p class="text-xs text-gray-500">Rate groups & pricing</p>
-                        </div>
-                        <svg class="w-4 h-4 text-gray-300 group-hover:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                        </svg>
-                    </a>
+                        </a>
 
-                    <a href="{{ route('admin.trunks.index') }}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
-                        <div class="w-9 h-9 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        <a href="{{ route('admin.trunks.index') }}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
+                            <div class="w-9 h-9 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold text-gray-900">Manage Trunks</p>
+                                <p class="text-xs text-gray-500">SIP trunk connections</p>
+                            </div>
+                            <svg class="w-4 h-4 text-gray-300 group-hover:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                             </svg>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm font-semibold text-gray-900">Manage Trunks</p>
-                            <p class="text-xs text-gray-500">SIP trunk connections</p>
-                        </div>
-                        <svg class="w-4 h-4 text-gray-300 group-hover:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                        </svg>
-                    </a>
+                        </a>
+                    @endif
                 </div>
             </div>
         </div>
