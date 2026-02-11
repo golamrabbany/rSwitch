@@ -136,37 +136,37 @@
         background-color: #059669;
     }
 
-    /* Client theme (sky) */
+    /* Client theme (indigo - same as admin) */
     .theme-client .nav-item:hover {
-        background: linear-gradient(90deg, #f0f9ff 0%, transparent 100%);
+        background: linear-gradient(90deg, #eef2ff 0%, transparent 100%);
     }
     .theme-client .nav-item.active {
-        background: linear-gradient(90deg, #e0f2fe 0%, #f0f9ff 50%, transparent 100%);
-        border-left-color: #0284c7;
+        background: linear-gradient(90deg, #e0e7ff 0%, #eef2ff 50%, transparent 100%);
+        border-left-color: #4f46e5;
     }
     .theme-client .nav-item.active .nav-icon {
-        @apply text-sky-600;
+        @apply text-indigo-600;
     }
     .theme-client .nav-item.active .nav-text {
-        @apply text-sky-700;
+        @apply text-indigo-700;
     }
     .theme-client .nav-parent.has-active {
-        @apply bg-sky-50;
+        @apply bg-indigo-50;
     }
     .theme-client .nav-parent.has-active .nav-icon {
-        @apply text-sky-600;
+        @apply text-indigo-600;
     }
     .theme-client .nav-parent.has-active .nav-text {
-        @apply text-sky-700;
+        @apply text-indigo-700;
     }
     .theme-client .nav-child:hover {
-        @apply bg-sky-50 text-sky-700;
+        @apply bg-indigo-50 text-indigo-700;
     }
     .theme-client .nav-child.active {
-        @apply bg-sky-100 text-sky-700;
+        @apply bg-indigo-100 text-indigo-700;
     }
     .theme-client .nav-child.active::before {
-        background-color: #0284c7;
+        background-color: #4f46e5;
     }
 
     /* ========================================
@@ -678,25 +678,25 @@
     }
 
     /* ========================================
-       Client Theme
+       Client Theme (Using indigo to match Admin)
        ======================================== */
     .btn-action-primary-client {
-        @apply inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition-colors;
+        @apply inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors;
     }
     .btn-search-client {
-        @apply inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition-colors;
+        @apply inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors;
     }
     .btn-primary-client {
-        @apply inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition-colors;
+        @apply inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors;
     }
     .btn-secondary-client {
         @apply inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors;
     }
     .empty-link-client {
-        @apply text-sky-600 hover:text-sky-700 text-sm font-medium;
+        @apply text-indigo-600 hover:text-indigo-700 text-sm font-medium;
     }
     .action-icon-client {
-        @apply inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-sky-600 hover:bg-sky-50 transition-colors ml-1 first:ml-0;
+        @apply inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors ml-1 first:ml-0;
     }
 
     /* ========================================

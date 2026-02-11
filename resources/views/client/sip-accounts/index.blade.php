@@ -59,7 +59,7 @@
                             <div class="flex items-center gap-2">
                                 <span class="font-medium text-gray-900">{{ $sip->username }}</span>
                                 @if($sip->is_online ?? false)
-                                    <span class="w-2 h-2 bg-sky-500 rounded-full" title="Online"></span>
+                                    <span class="w-2 h-2 bg-indigo-500 rounded-full" title="Online"></span>
                                 @endif
                             </div>
                             @if($sip->last_registered_at)

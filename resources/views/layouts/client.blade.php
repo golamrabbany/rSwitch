@@ -16,13 +16,13 @@
             <!-- Logo -->
             <div class="flex items-center h-16 px-5 border-b border-gray-100">
                 <a href="{{ route('client.dashboard') }}" class="flex items-center">
-                    <div class="w-9 h-9 bg-sky-600 rounded-lg flex items-center justify-center mr-3">
+                    <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center mr-3">
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
                     </div>
                     <div>
-                        <span class="text-lg font-bold text-gray-800">r<span class="text-sky-600">Switch</span></span>
+                        <span class="text-lg font-bold text-gray-800">r<span class="text-indigo-600">Switch</span></span>
                         <p class="text-[10px] text-gray-400 -mt-1">Client Portal</p>
                     </div>
                 </a>
@@ -32,7 +32,7 @@
             <nav class="flex-1 px-3 py-4 overflow-y-auto">
                 <!-- Dashboard -->
                 <a href="{{ route('client.dashboard') }}" class="nav-item {{ request()->routeIs('client.dashboard') ? 'active' : 'text-gray-600' }}">
-                    <svg class="nav-icon {{ request()->routeIs('client.dashboard') ? 'text-sky-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="nav-icon {{ request()->routeIs('client.dashboard') ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
                     </svg>
                     <span class="nav-text">Dashboard</span>
@@ -45,7 +45,7 @@
                 <div x-data="{ open: {{ $telecomActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $telecomActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
-                            <svg class="nav-icon {{ $telecomActive ? 'text-sky-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="nav-icon {{ $telecomActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                             </svg>
                             <span class="nav-text">Services</span>
@@ -68,7 +68,7 @@
                 <div x-data="{ open: {{ $financeActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $financeActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
-                            <svg class="nav-icon {{ $financeActive ? 'text-sky-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="nav-icon {{ $financeActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                             <span class="nav-text">Finance</span>
@@ -88,12 +88,12 @@
             <!-- Sidebar Footer -->
             <div class="p-4 border-t border-gray-100">
                 <div class="flex items-center gap-3 px-2">
-                    <div class="w-10 h-10 rounded-full bg-sky-600 flex items-center justify-center flex-shrink-0">
+                    <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
                         <span class="text-white font-semibold">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-gray-800 truncate">{{ auth()->user()->name }}</p>
-                        <p class="text-xs text-sky-600 font-semibold">{{ format_currency(auth()->user()->balance) }}</p>
+                        <p class="text-xs text-indigo-600 font-semibold">{{ format_currency(auth()->user()->balance) }}</p>
                     </div>
                 </div>
             </div>
@@ -124,7 +124,7 @@
                         <!-- User Dropdown -->
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                                <div class="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center">
+                                <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
                                     <span class="text-white font-semibold text-sm">{{ substr(auth()->user()->name, 0, 1) }}</span>
                                 </div>
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
