@@ -18,6 +18,18 @@
             <span class="badge {{ $rechargeAdmin->status === 'active' ? 'badge-success' : ($rechargeAdmin->status === 'suspended' ? 'badge-warning' : 'badge-danger') }}">
                 {{ ucfirst($rechargeAdmin->status) }}
             </span>
+            @if(auth()->user()->isSuperAdmin())
+                <form action="{{ route('admin.impersonate.start', $rechargeAdmin) }}" method="POST" class="inline">
+                    @csrf
+                    <button type="submit" class="btn-secondary text-amber-600 border-amber-300 hover:bg-amber-50">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                        Login As
+                    </button>
+                </form>
+            @endif
             <a href="{{ route('admin.recharge-admins.edit', $rechargeAdmin) }}" class="btn-secondary">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
