@@ -11,11 +11,12 @@ class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_login_screen_redirects_to_admin_login(): void
+    public function test_login_screen_can_be_rendered(): void
     {
         $response = $this->get('/login');
 
-        $response->assertRedirect(route('admin.login'));
+        $response->assertOk();
+        $response->assertSee('Log in');
     }
 
     public function test_admin_login_screen_can_be_rendered(): void
@@ -175,5 +176,35 @@ class AuthenticationTest extends TestCase
         $response = $this->get(route('admin.dashboard'));
 
         $response->assertForbidden();
+    }
+
+    public function test_client_can_login_via_livewire(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'client',
+            'status' => 'active',
+            'password' => Hash::make('password'),
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get('/dashboard');
+
+        $response->assertRedirect(route('client.dashboard'));
+    }
+
+    public function test_reseller_can_login_via_livewire(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'reseller',
+            'status' => 'active',
+            'password' => Hash::make('password'),
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get('/dashboard');
+
+        $response->assertRedirect(route('reseller.dashboard'));
     }
 }
