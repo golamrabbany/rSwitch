@@ -4,82 +4,120 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Volt\Volt;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_login_screen_can_be_rendered(): void
+    public function test_login_screen_redirects_to_admin_login(): void
     {
         $response = $this->get('/login');
 
-        $response
-            ->assertOk()
-            ->assertSeeVolt('pages.auth.login');
+        $response->assertRedirect(route('admin.login'));
     }
 
-    public function test_users_can_authenticate_using_the_login_screen(): void
+    public function test_admin_login_screen_can_be_rendered(): void
     {
-        $user = User::factory()->create();
+        $response = $this->get(route('admin.login'));
 
-        $component = Volt::test('pages.auth.login')
-            ->set('form.email', $user->email)
-            ->set('form.password', 'password');
+        $response->assertOk();
+    }
 
-        $component->call('login');
+    public function test_admin_can_authenticate_with_otp(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'admin',
+            'status' => 'active',
+            'password' => Hash::make('password'),
+        ]);
 
-        $component
-            ->assertHasNoErrors()
-            ->assertRedirect(route('dashboard', absolute: false));
+        // Step 1: Submit credentials
+        $response = $this->post(route('admin.login.submit'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
 
+        $response->assertRedirect(route('admin.otp.verify.form'));
+        $this->assertNotNull(session('admin_otp_user_id'));
+
+        // Step 2: Verify OTP
+        $user->refresh();
+        $response = $this->post(route('admin.otp.verify'), [
+            'otp' => $user->otp_code,
+        ]);
+
+        $response->assertRedirect(route('admin.dashboard'));
         $this->assertAuthenticated();
     }
 
-    public function test_users_can_not_authenticate_with_invalid_password(): void
+    public function test_admin_cannot_authenticate_with_invalid_password(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'role' => 'admin',
+            'status' => 'active',
+            'password' => Hash::make('password'),
+        ]);
 
-        $component = Volt::test('pages.auth.login')
-            ->set('form.email', $user->email)
-            ->set('form.password', 'wrong-password');
+        $response = $this->post(route('admin.login.submit'), [
+            'email' => $user->email,
+            'password' => 'wrong-password',
+        ]);
 
-        $component->call('login');
-
-        $component
-            ->assertHasErrors()
-            ->assertNoRedirect();
-
+        $response->assertSessionHasErrors('email');
         $this->assertGuest();
     }
 
-    public function test_navigation_menu_can_be_rendered(): void
+    public function test_admin_cannot_authenticate_with_invalid_otp(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'role' => 'admin',
+            'status' => 'active',
+            'password' => Hash::make('password'),
+        ]);
+
+        // Submit credentials first
+        $this->post(route('admin.login.submit'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        // Try wrong OTP
+        $response = $this->post(route('admin.otp.verify'), [
+            'otp' => '000000',
+        ]);
+
+        $response->assertSessionHasErrors('otp');
+        $this->assertGuest();
+    }
+
+    public function test_dashboard_redirects_based_on_role(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'reseller',
+            'status' => 'active',
+        ]);
 
         $this->actingAs($user);
 
         $response = $this->get('/dashboard');
 
-        // Dashboard redirects to role-specific dashboard
-        $response->assertRedirect();
+        $response->assertRedirect(route('reseller.dashboard'));
     }
 
-    public function test_users_can_logout(): void
+    public function test_admin_can_logout(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
 
         $this->actingAs($user);
 
-        $component = Volt::test('layout.navigation');
+        $response = $this->post(route('admin.logout'));
 
-        $component->call('logout');
-
-        $component
-            ->assertHasNoErrors()
-            ->assertRedirect('/');
-
+        $response->assertRedirect(route('admin.login'));
         $this->assertGuest();
     }
 }
