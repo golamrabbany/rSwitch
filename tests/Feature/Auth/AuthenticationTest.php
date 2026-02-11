@@ -120,4 +120,60 @@ class AuthenticationTest extends TestCase
         $response->assertRedirect(route('admin.login'));
         $this->assertGuest();
     }
+
+    public function test_recharge_admin_can_authenticate_with_otp(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'recharge_admin',
+            'status' => 'active',
+            'password' => Hash::make('password'),
+        ]);
+
+        // Step 1: Submit credentials
+        $response = $this->post(route('admin.login.submit'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect(route('admin.otp.verify.form'));
+        $this->assertNotNull(session('admin_otp_user_id'));
+
+        // Step 2: Verify OTP
+        $user->refresh();
+        $response = $this->post(route('admin.otp.verify'), [
+            'otp' => $user->otp_code,
+        ]);
+
+        // Recharge admin redirects to recharge-admin dashboard
+        $response->assertRedirect(route('recharge-admin.dashboard'));
+        $this->assertAuthenticated();
+    }
+
+    public function test_recharge_admin_can_access_dashboard(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'recharge_admin',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('recharge-admin.dashboard'));
+
+        $response->assertOk();
+    }
+
+    public function test_recharge_admin_cannot_access_admin_dashboard(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'recharge_admin',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('admin.dashboard'));
+
+        $response->assertForbidden();
+    }
 }

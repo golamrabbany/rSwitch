@@ -134,7 +134,14 @@ class AdminOtpLoginController extends Controller
         Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
-        return redirect()->intended(route('admin.dashboard'));
+        // Redirect based on role
+        $defaultRoute = match ($user->role) {
+            'super_admin', 'admin' => route('admin.dashboard'),
+            'recharge_admin' => route('recharge-admin.dashboard'),
+            default => route('admin.dashboard'),
+        };
+
+        return redirect()->intended($defaultRoute);
     }
 
     /**
