@@ -71,7 +71,7 @@
                     <th>Username</th>
                     <th>Owner</th>
                     <th>Caller ID</th>
-                    <th>Channels</th>
+                    <th>Chan</th>
                     <th>Status</th>
                     <th class="text-center align-middle">Actions</th>
                 </tr>
