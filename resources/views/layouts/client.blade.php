@@ -278,5 +278,8 @@
             overlay.classList.toggle('hidden');
         }
     </script>
+
+    {{-- Impersonation Banner --}}
+    <x-impersonation-banner />
 </body>
 </html>

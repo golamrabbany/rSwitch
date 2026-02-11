@@ -21,6 +21,10 @@ Route::prefix('admin')->name('admin.')->middleware('guest')->group(function () {
 });
 Route::post('admin/logout', [Admin\AdminOtpLoginController::class, 'logout'])->middleware('auth')->name('admin.logout');
 
+// Impersonation routes (Super Admin only)
+Route::post('admin/impersonate/{user}', [Admin\ImpersonationController::class, 'start'])->middleware('auth')->name('admin.impersonate.start');
+Route::post('admin/stop-impersonation', [Admin\ImpersonationController::class, 'stop'])->middleware('auth')->name('admin.impersonate.stop');
+
 // Role-based dashboard redirect
 Route::get('dashboard', function () {
     return match (auth()->user()->role) {
