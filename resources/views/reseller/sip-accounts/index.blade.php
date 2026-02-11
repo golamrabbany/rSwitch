@@ -73,7 +73,7 @@
                     <th>Caller ID</th>
                     <th>Chan</th>
                     <th>Status</th>
-                    <th class="text-center align-middle">Actions</th>
+                    <th class="text-center" style="vertical-align: middle;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -119,7 +119,7 @@
                                     <span class="badge badge-danger">Disabled</span>
                             @endswitch
                         </td>
-                        <td class="text-center align-middle">
+                        <td class="text-center" style="vertical-align: middle;">
                             <div class="flex items-center justify-center gap-2">
                                 <a href="{{ route('reseller.sip-accounts.show', $sip) }}" class="action-icon" title="View">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
