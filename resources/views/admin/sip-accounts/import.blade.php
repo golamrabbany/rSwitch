@@ -105,7 +105,7 @@
                             <span class="badge badge-danger">Required</span>
                             <div>
                                 <p class="text-sm font-medium text-gray-900">password</p>
-                                <p class="text-xs text-gray-500">SIP password (min 12 characters for new accounts)</p>
+                                <p class="text-xs text-gray-500">SIP password (min 6 characters for new accounts)</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-3">
@@ -158,6 +158,20 @@
                             <div>
                                 <p class="text-sm font-medium text-gray-900">status</p>
                                 <p class="text-xs text-gray-500">active, suspended, or disabled (default: active)</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="badge badge-gray">Optional</span>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">allow_p2p</p>
+                                <p class="text-xs text-gray-500">Enable P2P calls: true/false or 1/0 (default: true)</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="badge badge-gray">Optional</span>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">allow_recording</p>
+                                <p class="text-xs text-gray-500">Enable call recording: true/false or 1/0 (default: false)</p>
                             </div>
                         </div>
                     </div>

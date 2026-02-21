@@ -13,7 +13,8 @@ class SipAccount extends Model
     protected $fillable = [
         'user_id', 'username', 'password', 'auth_type', 'allowed_ips',
         'caller_id_name', 'caller_id_number', 'max_channels',
-        'codec_allow', 'status', 'last_registered_at', 'last_registered_ip',
+        'codec_allow', 'allow_p2p', 'allow_recording',
+        'status', 'last_registered_at', 'last_registered_ip',
     ];
 
     protected $hidden = ['password'];
@@ -22,6 +23,8 @@ class SipAccount extends Model
     {
         return [
             'last_registered_at' => 'datetime',
+            'allow_p2p' => 'boolean',
+            'allow_recording' => 'boolean',
         ];
     }
 

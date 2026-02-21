@@ -90,12 +90,104 @@
                         <div class="form-card-body">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 @foreach ($items as $setting)
-                                    <div class="form-group {{ in_array($setting->key, ['company_address', 'codec_allow']) ? 'md:col-span-2' : '' }}">
+                                    <div class="form-group {{ in_array($setting->key, ['company_address', 'default_codec_allow']) ? 'md:col-span-2' : '' }}">
                                         <label for="setting_{{ $setting->key }}" class="form-label">
                                             {{ $setting->label ?: Str::headline(str_replace('_', ' ', $setting->key)) }}
                                         </label>
 
-                                        @if ($setting->key === 'default_currency')
+                                        @if ($setting->key === 'default_codec_allow')
+                                            <div x-data="{
+                                                audioCodecs: [
+                                                    { value: 'ulaw', desc: 'μ-law' },
+                                                    { value: 'alaw', desc: 'A-law' },
+                                                    { value: 'g711', desc: 'PCM' },
+                                                    { value: 'g722', desc: 'HD' },
+                                                    { value: 'g723', desc: '5.3k' },
+                                                    { value: 'g726', desc: 'ADPCM' },
+                                                    { value: 'g729', desc: '8k' },
+                                                    { value: 'opus', desc: 'Adaptive' },
+                                                    { value: 'gsm', desc: 'Mobile' },
+                                                    { value: 'ilbc', desc: 'iLBC' },
+                                                    { value: 'speex', desc: 'Open' },
+                                                    { value: 'silk', desc: 'Skype' },
+                                                    { value: 'siren7', desc: '16kHz' },
+                                                    { value: 'siren14', desc: '32kHz' },
+                                                ],
+                                                videoCodecs: [
+                                                    { value: 'h261', desc: 'Legacy' },
+                                                    { value: 'h263', desc: 'Standard' },
+                                                    { value: 'h264', desc: 'HD' },
+                                                    { value: 'vp8', desc: 'WebRTC' },
+                                                    { value: 'vp9', desc: 'Next-gen' },
+                                                ],
+                                                selected: '{{ old("settings.{$setting->key}", $setting->value) }}'.split(',').map(s => s.trim()).filter(Boolean),
+                                                toggle(val) {
+                                                    const idx = this.selected.indexOf(val);
+                                                    if (idx > -1) { this.selected.splice(idx, 1); }
+                                                    else { this.selected.push(val); }
+                                                },
+                                                isSelected(val) { return this.selected.includes(val); },
+                                                selectAllAudio() { this.audioCodecs.forEach(c => { if (!this.isSelected(c.value)) this.selected.push(c.value); }); },
+                                                selectAllVideo() { this.videoCodecs.forEach(c => { if (!this.isSelected(c.value)) this.selected.push(c.value); }); },
+                                                clearAll() { this.selected = []; },
+                                                get value() { return this.selected.join(','); },
+                                                get count() { return this.selected.length; }
+                                            }">
+                                                <input type="hidden" name="settings[{{ $setting->key }}]" :value="value">
+
+                                                {{-- Audio Codecs --}}
+                                                <div class="mb-3">
+                                                    <div class="flex items-center justify-between mb-2">
+                                                        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Audio</span>
+                                                        <button type="button" @click="selectAllAudio()" class="text-xs text-indigo-600 hover:text-indigo-800">Select all</button>
+                                                    </div>
+                                                    <div class="flex flex-wrap gap-1.5">
+                                                        <template x-for="codec in audioCodecs" :key="codec.value">
+                                                            <button type="button" @click="toggle(codec.value)"
+                                                                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-xs font-medium transition-all duration-150 cursor-pointer"
+                                                                :class="isSelected(codec.value)
+                                                                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                                                                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-white'">
+                                                                <svg x-show="isSelected(codec.value)" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                                                </svg>
+                                                                <span class="font-mono font-semibold" x-text="codec.value"></span>
+                                                                <span class="font-normal opacity-60" x-text="codec.desc"></span>
+                                                            </button>
+                                                        </template>
+                                                    </div>
+                                                </div>
+
+                                                {{-- Video Codecs --}}
+                                                <div class="mb-2">
+                                                    <div class="flex items-center justify-between mb-2">
+                                                        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Video</span>
+                                                        <button type="button" @click="selectAllVideo()" class="text-xs text-indigo-600 hover:text-indigo-800">Select all</button>
+                                                    </div>
+                                                    <div class="flex flex-wrap gap-1.5">
+                                                        <template x-for="codec in videoCodecs" :key="codec.value">
+                                                            <button type="button" @click="toggle(codec.value)"
+                                                                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-xs font-medium transition-all duration-150 cursor-pointer"
+                                                                :class="isSelected(codec.value)
+                                                                    ? 'bg-violet-50 border-violet-300 text-violet-700'
+                                                                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-white'">
+                                                                <svg x-show="isSelected(codec.value)" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                                                </svg>
+                                                                <span class="font-mono font-semibold" x-text="codec.value"></span>
+                                                                <span class="font-normal opacity-60" x-text="codec.desc"></span>
+                                                            </button>
+                                                        </template>
+                                                    </div>
+                                                </div>
+
+                                                {{-- Selected count & clear --}}
+                                                <div class="flex items-center justify-between mt-2">
+                                                    <span class="text-xs text-gray-400" x-text="count + ' codec' + (count !== 1 ? 's' : '') + ' selected'"></span>
+                                                    <button type="button" @click="clearAll()" x-show="count > 0" class="text-xs text-red-500 hover:text-red-700">Clear all</button>
+                                                </div>
+                                            </div>
+                                        @elseif ($setting->key === 'default_currency')
                                             <select id="setting_{{ $setting->key }}"
                                                     name="settings[{{ $setting->key }}]"
                                                     class="form-input">
@@ -229,9 +321,9 @@
                         </div>
                         <div>
                             <div class="flex items-center gap-2 mb-1">
-                                <span class="badge badge-success">Billing</span>
+                                <span class="badge badge-warning">System</span>
                             </div>
-                            <p class="text-xs text-gray-500">Invoice prefix, tax rates, currency, low balance thresholds.</p>
+                            <p class="text-xs text-gray-500">Data retention, session timeout, API access, and maintenance mode.</p>
                         </div>
                         <div>
                             <div class="flex items-center gap-2 mb-1">
@@ -241,9 +333,9 @@
                         </div>
                         <div>
                             <div class="flex items-center gap-2 mb-1">
-                                <span class="badge badge-warning">System</span>
+                                <span class="badge badge-success">Billing</span>
                             </div>
-                            <p class="text-xs text-gray-500">Data retention periods, maintenance, and system policies.</p>
+                            <p class="text-xs text-gray-500">Invoice prefix, tax rates, currency, low balance thresholds.</p>
                         </div>
                     </div>
                 </div>

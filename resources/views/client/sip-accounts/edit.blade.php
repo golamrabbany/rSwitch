@@ -29,7 +29,7 @@
                     <input type="text" id="password" name="password" value="{{ old('password') }}"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
                            placeholder="Leave blank to keep current password">
-                    <p class="mt-1 text-xs text-gray-500">Minimum 12 characters.</p>
+                    <p class="mt-1 text-xs text-gray-500">Minimum 6 characters.</p>
                     <x-input-error :messages="$errors->get('password')" class="mt-2" />
                 </div>
 

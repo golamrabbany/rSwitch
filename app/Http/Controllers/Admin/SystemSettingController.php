@@ -14,7 +14,10 @@ class SystemSettingController extends Controller
         // Ensure defaults exist
         SystemSetting::seedDefaults();
 
-        $settings = SystemSetting::orderBy('group')->orderBy('key')->get()->groupBy('group');
+        $groupOrder = ['general', 'system', 'sip', 'billing'];
+        $settings = SystemSetting::orderBy('sort_order')->get()
+            ->groupBy('group')
+            ->sortBy(fn($items, $group) => array_search($group, $groupOrder));
 
         return view('admin.settings.index', compact('settings'));
     }

@@ -113,6 +113,19 @@ update_application() {
     sudo -u www-data php artisan route:cache
     sudo -u www-data php artisan view:cache
 
+    # Update Asterisk dialplan
+    log_info "Updating Asterisk dialplan..."
+    if [[ -f "$INSTALL_DIR/installer/templates/asterisk/extensions.conf.template" ]]; then
+        cp "$INSTALL_DIR/installer/templates/asterisk/extensions.conf.template" /etc/asterisk/extensions.conf
+        chown asterisk:asterisk /etc/asterisk/extensions.conf
+        asterisk -rx "dialplan reload" 2>/dev/null || true
+        log_success "Asterisk dialplan updated"
+    fi
+
+    # Create recording directory if it doesn't exist
+    mkdir -p /var/spool/asterisk/recording
+    chown asterisk:asterisk /var/spool/asterisk/recording
+
     # Restart queue workers
     log_info "Restarting queue workers..."
     supervisorctl restart rswitch-worker:*

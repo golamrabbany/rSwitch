@@ -95,6 +95,22 @@
                             <span class="detail-label">Codecs</span>
                             <span class="detail-value font-mono">{{ $sipAccount->codec_allow }}</span>
                         </div>
+                        <div class="detail-item">
+                            <span class="detail-label">P2P Calls</span>
+                            @if($sipAccount->allow_p2p)
+                                <span class="badge badge-success">Enabled</span>
+                            @else
+                                <span class="badge badge-danger">Disabled</span>
+                            @endif
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Call Recording</span>
+                            @if($sipAccount->allow_recording)
+                                <span class="badge badge-success">Enabled</span>
+                            @else
+                                <span class="badge badge-danger">Disabled</span>
+                            @endif
+                        </div>
                     </div>
                 </div>
             </div>

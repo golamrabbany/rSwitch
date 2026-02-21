@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Reseller;
 
 use App\Http\Controllers\Controller;
 use App\Models\SipAccount;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\SipProvisioningService;
@@ -55,7 +56,9 @@ class SipAccountController extends Controller
         $users = User::whereIn('id', $clientIds)->active()->orderBy('name')->get();
         $selectedUserId = $request->query('user_id');
 
-        return view('reseller.sip-accounts.create', compact('users', 'selectedUserId'));
+        $availableCodecs = SystemSetting::get('default_codec_allow', 'ulaw,alaw,g729');
+
+        return view('reseller.sip-accounts.create', compact('users', 'selectedUserId', 'availableCodecs'));
     }
 
     public function store(Request $request)
@@ -66,7 +69,7 @@ class SipAccountController extends Controller
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
             'username' => ['required', 'string', 'max:40', 'unique:sip_accounts,username', 'alpha_dash'],
-            'password' => ['required', 'string', 'min:12', 'max:80'],
+            'password' => ['required', 'string', 'min:6', 'max:80'],
             'auth_type' => ['required', Rule::in(['password', 'ip', 'both'])],
             'allowed_ips' => ['nullable', 'required_if:auth_type,ip', 'required_if:auth_type,both', 'string', 'max:500'],
             'caller_id_name' => ['required', 'string', 'max:80'],
@@ -103,7 +106,9 @@ class SipAccountController extends Controller
         // Only clients can own SIP accounts
         $users = User::whereIn('id', auth()->user()->clientIds())->active()->orderBy('name')->get();
 
-        return view('reseller.sip-accounts.edit', compact('sipAccount', 'users'));
+        $availableCodecs = SystemSetting::get('default_codec_allow', 'ulaw,alaw,g729');
+
+        return view('reseller.sip-accounts.edit', compact('sipAccount', 'users', 'availableCodecs'));
     }
 
     public function update(Request $request, SipAccount $sipAccount)
@@ -113,7 +118,7 @@ class SipAccountController extends Controller
 
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
-            'password' => ['nullable', 'string', 'min:12', 'max:80'],
+            'password' => ['nullable', 'string', 'min:6', 'max:80'],
             'auth_type' => ['required', Rule::in(['password', 'ip', 'both'])],
             'allowed_ips' => ['nullable', 'required_if:auth_type,ip', 'required_if:auth_type,both', 'string', 'max:500'],
             'caller_id_name' => ['required', 'string', 'max:80'],

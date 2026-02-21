@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SipAccount;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\SipProvisioningService;
@@ -82,8 +83,9 @@ class SipAccountController extends Controller
         $users = $userQuery->get();
 
         $selectedUserId = $request->query('user_id');
+        $availableCodecs = SystemSetting::get('default_codec_allow', 'ulaw,alaw,g729');
 
-        return view('admin.sip-accounts.create', compact('users', 'selectedUserId'));
+        return view('admin.sip-accounts.create', compact('users', 'selectedUserId', 'availableCodecs'));
     }
 
     public function store(Request $request)
@@ -100,14 +102,20 @@ class SipAccountController extends Controller
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
             'username' => ['required', 'string', 'max:40', 'unique:sip_accounts,username', 'alpha_dash'],
-            'password' => ['required', 'string', 'min:12', 'max:80'],
+            'password' => ['required', 'string', 'min:6', 'max:80'],
             'auth_type' => ['required', Rule::in(['password', 'ip', 'both'])],
             'allowed_ips' => ['nullable', 'required_if:auth_type,ip', 'required_if:auth_type,both', 'string', 'max:500'],
             'caller_id_name' => ['required', 'string', 'max:80'],
             'caller_id_number' => ['required', 'string', 'max:20'],
             'max_channels' => ['required', 'integer', 'min:1', 'max:100'],
             'codec_allow' => ['required', 'string', 'max:100'],
+            'allow_p2p' => ['boolean'],
+            'allow_recording' => ['boolean'],
         ]);
+
+        // Handle checkbox boolean conversion (unchecked checkboxes send nothing)
+        $validated['allow_p2p'] = $request->boolean('allow_p2p');
+        $validated['allow_recording'] = $request->boolean('allow_recording');
 
         $sip = SipAccount::create($validated);
 
@@ -145,7 +153,14 @@ class SipAccountController extends Controller
         }
         $users = $userQuery->get();
 
-        return view('admin.sip-accounts.edit', compact('sipAccount', 'users'));
+        // Ensure current owner is always in dropdown (even if inactive)
+        if (!$users->contains('id', $sipAccount->user_id)) {
+            $users->prepend($sipAccount->user);
+        }
+
+        $availableCodecs = SystemSetting::get('default_codec_allow', 'ulaw,alaw,g729');
+
+        return view('admin.sip-accounts.edit', compact('sipAccount', 'users', 'availableCodecs'));
     }
 
     public function update(Request $request, SipAccount $sipAccount)
@@ -161,17 +176,28 @@ class SipAccountController extends Controller
         }
         $clientIds = $clientQuery->pluck('id')->toArray();
 
+        // Always allow current owner (even if inactive/suspended)
+        if (!in_array($sipAccount->user_id, $clientIds)) {
+            $clientIds[] = $sipAccount->user_id;
+        }
+
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
-            'password' => ['nullable', 'string', 'min:12', 'max:80'],
+            'password' => ['nullable', 'string', 'min:6', 'max:80'],
             'auth_type' => ['required', Rule::in(['password', 'ip', 'both'])],
             'allowed_ips' => ['nullable', 'required_if:auth_type,ip', 'required_if:auth_type,both', 'string', 'max:500'],
             'caller_id_name' => ['required', 'string', 'max:80'],
             'caller_id_number' => ['required', 'string', 'max:20'],
             'max_channels' => ['required', 'integer', 'min:1', 'max:100'],
             'codec_allow' => ['required', 'string', 'max:100'],
+            'allow_p2p' => ['boolean'],
+            'allow_recording' => ['boolean'],
             'status' => ['required', Rule::in(['active', 'suspended', 'disabled'])],
         ]);
+
+        // Handle checkbox boolean conversion
+        $validated['allow_p2p'] = $request->boolean('allow_p2p');
+        $validated['allow_recording'] = $request->boolean('allow_recording');
 
         $original = $sipAccount->getAttributes();
 
@@ -402,7 +428,7 @@ class SipAccountController extends Controller
                     }
 
                     // Update existing
-                    $existing->update([
+                    $updateData = [
                         'user_id' => $user->id,
                         'password' => !empty($data['password']) ? $data['password'] : $existing->password,
                         'auth_type' => $data['auth_type'] ?? $existing->auth_type,
@@ -412,7 +438,16 @@ class SipAccountController extends Controller
                         'max_channels' => $data['max_channels'] ?? $existing->max_channels,
                         'codec_allow' => $data['codec_allow'] ?? $existing->codec_allow,
                         'status' => $data['status'] ?? $existing->status,
-                    ]);
+                    ];
+
+                    if (isset($headerMap['allow_p2p']) && isset($data['allow_p2p'])) {
+                        $updateData['allow_p2p'] = filter_var($data['allow_p2p'], FILTER_VALIDATE_BOOLEAN);
+                    }
+                    if (isset($headerMap['allow_recording']) && isset($data['allow_recording'])) {
+                        $updateData['allow_recording'] = filter_var($data['allow_recording'], FILTER_VALIDATE_BOOLEAN);
+                    }
+
+                    $existing->update($updateData);
 
                     // Re-provision
                     if ($existing->status === 'active') {
@@ -435,7 +470,7 @@ class SipAccountController extends Controller
                     }
 
                     // Create new
-                    $sip = SipAccount::create([
+                    $createData = [
                         'user_id' => $user->id,
                         'username' => $data['username'],
                         'password' => $data['password'],
@@ -446,7 +481,16 @@ class SipAccountController extends Controller
                         'max_channels' => $data['max_channels'] ?? 2,
                         'codec_allow' => $data['codec_allow'] ?? 'ulaw,alaw,g729',
                         'status' => $data['status'] ?? 'active',
-                    ]);
+                    ];
+
+                    if (isset($headerMap['allow_p2p']) && isset($data['allow_p2p'])) {
+                        $createData['allow_p2p'] = filter_var($data['allow_p2p'], FILTER_VALIDATE_BOOLEAN);
+                    }
+                    if (isset($headerMap['allow_recording']) && isset($data['allow_recording'])) {
+                        $createData['allow_recording'] = filter_var($data['allow_recording'], FILTER_VALIDATE_BOOLEAN);
+                    }
+
+                    $sip = SipAccount::create($createData);
 
                     // Provision to Asterisk
                     if ($sip->status === 'active') {

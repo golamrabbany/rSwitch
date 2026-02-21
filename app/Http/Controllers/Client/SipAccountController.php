@@ -59,7 +59,7 @@ class SipAccountController extends Controller
         abort_unless($sipAccount->user_id === auth()->id(), 403);
 
         $validated = $request->validate([
-            'password' => 'nullable|string|min:12',
+            'password' => 'nullable|string|min:6',
             'caller_id_name' => 'required|string|max:80',
             'caller_id_number' => 'required|string|max:20',
         ]);

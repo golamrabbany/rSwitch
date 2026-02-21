@@ -163,7 +163,7 @@
                                         Regenerate
                                     </button>
                                 </div>
-                                <p class="form-hint">Min 12 characters, auto-generated</p>
+                                <p class="form-hint">Min 6 characters, auto-generated</p>
                                 <x-input-error :messages="$errors->get('password')" class="mt-2" />
                             </div>
 
@@ -184,11 +184,81 @@
                                 <x-input-error :messages="$errors->get('allowed_ips')" class="mt-2" />
                             </div>
 
-                            <div class="form-group md:col-span-2">
-                                <label for="codec_allow" class="form-label">Codecs</label>
-                                <input type="text" id="codec_allow" name="codec_allow" value="{{ old('codec_allow', 'ulaw,alaw,g729') }}" required class="form-input font-mono">
-                                <p class="form-hint">Comma-separated codec list in priority order</p>
+                            <div class="form-group md:col-span-2" x-data="{
+                                codecs: '{{ $availableCodecs }}'.split(',').map(s => s.trim()).filter(Boolean),
+                                selected: '{{ old('codec_allow', $availableCodecs) }}'.split(',').map(s => s.trim()).filter(Boolean),
+                                toggle(val) {
+                                    const idx = this.selected.indexOf(val);
+                                    if (idx > -1) { this.selected.splice(idx, 1); }
+                                    else { this.selected.push(val); }
+                                },
+                                isSelected(val) { return this.selected.includes(val); },
+                                get value() { return this.selected.join(','); }
+                            }">
+                                <label class="form-label">Codecs</label>
+                                <input type="hidden" name="codec_allow" :value="value">
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="codec in codecs" :key="codec">
+                                        <button type="button" @click="toggle(codec)"
+                                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-150 cursor-pointer"
+                                            :class="isSelected(codec)
+                                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-200'
+                                                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'">
+                                            <svg x-show="isSelected(codec)" class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                            <span class="font-mono" x-text="codec"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                                <p class="form-hint mt-2">Click to select/deselect codecs. At least one is required.</p>
                                 <x-input-error :messages="$errors->get('codec_allow')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Call Features --}}
+                <div class="form-card" x-data="{
+                    allowP2p: {{ old('allow_p2p', '1') == '1' ? 'true' : 'false' }},
+                    allowRecording: {{ old('allow_recording', '0') == '1' ? 'true' : 'false' }}
+                }">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Call Features</h3>
+                        <p class="form-card-subtitle">P2P calling and call recording options</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="space-y-4">
+                            {{-- Allow P2P Calls --}}
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">Allow P2P Calls</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">Enable internal SIP-to-SIP (PIN-to-PIN) calls between accounts</p>
+                                </div>
+                                <input type="hidden" name="allow_p2p" :value="allowP2p ? '1' : '0'">
+                                <button type="button" @click="allowP2p = !allowP2p"
+                                    class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                    :class="allowP2p ? 'bg-indigo-600' : 'bg-gray-200'"
+                                    role="switch" :aria-checked="allowP2p">
+                                    <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                        :class="allowP2p ? 'translate-x-5' : 'translate-x-0'"></span>
+                                </button>
+                            </div>
+
+                            {{-- Allow Call Recording --}}
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">Allow Call Recording</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">Record all calls made by this SIP account</p>
+                                </div>
+                                <input type="hidden" name="allow_recording" :value="allowRecording ? '1' : '0'">
+                                <button type="button" @click="allowRecording = !allowRecording"
+                                    class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                    :class="allowRecording ? 'bg-indigo-600' : 'bg-gray-200'"
+                                    role="switch" :aria-checked="allowRecording">
+                                    <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                        :class="allowRecording ? 'translate-x-5' : 'translate-x-0'"></span>
+                                </button>
                             </div>
                         </div>
                     </div>

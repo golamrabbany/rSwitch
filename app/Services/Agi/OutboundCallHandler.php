@@ -193,6 +193,7 @@ class OutboundCallHandler
         $agi->setVariable('ROUTE_CLI_NAME', $cliName);
         $agi->setVariable('ROUTE_CLI_NUM', $cliNum);
         $agi->setVariable('CDR_UUID', $uuid);
+        $agi->setVariable('RECORD_CALL', $sipAccount->allow_recording ? '1' : '0');
 
         $agi->verbose("rSwitch: Route {$extension} via {$trunk->name} -> {$dialString}", 2);
 
@@ -224,6 +225,13 @@ class OutboundCallHandler
             ->first();
 
         if ($destinationSip) {
+            // Check if caller has P2P calls enabled
+            if (!$callerSip->allow_p2p) {
+                $agi->verbose("rSwitch: P2P calls disabled for SIP {$callerSip->username}", 1);
+                $this->reject($agi, 'p2p_disabled');
+                return true;
+            }
+
             return $this->routeToSipAccount($agi, $destinationSip, $callerSip, $callerUser, $channel, $extension, $callerId, $callerName);
         }
 
@@ -301,6 +309,7 @@ class OutboundCallHandler
         $agi->setVariable('ROUTE_CLI_NAME', $callerSip->caller_id_name ?: $callerName);
         $agi->setVariable('ROUTE_CLI_NUM', $callerSip->caller_id_number ?: $callerId);
         $agi->setVariable('CDR_UUID', $uuid);
+        $agi->setVariable('RECORD_CALL', $callerSip->allow_recording ? '1' : '0');
 
         $agi->verbose("rSwitch: Internal call to SIP/{$extension} -> {$dialString}", 2);
 

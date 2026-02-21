@@ -310,11 +310,10 @@ class DatabaseSeeder extends Seeder
         // ==========================================
         $sipAccounts = [];
         $sipCounter = 100000;
-        $allUsers = array_merge($resellers, $clients);
 
-        // Create ~2-3 SIP accounts per user to reach 100
-        foreach ($allUsers as $user) {
-            $numSipAccounts = $user->role === 'reseller' ? rand(3, 5) : rand(2, 3);
+        // SIP accounts can only belong to clients
+        foreach ($clients as $user) {
+            $numSipAccounts = rand(2, 4);
 
             for ($i = 0; $i < $numSipAccounts; $i++) {
                 $sipCounter++;
@@ -346,6 +345,8 @@ class DatabaseSeeder extends Seeder
         // ==========================================
         // DEMO DATA: DIDs
         // ==========================================
+        $allUsers = array_merge($resellers, $clients);
+
         $didNumbers = [
             '18005551001', '18005551002', '18005551003', '18005551004', '18005551005',
             '18005552001', '18005552002', '18005552003', '18005552004', '18005552005',

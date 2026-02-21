@@ -33,7 +33,7 @@
                         <label for="password" class="block text-sm font-medium text-gray-700">SIP Password</label>
                         <input type="text" id="password" name="password" value="{{ old('password', App\Services\SipProvisioningService::generatePassword()) }}" required
                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono">
-                        <p class="mt-1 text-xs text-gray-500">Minimum 12 characters. Auto-generated for security.</p>
+                        <p class="mt-1 text-xs text-gray-500">Minimum 6 characters. Auto-generated for security.</p>
                         <x-input-error :messages="$errors->get('password')" class="mt-2" />
                     </div>
                 </div>
@@ -84,11 +84,34 @@
                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                     </div>
-                    <div>
-                        <label for="codec_allow" class="block text-sm font-medium text-gray-700">Codecs</label>
-                        <input type="text" id="codec_allow" name="codec_allow" value="{{ old('codec_allow', 'ulaw,alaw,g729') }}" required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <p class="mt-1 text-xs text-gray-500">Comma-separated codec list.</p>
+                    <div x-data="{
+                        codecs: '{{ $availableCodecs }}'.split(',').map(s => s.trim()).filter(Boolean),
+                        selected: '{{ old('codec_allow', $availableCodecs) }}'.split(',').map(s => s.trim()).filter(Boolean),
+                        toggle(val) {
+                            const idx = this.selected.indexOf(val);
+                            if (idx > -1) { this.selected.splice(idx, 1); }
+                            else { this.selected.push(val); }
+                        },
+                        isSelected(val) { return this.selected.includes(val); },
+                        get value() { return this.selected.join(','); }
+                    }">
+                        <label class="block text-sm font-medium text-gray-700">Codecs</label>
+                        <input type="hidden" name="codec_allow" :value="value">
+                        <div class="mt-1 flex flex-wrap gap-2">
+                            <template x-for="codec in codecs" :key="codec">
+                                <button type="button" @click="toggle(codec)"
+                                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-150 cursor-pointer"
+                                    :class="isSelected(codec)
+                                        ? 'bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-200'
+                                        : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'">
+                                    <svg x-show="isSelected(codec)" class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span class="font-mono" x-text="codec"></span>
+                                </button>
+                            </template>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">Click to select/deselect codecs.</p>
                         <x-input-error :messages="$errors->get('codec_allow')" class="mt-2" />
                     </div>
                 </div>
