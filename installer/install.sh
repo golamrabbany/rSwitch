@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 
 # Version
 INSTALLER_VERSION="1.4.0"
-ASTERISK_VERSION="21.4.0"
+ASTERISK_VERSION="21.12.1"
 PHP_VERSION="8.3"
 NODE_VERSION="20"
 
@@ -429,26 +429,36 @@ install_mysql() {
         systemctl start mysqld
         systemctl enable mysqld
     else
+        export DEBIAN_FRONTEND=noninteractive
         apt-get install -y -qq mysql-server mysql-client
         systemctl start mysql
         systemctl enable mysql
     fi
 
-    # Secure MySQL installation
-    log_info "Securing MySQL installation..."
-    mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_PASS}_root';"
-    mysql -u root -p"${DB_PASS}_root" -e "DELETE FROM mysql.user WHERE User='';"
-    mysql -u root -p"${DB_PASS}_root" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
-    mysql -u root -p"${DB_PASS}_root" -e "DROP DATABASE IF EXISTS test;"
-    mysql -u root -p"${DB_PASS}_root" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
-    mysql -u root -p"${DB_PASS}_root" -e "FLUSH PRIVILEGES;"
+    # Check if root can connect without password (fresh install)
+    if mysql -u root -e "SELECT 1" &>/dev/null; then
+        log_info "Securing MySQL installation..."
+        mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_PASS}_root';"
+    else
+        log_warning "MySQL root already has a password set, skipping root password change."
+        log_warning "You may need to manually create the database and user."
+    fi
+
+    MYSQL_ROOT_PASS="${DB_PASS}_root"
+
+    # Clean up default users and databases
+    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DELETE FROM mysql.user WHERE User='';" 2>/dev/null || true
+    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');" 2>/dev/null || true
+    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DROP DATABASE IF EXISTS test;" 2>/dev/null || true
+    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';" 2>/dev/null || true
+    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "FLUSH PRIVILEGES;" 2>/dev/null || true
 
     # Create application database and user
     log_info "Creating database and user..."
-    mysql -u root -p"${DB_PASS}_root" -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-    mysql -u root -p"${DB_PASS}_root" -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
-    mysql -u root -p"${DB_PASS}_root" -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
-    mysql -u root -p"${DB_PASS}_root" -e "FLUSH PRIVILEGES;"
+    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
+    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "FLUSH PRIVILEGES;"
 
     log_success "MySQL installed and configured"
 }
@@ -556,23 +566,29 @@ install_asterisk() {
             freetds-dev \
             libpq-dev \
             libopus-dev \
-            libvpb-dev
+            libvpb-dev \
+            subversion
     fi
 
     # Download Asterisk
     log_info "Downloading Asterisk $ASTERISK_VERSION..."
     cd /usr/src
-    wget -q https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-${ASTERISK_VERSION}.tar.gz
-    tar -xzf asterisk-${ASTERISK_VERSION}.tar.gz
+    if [[ ! -f asterisk-${ASTERISK_VERSION}.tar.gz ]]; then
+        wget -q https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-${ASTERISK_VERSION}.tar.gz
+    fi
+    if [[ ! -d asterisk-${ASTERISK_VERSION} ]]; then
+        tar -xzf asterisk-${ASTERISK_VERSION}.tar.gz
+    fi
     cd asterisk-${ASTERISK_VERSION}
 
     # Install MP3 support
     log_info "Installing MP3 support..."
-    contrib/scripts/get_mp3_source.sh
+    contrib/scripts/get_mp3_source.sh || true
 
     # Install prerequisites
     log_info "Installing Asterisk prerequisites..."
-    contrib/scripts/install_prereq install
+    export DEBIAN_FRONTEND=noninteractive
+    yes | contrib/scripts/install_prereq install || true
 
     # Configure
     log_info "Configuring Asterisk..."
@@ -596,9 +612,9 @@ install_asterisk() {
         --enable CORE-SOUNDS-EN-WAV \
         --enable CORE-SOUNDS-EN-ULAW \
         --enable CORE-SOUNDS-EN-ALAW \
-        --enable MOH-ORSOUND-WAV \
-        --enable MOH-ORSOUND-ULAW \
-        --enable MOH-ORSOUND-ALAW \
+        --enable MOH-OPSOUND-WAV \
+        --enable MOH-OPSOUND-ULAW \
+        --enable MOH-OPSOUND-ALAW \
         --enable EXTRA-SOUNDS-EN-WAV \
         --enable format_mp3 \
         menuselect.makeopts
@@ -887,21 +903,30 @@ install_application() {
     log_info "Creating environment configuration..."
     cp .env.example .env
 
-    # Update .env
-    sed -i "s|APP_NAME=.*|APP_NAME=rSwitch|" .env
-    sed -i "s|APP_ENV=.*|APP_ENV=production|" .env
-    sed -i "s|APP_DEBUG=.*|APP_DEBUG=false|" .env
-    sed -i "s|APP_URL=.*|APP_URL=https://${DOMAIN}|" .env
-    sed -i "s|DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
-    sed -i "s|DB_HOST=.*|DB_HOST=127.0.0.1|" .env
-    sed -i "s|DB_PORT=.*|DB_PORT=3306|" .env
-    sed -i "s|DB_DATABASE=.*|DB_DATABASE=${DB_NAME}|" .env
-    sed -i "s|DB_USERNAME=.*|DB_USERNAME=${DB_USER}|" .env
-    sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${DB_PASS}|" .env
-    sed -i "s|CACHE_DRIVER=.*|CACHE_DRIVER=redis|" .env
-    sed -i "s|SESSION_DRIVER=.*|SESSION_DRIVER=redis|" .env
-    sed -i "s|QUEUE_CONNECTION=.*|QUEUE_CONNECTION=redis|" .env
-    sed -i "s|REDIS_HOST=.*|REDIS_HOST=127.0.0.1|" .env
+    # Update .env (handle both commented and uncommented lines)
+    sed -i "s|^APP_NAME=.*|APP_NAME=rSwitch|" .env
+    sed -i "s|^APP_ENV=.*|APP_ENV=production|" .env
+    sed -i "s|^APP_DEBUG=.*|APP_DEBUG=false|" .env
+    sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN}|" .env
+    sed -i "s|^# DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
+    sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
+    sed -i "s|^# DB_HOST=.*|DB_HOST=127.0.0.1|" .env
+    sed -i "s|^DB_HOST=.*|DB_HOST=127.0.0.1|" .env
+    sed -i "s|^# DB_PORT=.*|DB_PORT=3306|" .env
+    sed -i "s|^DB_PORT=.*|DB_PORT=3306|" .env
+    sed -i "s|^# DB_DATABASE=.*|DB_DATABASE=${DB_NAME}|" .env
+    sed -i "s|^DB_DATABASE=.*|DB_DATABASE=${DB_NAME}|" .env
+    sed -i "s|^# DB_USERNAME=.*|DB_USERNAME=${DB_USER}|" .env
+    sed -i "s|^DB_USERNAME=.*|DB_USERNAME=${DB_USER}|" .env
+    sed -i "s|^# DB_PASSWORD=.*|DB_PASSWORD=${DB_PASS}|" .env
+    sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${DB_PASS}|" .env
+    sed -i "s|^CACHE_STORE=.*|CACHE_STORE=redis|" .env
+    sed -i "s|^SESSION_DRIVER=.*|SESSION_DRIVER=redis|" .env
+    sed -i "s|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=redis|" .env
+    sed -i "s|^REDIS_HOST=.*|REDIS_HOST=127.0.0.1|" .env
+
+    # Ensure .env is owned by web user before artisan commands
+    chown ${WEB_USER}:${WEB_USER} .env
 
     # Add AGI and AMI configuration
     cat >> .env << EOF
@@ -930,6 +955,7 @@ EOF
 
     # Install NPM dependencies and build assets
     log_info "Building frontend assets..."
+    mkdir -p /var/www/.npm && chown -R ${WEB_USER}:${WEB_USER} /var/www/.npm
     sudo -u ${WEB_USER} npm ci
     sudo -u ${WEB_USER} npm run build
 
@@ -1406,25 +1432,30 @@ create_admin_user() {
 
     cd $INSTALL_DIR
 
-    # Use tinker to create admin user
-    php artisan tinker --execute="
-        \$user = App\Models\User::where('email', '${ADMIN_EMAIL}')->first();
-        if (!\$user) {
-            \$user = App\Models\User::create([
-                'name' => 'Administrator',
-                'email' => '${ADMIN_EMAIL}',
-                'password' => Hash::make('${ADMIN_PASSWORD}'),
-                'role' => 'admin',
-                'status' => 'active',
-                'billing_type' => 'postpaid',
-                'balance' => 0,
-            ]);
-            \$user->assignRole('admin');
-            echo 'Admin user created successfully';
-        } else {
-            echo 'Admin user already exists';
-        }
-    "
+    # Determine web user
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        WEB_USER="nginx"
+    else
+        WEB_USER="www-data"
+    fi
+
+    # Ensure psysh config dir is writable
+    mkdir -p /var/www/.config/psysh && chown -R ${WEB_USER}:${WEB_USER} /var/www/.config
+
+    # Create admin user via MySQL (avoids tinker permission issues)
+    HASHED_PASS=$(php -r "echo password_hash('${ADMIN_PASSWORD}', PASSWORD_BCRYPT);")
+
+    MYSQL_ROOT_PASS="${DB_PASS}_root"
+    mysql -u root -p"${MYSQL_ROOT_PASS}" ${DB_NAME} -e "
+        INSERT INTO users (name, email, password, role, status, email_verified_at, billing_type, balance, created_at, updated_at)
+        VALUES ('Super Admin', '${ADMIN_EMAIL}', '${HASHED_PASS}', 'super_admin', 'active', NOW(), 'postpaid', 0, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE name=name;
+    " 2>/dev/null
+
+    # Set hierarchy path for the admin user
+    mysql -u root -p"${MYSQL_ROOT_PASS}" ${DB_NAME} -e "
+        UPDATE users SET hierarchy_path = CONCAT('/', id, '/') WHERE hierarchy_path IS NULL OR hierarchy_path = '';
+    " 2>/dev/null
 
     log_success "Admin user created"
 }
