@@ -1,6 +1,6 @@
-# CLAUDE.md - rSwitch VoIP Billing Platform
+# CLAUDE.md
 
-This file provides guidance to Claude Code when working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -17,6 +17,9 @@ rSwitch is a multi-tenant VoIP billing and switching platform built with Laravel
 
 # Run specific test file
 ./vendor/bin/sail test tests/Feature/Admin/UserManagementTest.php
+
+# Run specific test method
+./vendor/bin/sail test --filter=test_admin_can_authenticate_with_otp
 
 # Run migrations
 ./vendor/bin/sail artisan migrate
@@ -64,6 +67,17 @@ The User model is organized into traits in `app/Models/Traits/`:
 - **HasHierarchy** - Materialized path pattern for efficient descendant queries with caching
 - **HasAuthorization** - `canManage()`, `scopeVisibleTo()`, scoping logic
 
+### Authentication
+
+Two separate login flows:
+
+- **Admins** (`super_admin`, `admin`, `recharge_admin`): OTP-based login at `/admin/login` via `AdminOtpLoginController`
+- **Clients & Resellers**: Standard Livewire login at `/login` via `LoginForm`
+
+After login, `/dashboard` redirects to role-based dashboard via a match statement in `routes/web.php`.
+
+**Impersonation**: Super Admin can "Login As" any non-super-admin user via `ImpersonationController`. Session stores `impersonator_id`.
+
 ### Key Services
 
 | Service | Location | Purpose |
@@ -100,6 +114,8 @@ The User model is organized into traits in `app/Models/Traits/`:
 ### Route Structure
 
 ```
+/admin/login       - Admin OTP login (super_admin, admin, recharge_admin)
+/login             - Client/Reseller Livewire login
 /admin/*           - Super Admin & Regular Admin routes
 /recharge-admin/*  - Recharge Admin routes (view-only + balance)
 /reseller/*        - Reseller portal
@@ -109,14 +125,13 @@ The User model is organized into traits in `app/Models/Traits/`:
 
 ### View Structure
 
-Layouts are in `resources/views/layouts/`:
-- `admin.blade.php` - Admin panel layout with dark sidebar
-- `recharge-admin.blade.php` - Recharge admin layout
-- `reseller.blade.php` - Reseller portal layout
-- `client.blade.php` - Client portal layout
+Layouts in `resources/views/layouts/` — each portal has its own layout file. All use indigo as brand color. Components in `resources/views/components/` wrap the layouts.
 
-Components in `resources/views/components/`:
-- `admin-layout.blade.php`, `reseller-layout.blade.php`, `client-layout.blade.php`
+CSS theme classes are in `resources/css/app.css`: `.theme-admin`, `.theme-reseller`, `.theme-client` control sidebar active/hover states.
+
+### Global Helpers
+
+`app/Helpers/currency.php` is autoloaded via composer and provides `format_currency()`.
 
 ## Coding Patterns
 
@@ -167,27 +182,32 @@ abort_unless(auth()->user()->canManage($user), 403);
 abort_unless(auth()->user()->canRechargeBalance($user), 403);
 ```
 
-## Testing
-
-Tests are in `tests/Feature/` and `tests/Unit/`. Key test files:
-
-- `tests/Feature/Admin/UserManagementTest.php` - User CRUD and scoping
-- `tests/Feature/RatingServiceTest.php` - Billing rate calculations
-- `tests/Feature/BalanceServiceTest.php` - Balance operations
-
-Run with: `./vendor/bin/sail test`
-
 ## Docker Services
 
-Defined in `docker-compose.yml`:
+Defined in `compose.yaml`:
 - `laravel.test` - Main Laravel application (Sail)
 - `mysql` - MySQL 8.4
 - `redis` - Cache and queues
 - `asterisk` - Asterisk 21.x with PJSIP/ODBC
+- `phpmyadmin` - Database management (port 8080)
+- `worker` - Queue worker via Supervisor
+
+Port conflicts: If XAMPP or local MySQL is running, set `FORWARD_DB_PORT=3307` and `APP_PORT=8000` in `.env`.
+
+## Production Installer
+
+The `installer/` directory contains bash scripts for bare-metal server deployment:
+- `install.sh` - Full installation (PHP, MySQL, Redis, Nginx, Asterisk, ODBC)
+- `update.sh` - Application update with backup
+- `uninstall.sh` - Clean removal
+- `troubleshoot.sh` - Diagnostic tool
+- `templates/` - Nginx, Supervisor, Asterisk, Fail2Ban config templates
+
+Supports Ubuntu 22.04+, Debian 12+, CentOS 9+, AlmaLinux 9+.
 
 ## Important Notes
 
-1. **Hierarchy Path**: Users have a `hierarchy_path` column (e.g., `/1/5/12/`) for efficient descendant queries. This is auto-generated via the `HasHierarchy` trait.
+1. **Hierarchy Path**: Users have a `hierarchy_path` column (e.g., `/1/5/12/`) for efficient descendant queries. Auto-generated via the `HasHierarchy` trait.
 
 2. **CDR Partitioning**: The `call_records` table is partitioned by month on `call_start`. Always include `call_start` in WHERE clauses.
 
@@ -196,3 +216,5 @@ Defined in `docker-compose.yml`:
 4. **Admin-Reseller Assignment**: Regular Admins and Recharge Admins are assigned to specific resellers via `admin_resellers` pivot table.
 
 5. **Rate Groups**: Users are assigned rate groups. Billing uses longest-prefix-match on `rates.prefix`.
+
+6. **Two Login Systems**: Admins use OTP at `/admin/login`, clients/resellers use standard Livewire at `/login`. Do not mix these.
