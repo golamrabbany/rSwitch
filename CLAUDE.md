@@ -194,6 +194,16 @@ Defined in `compose.yaml`:
 
 Port conflicts: If XAMPP or local MySQL is running, set `FORWARD_DB_PORT=3307` and `APP_PORT=8000` in `.env`.
 
+## Production Server
+
+- **Host**: 103.170.231.19
+- **User**: sarker
+- **Password**: Sarker@!#$
+- **Domain**: rswitch.webvoice.net
+- **Install Dir**: /var/www/rswitch
+- **SSH**: `sshpass -f <(printf '%s' $'Sarker@!#$') ssh sarker@103.170.231.19`
+- **No git repo** on server — deploy by uploading files to `/tmp/` then `sudo cp` into place
+
 ## Production Installer
 
 The `installer/` directory contains bash scripts for bare-metal server deployment:

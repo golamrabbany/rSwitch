@@ -134,6 +134,53 @@ Designed a complete MVP plan for a Softswitch with billing system.
 
 ---
 
+---
+
+## Session: 2026-02-21 — Add Allow P2P Calls & Allow Call Recording to SIP Accounts
+
+### What Was Done
+
+Added two per-account boolean toggles to SIP accounts:
+- **Allow P2P Calls** (default: enabled) — gates internal SIP-to-SIP calls in AGI
+- **Allow Call Recording** (default: disabled) — triggers MixMonitor in Asterisk dialplan
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `database/migrations/2026_02_21_221148_add_p2p_and_recording_to_sip_accounts_table.php` | New migration: `allow_p2p` (bool, default true), `allow_recording` (bool, default false) |
+| `app/Models/SipAccount.php` | Added to `$fillable` and `casts()` |
+| `app/Http/Controllers/Admin/SipAccountController.php` | Validation rules in `store()`/`update()`, `$request->boolean()` conversion, optional CSV column handling in `import()` |
+| `resources/views/admin/sip-accounts/create.blade.php` | "Call Features" card with Alpine.js toggle switches |
+| `resources/views/admin/sip-accounts/edit.blade.php` | Same card, pre-populated from `$sipAccount` |
+| `resources/views/admin/sip-accounts/show.blade.php` | P2P and Recording rows with Enabled/Disabled badges |
+| `resources/views/admin/sip-accounts/import.blade.php` | Documented `allow_p2p` and `allow_recording` as optional CSV columns |
+| `app/Services/Agi/OutboundCallHandler.php` | P2P gate check (rejects with `p2p_disabled`), sets `RECORD_CALL` channel var for external and internal paths |
+| `docker/asterisk/conf/extensions.conf` | `ExecIf` MixMonitor before Dial on external and internal paths |
+| `installer/templates/asterisk/extensions.conf.template` | Same MixMonitor changes |
+| `installer/update.sh` | Copies dialplan template, reloads Asterisk, creates recording directory |
+| `CLAUDE.md` | Added Production Server access details |
+
+### Commits
+
+| Commit | Description |
+|---|---|
+| `a8839aa` | Add Allow P2P Calls & Allow Call Recording toggles to SIP accounts |
+
+### Deployment
+
+Deployed to production server (103.170.231.19 / rswitch.webvoice.net):
+- Files uploaded via SCP to `/tmp/` then `sudo cp` into `/var/www/rswitch/`
+- Migration ran successfully
+- Asterisk dialplan reloaded with MixMonitor support
+- Recording directory created at `/var/spool/asterisk/recording/`
+- View cache refreshed
+
+### Notes
+- Reseller/Client portals do **not** see these toggles — DB defaults apply (P2P=on, Recording=off)
+- No git repo on production server — deploy by uploading files then `sudo cp`
+- Server access saved in CLAUDE.md
+
 ## Next Steps
 - Start implementing Phase 1 (Foundation)
 - Set up Laravel project with auth and role system
