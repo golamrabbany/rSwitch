@@ -213,7 +213,6 @@
                     <th>Owner</th>
                     <th>Caller ID</th>
                     <th>Chan</th>
-                    <th>Registration</th>
                     <th>Status</th>
                     <th class="text-center" style="vertical-align: middle;">Actions</th>
                 </tr>
@@ -250,24 +249,6 @@
                         </td>
                         <td class="font-medium">{{ $sip->max_channels }}</td>
                         <td>
-                            @php
-                                $contact = $contacts->get($sip->username);
-                                $sourceIp = null;
-                                if ($contact && $contact->uri) {
-                                    preg_match('/@([^:;>]+)/', $contact->uri, $m);
-                                    $sourceIp = $m[1] ?? null;
-                                }
-                            @endphp
-                            @if($contact)
-                                <span class="badge badge-success">Registered</span>
-                                @if($sourceIp)
-                                    <div class="text-xs text-gray-500 font-mono mt-0.5">{{ $sourceIp }}</div>
-                                @endif
-                            @else
-                                <span class="badge badge-gray">Unregistered</span>
-                            @endif
-                        </td>
-                        <td>
                             @if($sip->status === 'active')
                                 <span class="badge badge-success">Active</span>
                             @elseif($sip->status === 'suspended')
@@ -294,7 +275,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center py-12">
+                        <td colspan="6" class="text-center py-12">
                             <div class="empty-state">
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>

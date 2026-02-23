@@ -58,13 +58,6 @@ class SipAccountController extends Controller
 
         $sipAccounts = $query->orderByDesc('created_at')->paginate(20);
 
-        // Fetch registration status from ps_contacts for current page
-        $usernames = $sipAccounts->pluck('username')->toArray();
-        $contacts = \DB::table('ps_contacts')
-            ->whereIn(\DB::raw('SUBSTRING_INDEX(id, ";", 1)'), $usernames)
-            ->get()
-            ->keyBy(fn ($c) => explode(';', $c->id)[0]);
-
         // Get resellers and clients for filters (scoped for non-super admins)
         $resellerQuery = User::where('role', 'reseller')->orderBy('name');
         $clientQuery = User::where('role', 'client')->orderBy('name');
@@ -75,7 +68,7 @@ class SipAccountController extends Controller
         $resellers = $resellerQuery->get(['id', 'name', 'email']);
         $clients = $clientQuery->get(['id', 'name', 'email', 'parent_id']);
 
-        return view('admin.sip-accounts.index', compact('sipAccounts', 'resellers', 'clients', 'contacts'));
+        return view('admin.sip-accounts.index', compact('sipAccounts', 'resellers', 'clients'));
     }
 
     public function create(Request $request)
