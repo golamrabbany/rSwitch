@@ -76,52 +76,48 @@
 
     {{-- Filter Card --}}
     <div class="filter-card">
-        <form method="GET" action="{{ route('admin.operational-reports.p2p') }}">
-            <div class="cdr-filter-grid">
-                <div class="cdr-filter-item">
-                    <label for="date_from" class="cdr-filter-label">Date From</label>
-                    <input type="date" id="date_from" name="date_from" value="{{ $dateFrom->format('Y-m-d') }}" required class="filter-date">
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="date_to" class="cdr-filter-label">Date To</label>
-                    <input type="date" id="date_to" name="date_to" value="{{ $dateTo->format('Y-m-d') }}" required class="filter-date">
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="user_id" class="cdr-filter-label">User</label>
-                    <select id="user_id" name="user_id" class="filter-select">
-                        <option value="">All Users</option>
-                        @foreach ($users as $user)
-                            <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
-                                {{ $user->name }} ({{ ucfirst($user->role) }})
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="disposition" class="cdr-filter-label">Disposition</label>
-                    <select id="disposition" name="disposition" class="filter-select">
-                        <option value="">All</option>
-                        @foreach (['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CANCEL'] as $d)
-                            <option value="{{ $d }}" {{ request('disposition') === $d ? 'selected' : '' }}>{{ $d }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="search" class="cdr-filter-label">Caller / Callee</label>
-                    <input type="text" id="search" name="search" value="{{ request('search') }}" placeholder="Number prefix..." class="filter-input">
-                </div>
+        <form method="GET" action="{{ route('admin.operational-reports.p2p') }}" class="flex flex-wrap items-end gap-3">
+            <div class="cdr-filter-item">
+                <label for="date_from" class="cdr-filter-label">Date From</label>
+                <input type="date" id="date_from" name="date_from" value="{{ $dateFrom->format('Y-m-d') }}" required class="filter-date">
             </div>
-            <div class="flex items-center gap-3 mt-4">
-                <button type="submit" class="btn-search-admin">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-                    </svg>
-                    Filter
-                </button>
-                @if(request()->hasAny(['disposition', 'user_id', 'search']))
-                    <a href="{{ route('admin.operational-reports.p2p') }}" class="btn-clear">Clear Filters</a>
-                @endif
+            <div class="cdr-filter-item">
+                <label for="date_to" class="cdr-filter-label">Date To</label>
+                <input type="date" id="date_to" name="date_to" value="{{ $dateTo->format('Y-m-d') }}" required class="filter-date">
             </div>
+            <div class="cdr-filter-item">
+                <label for="user_id" class="cdr-filter-label">User</label>
+                <select id="user_id" name="user_id" class="filter-select">
+                    <option value="">All Users</option>
+                    @foreach ($users as $user)
+                        <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
+                            {{ $user->name }} ({{ ucfirst($user->role) }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="cdr-filter-item">
+                <label for="disposition" class="cdr-filter-label">Disposition</label>
+                <select id="disposition" name="disposition" class="filter-select">
+                    <option value="">All</option>
+                    @foreach (['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CANCEL'] as $d)
+                        <option value="{{ $d }}" {{ request('disposition') === $d ? 'selected' : '' }}>{{ $d }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="cdr-filter-item">
+                <label for="search" class="cdr-filter-label">Caller / Callee</label>
+                <input type="text" id="search" name="search" value="{{ request('search') }}" placeholder="Number prefix..." class="filter-input">
+            </div>
+            <button type="submit" class="btn-search-admin">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                </svg>
+                Filter
+            </button>
+            @if(request()->hasAny(['disposition', 'user_id', 'search']))
+                <a href="{{ route('admin.operational-reports.p2p') }}" class="btn-clear">Clear Filters</a>
+            @endif
         </form>
     </div>
 
