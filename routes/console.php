@@ -20,7 +20,7 @@ Schedule::call(function () {
             'status' => \Illuminate\Support\Facades\DB::raw("CASE WHEN disposition = 'ANSWERED' AND billsec > 0 THEN 'completed' ELSE 'unbillable' END"),
             'call_end' => \Illuminate\Support\Facades\DB::raw("COALESCE(call_end, call_start + INTERVAL GREATEST(duration, 1) SECOND)"),
         ]);
-})->everyMinute()->withoutOverlapping()->name('cleanup-stale-calls');
+})->name('cleanup-stale-calls')->everyMinute()->withoutOverlapping();
 
 Schedule::command('cdr:aggregate')
     ->everyFiveMinutes()
