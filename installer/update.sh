@@ -126,10 +126,26 @@ update_application() {
     mkdir -p /var/spool/asterisk/recording
     chown asterisk:asterisk /var/spool/asterisk/recording
 
-    # Restart queue workers
-    log_info "Restarting queue workers..."
-    supervisorctl restart rswitch-worker:*
-    supervisorctl restart rswitch-webhook-worker:*
+    # Ensure sorcery.conf has PJSIP realtime mappings
+    log_info "Checking Asterisk sorcery configuration..."
+    if ! grep -q "endpoint=realtime,ps_endpoints" /etc/asterisk/sorcery.conf 2>/dev/null; then
+        cat > /etc/asterisk/sorcery.conf << 'SORCERYEOF'
+[res_pjsip]
+endpoint=realtime,ps_endpoints
+auth=realtime,ps_auths
+aor=realtime,ps_aors
+
+[res_pjsip_endpoint_identifier_ip]
+identify=realtime,ps_endpoint_id_ips
+SORCERYEOF
+        chown asterisk:asterisk /etc/asterisk/sorcery.conf
+        log_success "Sorcery configuration updated"
+    fi
+
+    # Restart queue workers and AGI
+    log_info "Restarting workers and AGI..."
+    supervisorctl restart rswitch-worker:* 2>/dev/null || true
+    supervisorctl restart rswitch-agi 2>/dev/null || true
 
     log_success "Application updated"
 }

@@ -38,7 +38,7 @@ return new class extends Migration
                 reseller_cost DECIMAL(10,4) NOT NULL DEFAULT 0,
                 disposition ENUM('ANSWERED','NO ANSWER','BUSY','FAILED','CANCEL') NULL,
                 hangup_cause VARCHAR(50) NULL,
-                status ENUM('in_progress','rated','failed','unbillable') NOT NULL DEFAULT 'in_progress',
+                status ENUM('in_progress','rated','failed','unbillable','completed') NOT NULL DEFAULT 'in_progress',
                 ast_channel VARCHAR(80) NULL,
                 ast_dstchannel VARCHAR(80) NULL,
                 ast_context VARCHAR(40) NULL,

@@ -57,11 +57,15 @@ class CallEndHandler
             $updateData['ast_dstchannel'] = $dstChannel;
         }
 
-        // Unanswered or zero-billsec calls are unbillable
-        // Answered calls stay 'in_progress' for billing:rate-calls to process
+        // Determine final status
         if ($disposition !== 'ANSWERED' || $billsec <= 0) {
+            // Unanswered or zero-billsec calls are unbillable
             $updateData['status'] = 'unbillable';
+        } elseif ($cdr->call_flow === 'sip_to_sip') {
+            // Internal P2P calls are free — mark completed immediately
+            $updateData['status'] = 'completed';
         }
+        // Answered trunk calls stay 'in_progress' for billing:rate-calls to process
 
         $cdr->update($updateData);
 

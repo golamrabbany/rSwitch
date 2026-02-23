@@ -25,6 +25,9 @@ return new class extends Migration
             $table->unsignedInteger('max_audio_streams')->default(1);
             $table->unsignedInteger('device_state_busy_at')->default(0);
             $table->string('callerid', 80)->nullable();
+            $table->string('mailboxes', 40)->nullable();
+            $table->string('identify_by', 80)->default('username,ip');
+            $table->string('dtmf_mode', 20)->default('rfc4733');
         });
 
         Schema::create('ps_auths', function (Blueprint $table) {
@@ -39,6 +42,13 @@ return new class extends Migration
             $table->unsignedInteger('max_contacts')->default(1);
             $table->unsignedInteger('qualify_frequency')->default(60);
             $table->string('remove_existing', 10)->default('yes');
+            $table->string('contact', 255)->nullable();
+            $table->string('support_path', 10)->default('no');
+            $table->unsignedInteger('minimum_expiration')->default(60);
+            $table->unsignedInteger('default_expiration')->default(3600);
+            $table->unsignedInteger('maximum_expiration')->default(7200);
+            $table->string('authenticate_qualify', 10)->default('no');
+            $table->string('outbound_proxy', 256)->nullable();
         });
 
         Schema::create('ps_contacts', function (Blueprint $table) {

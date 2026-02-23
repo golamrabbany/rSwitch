@@ -455,8 +455,13 @@ class OutboundCallHandler
             return true;
         }
 
-        // Admin can call anyone
-        if ($caller->role === 'admin') {
+        // Admin/Super Admin can call anyone
+        if (in_array($caller->role, ['super_admin', 'admin', 'recharge_admin'])) {
+            return true;
+        }
+
+        // Resellers can call other resellers and their clients
+        if ($caller->role === 'reseller' && in_array($destination->role, ['reseller', 'client'])) {
             return true;
         }
 
