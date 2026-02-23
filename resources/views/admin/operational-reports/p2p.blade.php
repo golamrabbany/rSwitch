@@ -24,7 +24,7 @@
     </div>
 
     {{-- Stats Grid --}}
-    <div class="cdr-stats-grid">
+    <div class="cdr-stats-grid !lg:grid-cols-4" style="grid-template-columns: repeat(4, minmax(0, 1fr))">
         <div class="cdr-stat-card cdr-stat-total">
             <div class="cdr-stat-icon">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
