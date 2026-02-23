@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\CallRecord;
 use App\Models\SipAccount;
 use App\Models\Trunk;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -327,58 +329,84 @@ class OperationalReportController extends Controller
      */
     public function p2pCalls(Request $request)
     {
-        $query = CallRecord::with(['user', 'sipAccount'])
-            ->where('call_flow', 'sip_to_sip');
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfDay()
+            : Carbon::today()->startOfDay();
 
-        // Date range filter
-        if ($request->filled('date_from')) {
-            $query->where('call_start', '>=', $request->date_from);
-        } else {
-            $query->where('call_start', '>=', now()->startOfDay());
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfDay()
+            : Carbon::today()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfDay();
         }
 
-        if ($request->filled('date_to')) {
-            $query->where('call_start', '<=', $request->date_to . ' 23:59:59');
+        if ($dateFrom->diffInDays($dateTo) > 31) {
+            $dateTo = $dateFrom->copy()->addDays(31)->endOfDay();
         }
 
-        // Search
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('caller', 'like', $search . '%')
-                  ->orWhere('callee', 'like', $search . '%');
-            });
+        // Build query — call_start first for partition pruning
+        $query = CallRecord::query()
+            ->where('call_flow', 'sip_to_sip')
+            ->whereBetween('call_start', [$dateFrom, $dateTo]);
+
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
         }
 
-        // Disposition filter
         if ($request->filled('disposition')) {
             $query->where('disposition', $request->disposition);
         }
 
-        $calls = $query->orderBy('call_start', 'desc')->paginate(50);
-
-        // Stats for the filtered period
-        $statsQuery = CallRecord::where('call_flow', 'sip_to_sip');
-        if ($request->filled('date_from')) {
-            $statsQuery->where('call_start', '>=', $request->date_from);
-        } else {
-            $statsQuery->where('call_start', '>=', now()->startOfDay());
-        }
-        if ($request->filled('date_to')) {
-            $statsQuery->where('call_start', '<=', $request->date_to . ' 23:59:59');
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('caller', 'like', "{$search}%")
+                  ->orWhere('callee', 'like', "{$search}%");
+            });
         }
 
-        $totalCalls = (clone $statsQuery)->count();
-        $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
-        $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
-        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
+        $records = $query->with(['user:id,name', 'sipAccount:id,username'])
+            ->orderByDesc('call_start')
+            ->paginate(50);
+
+        // Stats
+        $statsQuery = CallRecord::query()
+            ->where('call_flow', 'sip_to_sip')
+            ->whereBetween('call_start', [$dateFrom, $dateTo]);
+
+        if ($request->filled('user_id')) {
+            $statsQuery->where('user_id', $request->user_id);
+        }
+        if ($request->filled('disposition')) {
+            $statsQuery->where('disposition', $request->disposition);
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $statsQuery->where(function ($q) use ($search) {
+                $q->where('caller', 'like', "{$search}%")
+                  ->orWhere('callee', 'like', "{$search}%");
+            });
+        }
+
+        $statsRow = $statsQuery->selectRaw('
+            COUNT(*) as total_calls,
+            SUM(disposition = "ANSWERED") as answered_calls,
+            COALESCE(SUM(duration), 0) as total_duration,
+            COALESCE(SUM(billsec), 0) as total_billsec
+        ')->first();
+
+        $stats = [
+            'total_calls' => $statsRow->total_calls ?? 0,
+            'answered_calls' => $statsRow->answered_calls ?? 0,
+            'total_duration' => $statsRow->total_duration ?? 0,
+            'total_billsec' => $statsRow->total_billsec ?? 0,
+        ];
+
+        $users = User::select('id', 'name', 'role')->orderBy('name')->get();
 
         return view('admin.operational-reports.p2p', compact(
-            'calls',
-            'totalCalls',
-            'answeredCalls',
-            'asr',
-            'totalMinutes'
+            'records', 'stats', 'users', 'dateFrom', 'dateTo'
         ));
     }
 
