@@ -642,6 +642,11 @@ install_asterisk() {
     sed -i 's/^;runuser = .*/runuser = asterisk/' /etc/asterisk/asterisk.conf
     sed -i 's/^;rungroup = .*/rungroup = asterisk/' /etc/asterisk/asterisk.conf
 
+    # Allow www-data (PHP) to query Asterisk CLI for registration status
+    echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/asterisk' > /etc/sudoers.d/asterisk-www-data
+    chmod 440 /etc/sudoers.d/asterisk-www-data
+    log_info "Configured sudoers for www-data to access Asterisk CLI"
+
     # Cleanup
     cd /usr/src
     rm -rf asterisk-${ASTERISK_VERSION}.tar.gz

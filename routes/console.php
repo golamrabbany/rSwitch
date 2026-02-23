@@ -15,7 +15,7 @@ Schedule::command('billing:rate-calls --chunk=200')
 
 Schedule::call(function () {
     \App\Models\CallRecord::where('status', 'in_progress')
-        ->where('call_start', '<', now()->subSeconds(30))
+        ->where('call_start', '<', now()->subMinutes(5))
         ->update([
             'status' => \Illuminate\Support\Facades\DB::raw("CASE WHEN disposition = 'ANSWERED' AND billsec > 0 THEN 'completed' ELSE 'unbillable' END"),
             'call_end' => \Illuminate\Support\Facades\DB::raw("COALESCE(call_end, call_start + INTERVAL GREATEST(duration, 1) SECOND)"),
