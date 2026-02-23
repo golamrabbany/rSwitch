@@ -142,6 +142,29 @@ SORCERYEOF
         log_success "Sorcery configuration updated"
     fi
 
+    # Remove dangerous rasterisk killer cron/scripts (if present from manual installs)
+    log_info "Cleaning up dangerous Asterisk cron jobs..."
+    if crontab -l 2>/dev/null | grep -q 'pkill.*rasterisk'; then
+        crontab -l 2>/dev/null | grep -v 'pkill.*rasterisk' | crontab -
+        log_warning "Removed dangerous rasterisk killer from crontab (was killing Asterisk)"
+    fi
+    rm -f /usr/local/bin/asterisk-cleanup
+    # Remove stale PID files if Asterisk is not running
+    if ! pgrep -x asterisk > /dev/null 2>&1; then
+        rm -f /var/run/asterisk/asterisk.pid /var/run/asterisk/asterisk.ctl
+    fi
+
+    # Ensure Asterisk is running via systemd
+    log_info "Ensuring Asterisk is running..."
+    systemctl enable asterisk 2>/dev/null || true
+    if ! asterisk -rx 'core show uptime' > /dev/null 2>&1; then
+        rm -f /var/run/asterisk/asterisk.pid /var/run/asterisk/asterisk.ctl
+        systemctl restart asterisk
+        log_success "Asterisk restarted"
+    else
+        asterisk -rx "dialplan reload" 2>/dev/null || true
+    fi
+
     # Restart queue workers and AGI
     log_info "Restarting workers and AGI..."
     supervisorctl restart rswitch-worker:* 2>/dev/null || true

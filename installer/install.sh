@@ -647,6 +647,16 @@ install_asterisk() {
     chmod 440 /etc/sudoers.d/asterisk-www-data
     log_info "Configured sudoers for www-data to access Asterisk CLI"
 
+    # Ensure no dangerous rasterisk killer cron jobs exist
+    if crontab -l 2>/dev/null | grep -q 'pkill.*rasterisk'; then
+        crontab -l 2>/dev/null | grep -v 'pkill.*rasterisk' | crontab -
+        log_warning "Removed dangerous rasterisk killer from crontab"
+    fi
+    rm -f /usr/local/bin/asterisk-cleanup
+
+    # Enable Asterisk to start on boot
+    systemctl enable asterisk 2>/dev/null || true
+
     # Cleanup
     cd /usr/src
     rm -rf asterisk-${ASTERISK_VERSION}.tar.gz
