@@ -229,10 +229,18 @@
                                 </div>
                                 <div>
                                     <div class="user-name font-mono">{{ $sip->username }}</div>
-                                    @if($sip->last_registered_at)
-                                        <div class="user-email">Reg: {{ $sip->last_registered_at->diffForHumans() }}</div>
+                                    @php
+                                        $contact = $contacts->get($sip->username);
+                                        $sourceIp = null;
+                                        if ($contact && $contact->uri) {
+                                            preg_match('/@([^:;>]+)/', $contact->uri, $m);
+                                            $sourceIp = $m[1] ?? null;
+                                        }
+                                    @endphp
+                                    @if($contact)
+                                        <div class="user-email text-emerald-600">Registered{{ $sourceIp ? " ({$sourceIp})" : '' }}</div>
                                     @else
-                                        <div class="user-email">Never registered</div>
+                                        <div class="user-email text-gray-400">Unregistered</div>
                                     @endif
                                 </div>
                             </div>
