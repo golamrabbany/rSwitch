@@ -75,7 +75,27 @@
     </div>
 
     {{-- Filter Card --}}
-    <div class="filter-card">
+    <div class="filter-card" x-data="{
+        userSearch: '{{ $users->firstWhere('id', request('user_id'))?->name ?? '' }}',
+        userId: '{{ request('user_id') }}',
+        userOpen: false,
+        users: {{ $users->toJson() }},
+        get filteredUsers() {
+            if (!this.userSearch) return this.users.slice(0, 20);
+            const s = this.userSearch.toLowerCase();
+            return this.users.filter(u => u.name.toLowerCase().includes(s) || (u.email && u.email.toLowerCase().includes(s))).slice(0, 20);
+        },
+        selectUser(user) {
+            this.userSearch = user.name;
+            this.userId = user.id;
+            this.userOpen = false;
+        },
+        clearUser() {
+            this.userSearch = '';
+            this.userId = '';
+            this.$refs.userInput.focus();
+        }
+    }">
         <form method="GET" action="{{ route('admin.operational-reports.p2p') }}" class="flex flex-wrap items-end gap-3">
             <div class="cdr-filter-item">
                 <label for="date_from" class="cdr-filter-label">Date From</label>
@@ -85,16 +105,51 @@
                 <label for="date_to" class="cdr-filter-label">Date To</label>
                 <input type="date" id="date_to" name="date_to" value="{{ $dateTo->format('Y-m-d') }}" required class="filter-date">
             </div>
-            <div class="cdr-filter-item">
-                <label for="user_id" class="cdr-filter-label">User</label>
-                <select id="user_id" name="user_id" class="filter-select">
-                    <option value="">All Users</option>
-                    @foreach ($users as $user)
-                        <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
-                            {{ $user->name }} ({{ ucfirst($user->role) }})
-                        </option>
-                    @endforeach
-                </select>
+            <div class="cdr-filter-item relative">
+                <label class="cdr-filter-label">User</label>
+                <input type="hidden" name="user_id" :value="userId">
+                <div class="relative">
+                    <input type="text"
+                           x-ref="userInput"
+                           x-model="userSearch"
+                           @focus="userOpen = true"
+                           @click="userOpen = true"
+                           @input="userOpen = true"
+                           @keydown.escape="userOpen = false"
+                           @keydown.tab="userOpen = false"
+                           class="filter-input pr-8"
+                           placeholder="Search user..."
+                           autocomplete="off">
+                    <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <button type="button" x-show="userSearch" x-cloak @click="clearUser()" class="p-0.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                {{-- Dropdown --}}
+                <div x-show="userOpen && filteredUsers.length > 0"
+                     x-cloak
+                     @click.outside="userOpen = false"
+                     class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                    <template x-for="user in filteredUsers" :key="user.id">
+                        <div @click="selectUser(user)"
+                             class="px-3 py-2 cursor-pointer hover:bg-indigo-50 flex items-center justify-between"
+                             :class="{ 'bg-indigo-50': userId == user.id }">
+                            <div>
+                                <span class="text-sm font-medium text-gray-900" x-text="user.name"></span>
+                                <span class="text-xs text-gray-400 ml-1" x-text="'(' + user.role.charAt(0).toUpperCase() + user.role.slice(1) + ')'"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div x-show="userOpen && userSearch && filteredUsers.length === 0"
+                     x-cloak
+                     @click.outside="userOpen = false"
+                     class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-center text-sm text-gray-500">
+                    No users found
+                </div>
             </div>
             <div class="cdr-filter-item">
                 <label for="disposition" class="cdr-filter-label">Disposition</label>
