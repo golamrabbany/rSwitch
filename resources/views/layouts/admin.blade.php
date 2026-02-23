@@ -165,6 +165,7 @@
                         <a href="{{ route('admin.operational-reports.active') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.active') ? 'active' : 'text-gray-500' }}">Active Calls</a>
                         <a href="{{ route('admin.operational-reports.inbound') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.inbound') ? 'active' : 'text-gray-500' }}">Inbound Calls</a>
                         <a href="{{ route('admin.operational-reports.outbound') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.outbound') ? 'active' : 'text-gray-500' }}">Outbound Calls</a>
+                        <a href="{{ route('admin.operational-reports.p2p') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.p2p') ? 'active' : 'text-gray-500' }}">P2P Calls</a>
                         <a href="{{ route('admin.operational-reports.summary') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.summary') ? 'active' : 'text-gray-500' }}">Call Summary</a>
                     </div>
                 </div>

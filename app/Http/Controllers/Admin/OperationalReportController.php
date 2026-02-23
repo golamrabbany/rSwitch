@@ -323,6 +323,66 @@ class OperationalReportController extends Controller
     }
 
     /**
+     * P2P Calls List (SIP-to-SIP internal calls)
+     */
+    public function p2pCalls(Request $request)
+    {
+        $query = CallRecord::with(['user', 'sipAccount'])
+            ->where('call_flow', 'sip_to_sip');
+
+        // Date range filter
+        if ($request->filled('date_from')) {
+            $query->where('call_start', '>=', $request->date_from);
+        } else {
+            $query->where('call_start', '>=', now()->startOfDay());
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('call_start', '<=', $request->date_to . ' 23:59:59');
+        }
+
+        // Search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('caller', 'like', $search . '%')
+                  ->orWhere('callee', 'like', $search . '%');
+            });
+        }
+
+        // Disposition filter
+        if ($request->filled('disposition')) {
+            $query->where('disposition', $request->disposition);
+        }
+
+        $calls = $query->orderBy('call_start', 'desc')->paginate(50);
+
+        // Stats for the filtered period
+        $statsQuery = CallRecord::where('call_flow', 'sip_to_sip');
+        if ($request->filled('date_from')) {
+            $statsQuery->where('call_start', '>=', $request->date_from);
+        } else {
+            $statsQuery->where('call_start', '>=', now()->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $statsQuery->where('call_start', '<=', $request->date_to . ' 23:59:59');
+        }
+
+        $totalCalls = (clone $statsQuery)->count();
+        $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
+        $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
+        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
+
+        return view('admin.operational-reports.p2p', compact(
+            'calls',
+            'totalCalls',
+            'answeredCalls',
+            'asr',
+            'totalMinutes'
+        ));
+    }
+
+    /**
      * Summary Calls - Combined Inbound & Outbound
      */
     public function summaryCalls(Request $request)

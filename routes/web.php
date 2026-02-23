@@ -124,6 +124,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('operational-reports/active', [Admin\OperationalReportController::class, 'activeCalls'])->name('operational-reports.active');
     Route::get('operational-reports/inbound', [Admin\OperationalReportController::class, 'inboundCalls'])->name('operational-reports.inbound');
     Route::get('operational-reports/outbound', [Admin\OperationalReportController::class, 'outboundCalls'])->name('operational-reports.outbound');
+    Route::get('operational-reports/p2p', [Admin\OperationalReportController::class, 'p2pCalls'])->name('operational-reports.p2p');
     Route::get('operational-reports/summary', [Admin\OperationalReportController::class, 'summaryCalls'])->name('operational-reports.summary');
 
     // Financial management (scoped)
