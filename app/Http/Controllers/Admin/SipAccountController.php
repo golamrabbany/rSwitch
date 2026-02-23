@@ -58,12 +58,20 @@ class SipAccountController extends Controller
 
         $sipAccounts = $query->orderByDesc('created_at')->paginate(20);
 
-        // Fetch live registration status from Asterisk ps_contacts
-        $usernames = $sipAccounts->pluck('username')->toArray();
-        $contacts = \DB::table('ps_contacts')
-            ->whereIn(\DB::raw('SUBSTRING_INDEX(id, ";", 1)'), $usernames)
-            ->get()
-            ->keyBy(fn ($c) => explode(';', $c->id)[0]);
+        // Fetch live registration status from Asterisk CLI
+        $contacts = collect();
+        try {
+            $output = shell_exec('sudo asterisk -rx "pjsip show contacts" 2>/dev/null');
+            if ($output) {
+                foreach (explode("\n", $output) as $line) {
+                    if (preg_match('/Contact:\s+(\S+)\/sip:\S+@([\d.]+):\d+\S*\s+\S+\s+(Avail|Unavail)/', $line, $m)) {
+                        $contacts->put($m[1], (object) ['ip' => $m[2], 'status' => $m[3]]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silently fail — show all as unregistered if Asterisk unreachable
+        }
 
         // Get resellers and clients for filters (scoped for non-super admins)
         $resellerQuery = User::where('role', 'reseller')->orderBy('name');
