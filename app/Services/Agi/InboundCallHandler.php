@@ -122,7 +122,7 @@ class InboundCallHandler
             'uuid' => $uuid,
             'user_id' => $did->assigned_to_user_id,
             'reseller_id' => $did->assignedUser?->parent_id,
-            'call_flow' => 'inbound',
+            'call_flow' => 'trunk_to_sip',
             'caller' => $callerId,
             'callee' => $extension,
             'caller_id' => $callerName ?: $callerId,

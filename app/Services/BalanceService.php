@@ -120,7 +120,12 @@ class BalanceService
      */
     public function canAffordCall(User $user, string $estimatedCost = '0'): bool
     {
-        $available = bcadd((string) $user->balance, (string) $user->credit_limit, 4);
+        // Re-read balance with row lock to prevent concurrent call overdraw
+        $freshUser = User::where('id', $user->id)->lockForUpdate()->first();
+        $balance = $freshUser ? (string) $freshUser->balance : (string) $user->balance;
+        $creditLimit = $freshUser ? (string) $freshUser->credit_limit : (string) $user->credit_limit;
+
+        $available = bcadd($balance, $creditLimit, 4);
 
         if ($user->isPrepaid()) {
             $required = bcadd((string) $user->min_balance_for_calls, $estimatedCost, 4);
@@ -128,8 +133,8 @@ class BalanceService
         }
 
         // Postpaid: balance can go negative but not below -credit_limit
-        $floor = bcmul((string) $user->credit_limit, '-1', 4);
-        $afterCharge = bcsub((string) $user->balance, $estimatedCost, 4);
+        $floor = bcmul($creditLimit, '-1', 4);
+        $afterCharge = bcsub($balance, $estimatedCost, 4);
         return bccomp($afterCharge, $floor, 4) >= 0;
     }
 

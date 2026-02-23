@@ -65,6 +65,7 @@ return new class extends Migration
                 PARTITION p2026_09 VALUES LESS THAN (TO_DAYS('2026-10-01')),
                 PARTITION p2026_10 VALUES LESS THAN (TO_DAYS('2026-11-01')),
                 PARTITION p2026_11 VALUES LESS THAN (TO_DAYS('2026-12-01')),
+                PARTITION p2026_12 VALUES LESS THAN (TO_DAYS('2027-01-01')),
                 PARTITION p2027_01 VALUES LESS THAN (TO_DAYS('2027-02-01')),
                 PARTITION p_future VALUES LESS THAN MAXVALUE
             )

@@ -294,7 +294,13 @@ class SipAccountController extends Controller
      */
     public function export(Request $request)
     {
+        $authUser = auth()->user();
         $query = SipAccount::with('user');
+
+        // Apply authorization scoping for non-super admins
+        if (!$authUser->isSuperAdmin()) {
+            $query->whereIn('user_id', $authUser->descendantIds());
+        }
 
         // Apply same filters as index
         if ($request->filled('reseller_id')) {
@@ -331,7 +337,6 @@ class SipAccountController extends Controller
                 'owner_email',
                 'owner_name',
                 'owner_role',
-                'password',
                 'auth_type',
                 'allowed_ips',
                 'caller_id_name',
@@ -350,7 +355,6 @@ class SipAccountController extends Controller
                         $sip->user->email,
                         $sip->user->name,
                         $sip->user->role,
-                        $sip->password,
                         $sip->auth_type,
                         $sip->allowed_ips,
                         $sip->caller_id_name,

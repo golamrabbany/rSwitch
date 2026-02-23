@@ -298,7 +298,7 @@ class OutboundCallHandler
             'ast_channel' => $channel,
             'ast_context' => $agi->getContext(),
             // Internal calls are typically free (no rates applied)
-            'rate_per_min' => '0.0000',
+            'rate_per_minute' => '0.0000',
             'total_cost' => '0.0000',
         ]);
 
@@ -364,7 +364,7 @@ class OutboundCallHandler
             'status' => 'in_progress',
             'ast_channel' => $channel,
             'ast_context' => $agi->getContext(),
-            'rate_per_min' => '0.0000',
+            'rate_per_minute' => '0.0000',
             'total_cost' => '0.0000',
         ]);
 

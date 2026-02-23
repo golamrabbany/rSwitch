@@ -20,39 +20,33 @@ class OperationalReportController extends Controller
     {
         $today = now()->startOfDay();
 
-        // Active calls (in_progress)
-        $activeCalls = CallRecord::where('status', 'in_progress')->count();
-        $inboundActive = CallRecord::where('status', 'in_progress')
-            ->where('call_flow', 'trunk_to_sip')->count();
-        $outboundActive = CallRecord::where('status', 'in_progress')
-            ->where('call_flow', 'sip_to_trunk')->count();
+        // Active calls — single query with conditional counts
+        $activeStats = CallRecord::where('status', 'in_progress')
+            ->selectRaw('
+                COUNT(*) as total,
+                SUM(call_flow = "trunk_to_sip") as inbound,
+                SUM(call_flow = "sip_to_trunk") as outbound
+            ')->first();
 
-        // Today's inbound calls
-        $todayInbound = CallRecord::where('call_start', '>=', $today)
-            ->where('call_flow', 'trunk_to_sip')
-            ->count();
+        $activeCalls = (int) $activeStats->total;
+        $inboundActive = (int) $activeStats->inbound;
+        $outboundActive = (int) $activeStats->outbound;
 
-        // Today's outbound calls
-        $todayOutbound = CallRecord::where('call_start', '>=', $today)
-            ->where('call_flow', 'sip_to_trunk')
-            ->count();
+        // Today's stats — single query with conditional aggregations
+        $todayStats = CallRecord::where('call_start', '>=', $today)
+            ->selectRaw('
+                SUM(call_flow = "trunk_to_sip") as inbound,
+                SUM(call_flow = "sip_to_trunk") as outbound,
+                SUM(disposition = "ANSWERED") as answered,
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as duration
+            ')->first();
 
-        // Today's total calls
+        $todayInbound = (int) $todayStats->inbound;
+        $todayOutbound = (int) $todayStats->outbound;
         $todayTotal = $todayInbound + $todayOutbound;
-
-        // Today's answered calls
-        $todayAnswered = CallRecord::where('call_start', '>=', $today)
-            ->where('disposition', 'ANSWERED')
-            ->count();
-
-        // ASR (Answer Seizure Ratio)
+        $todayAnswered = (int) $todayStats->answered;
         $todayAsr = $todayTotal > 0 ? round(($todayAnswered / $todayTotal) * 100, 1) : 0;
-
-        // Today's total duration (minutes)
-        $todayDuration = CallRecord::where('call_start', '>=', $today)
-            ->where('disposition', 'ANSWERED')
-            ->sum('billsec');
-        $todayMinutes = round($todayDuration / 60, 1);
+        $todayMinutes = round((int) $todayStats->duration / 60, 1);
 
         // Recent active calls (limit 10)
         $recentActive = CallRecord::with(['user', 'sipAccount', 'incomingTrunk', 'outgoingTrunk'])
