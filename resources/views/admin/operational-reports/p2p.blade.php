@@ -210,11 +210,11 @@
                         <td>
                             <span class="cdr-party-number">{{ $record->callee }}</span>
                         </td>
-                        <td class="text-right tabular-nums">
-                            {{ sprintf('%d:%02d', intdiv($record->duration, 60), $record->duration % 60) }}
+                        <td class="text-right font-mono tabular-nums whitespace-nowrap">
+                            {{ sprintf('%02d:%02d', intdiv($record->duration, 60), $record->duration % 60) }}
                         </td>
-                        <td class="text-right tabular-nums">
-                            {{ sprintf('%d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }}
+                        <td class="text-right font-mono tabular-nums whitespace-nowrap">
+                            {{ sprintf('%02d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }}
                         </td>
                         <td>
                             @switch($record->disposition)
