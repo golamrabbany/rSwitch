@@ -517,6 +517,8 @@ class ImportWeblink extends Command
                 'prefix' => trim($row->prefix),
                 'priority' => $row->priority ?? 1,
                 'weight' => $row->load_share ?? 100,
+                'remove_prefix' => !empty($row->remove_prefix) ? trim($row->remove_prefix) : null,
+                'add_prefix' => !empty($row->add_prefix) ? trim($row->add_prefix) : null,
                 'status' => $row->status == 1 ? 'active' : 'disabled',
             ]);
 

@@ -168,6 +168,8 @@ class TrunkRouteController extends Controller
             'timezone'            => ['required', 'string', 'max:50'],
             'priority'            => ['required', 'integer', 'min:1', 'max:100'],
             'weight'              => ['required', 'integer', 'min:1', 'max:1000'],
+            'remove_prefix'       => ['nullable', 'string', 'max:20', 'regex:/^\d*$/'],
+            'add_prefix'          => ['nullable', 'string', 'max:20', 'regex:/^\d*$/'],
             'mnp_enabled'         => ['nullable', 'boolean'],
             'mnp_prefix'          => ['nullable', 'string', 'max:10', 'regex:/^\d*$/'],
             'mnp_insert_position' => ['nullable', 'integer', 'min:0', 'max:20'],

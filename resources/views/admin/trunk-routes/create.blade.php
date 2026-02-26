@@ -180,6 +180,46 @@
                     </div>
                 </div>
 
+                {{-- Dial Manipulation --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Dial Manipulation</h3>
+                        <p class="form-card-subtitle">Strip or add prefix digits before sending to trunk</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="p-4 bg-amber-50 rounded-lg border border-amber-100 mb-4">
+                            <div class="flex items-start gap-3">
+                                <svg class="w-5 h-5 text-amber-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <div class="text-sm">
+                                    <p class="font-medium text-amber-800">Processing Order</p>
+                                    <p class="text-amber-700 mt-1 font-mono text-xs">
+                                        Remove Prefix → Add Prefix → MNP Dipping → Trunk Manipulation
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label for="remove_prefix" class="form-label">Remove Prefix</label>
+                                <input type="text" id="remove_prefix" name="remove_prefix" value="{{ old('remove_prefix') }}"
+                                       class="form-input font-mono" placeholder="e.g. 880" maxlength="20">
+                                <p class="form-hint">Strip this prefix from the beginning of the dialed number</p>
+                                <x-input-error :messages="$errors->get('remove_prefix')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label for="add_prefix" class="form-label">Add Prefix</label>
+                                <input type="text" id="add_prefix" name="add_prefix" value="{{ old('add_prefix') }}"
+                                       class="form-input font-mono" placeholder="e.g. 0" maxlength="20">
+                                <p class="form-hint">Prepend this prefix to the dialed number (after removal)</p>
+                                <x-input-error :messages="$errors->get('add_prefix')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- MNP Dipping --}}
                 <div class="form-card" x-data="{ mnpEnabled: {{ old('mnp_enabled') ? 'true' : 'false' }} }">
                     <div class="form-card-header">

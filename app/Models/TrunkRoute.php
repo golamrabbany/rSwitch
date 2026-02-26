@@ -13,6 +13,7 @@ class TrunkRoute extends Model
     protected $fillable = [
         'trunk_id', 'prefix', 'time_start', 'time_end',
         'days_of_week', 'timezone', 'priority', 'weight',
+        'remove_prefix', 'add_prefix',
         'mnp_enabled', 'mnp_prefix', 'mnp_insert_position', 'status',
     ];
 
@@ -32,6 +33,32 @@ class TrunkRoute extends Model
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
+    }
+
+    /**
+     * Apply route-level dial prefix manipulation.
+     *
+     * Order: remove_prefix first, then add_prefix.
+     * Example: 880171xxx → remove "880" → 171xxx → add "0" → 0171xxx
+     */
+    public function applyDialPrefixManipulation(string $number): string
+    {
+        $result = $number;
+
+        // 1. Remove matching prefix
+        if ($this->remove_prefix && str_starts_with($result, $this->remove_prefix)) {
+            $result = substr($result, strlen($this->remove_prefix));
+            if ($result === '' || $result === false) {
+                $result = $number; // Don't strip to empty
+            }
+        }
+
+        // 2. Add prefix
+        if ($this->add_prefix) {
+            $result = $this->add_prefix . $result;
+        }
+
+        return $result;
     }
 
     /**

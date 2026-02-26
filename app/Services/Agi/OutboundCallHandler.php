@@ -141,30 +141,37 @@ class OutboundCallHandler
         $trunk = $primaryRoute->trunk;
         $failoverRoute = $routing['failover'];
 
-        // 8. Apply MNP transformation if enabled on route
-        $mnpNumber = $primaryRoute->applyMnpTransformation($extension);
-        if ($mnpNumber !== $extension) {
-            $agi->verbose("rSwitch: MNP transformation {$extension} -> {$mnpNumber}", 2);
+        // 8. Apply route-level dial prefix manipulation (remove/add prefix)
+        $routeNumber = $primaryRoute->applyDialPrefixManipulation($extension);
+        if ($routeNumber !== $extension) {
+            $agi->verbose("rSwitch: Route dial manipulation {$extension} -> {$routeNumber}", 2);
         }
 
-        // 9. Apply trunk dial manipulation
+        // 9. Apply MNP transformation if enabled on route
+        $mnpNumber = $primaryRoute->applyMnpTransformation($routeNumber);
+        if ($mnpNumber !== $routeNumber) {
+            $agi->verbose("rSwitch: MNP transformation {$routeNumber} -> {$mnpNumber}", 2);
+        }
+
+        // 10. Apply trunk dial manipulation
         $dialNumber = $this->applyDialManipulation($mnpNumber, $trunk);
         $dialString = $this->buildDialString($dialNumber, $trunk);
 
-        // 10. Build failover dial string
+        // 11. Build failover dial string
         $failoverDialString = '';
 
         if ($failoverRoute) {
             $failoverTrunk = $failoverRoute->trunk;
-            $failoverMnp = $failoverRoute->applyMnpTransformation($extension);
+            $failoverRouteNum = $failoverRoute->applyDialPrefixManipulation($extension);
+            $failoverMnp = $failoverRoute->applyMnpTransformation($failoverRouteNum);
             $failoverNumber = $this->applyDialManipulation($failoverMnp, $failoverTrunk);
             $failoverDialString = $this->buildDialString($failoverNumber, $failoverTrunk);
         }
 
-        // 11. Apply CLI manipulation
+        // 12. Apply CLI manipulation
         [$cliName, $cliNum] = $this->applyCliManipulation($callerName, $callerId, $sipAccount, $trunk);
 
-        // 12. Create CDR entry
+        // 13. Create CDR entry
         $uuid = Str::uuid()->toString();
 
         CallRecord::create([
