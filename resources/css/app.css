@@ -394,6 +394,12 @@
     .data-table td {
         @apply px-6 py-4 text-sm text-gray-700;
     }
+    .data-table-compact td {
+        @apply px-4 py-2.5;
+    }
+    .data-table-compact th {
+        @apply px-4 py-2.5;
+    }
 
     /* User cell in table */
     .user-cell {
