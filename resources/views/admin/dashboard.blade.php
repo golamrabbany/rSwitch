@@ -311,65 +311,75 @@
                     </a>
                 </div>
                 <div class="p-5">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                        <a href="{{ route('admin.users.index', ['role' => 'reseller']) }}" class="group p-4 rounded-lg border border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all">
-                            <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <a href="{{ route('admin.users.index', ['role' => 'reseller']) }}" class="group flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21v-2a4 4 0 00-4-4H9a4 4 0 00-4 4v2"/>
                                     <circle cx="12" cy="7" r="4" stroke-width="2"/>
                                 </svg>
                             </div>
-                            <p class="text-2xl font-bold text-gray-900">{{ number_format($entityCounts['resellers']) }}</p>
-                            <p class="text-xs text-gray-500">Resellers</p>
+                            <div>
+                                <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['resellers']) }}</p>
+                                <p class="text-xs text-gray-500">Resellers</p>
+                            </div>
                         </a>
 
-                        <a href="{{ route('admin.users.index', ['role' => 'client']) }}" class="group p-4 rounded-lg border border-gray-100 hover:border-sky-200 hover:bg-sky-50/50 transition-all">
-                            <div class="w-10 h-10 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center mb-3 group-hover:bg-sky-500 group-hover:text-white transition-colors">
+                        <a href="{{ route('admin.users.index', ['role' => 'client']) }}" class="group flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-sky-200 hover:bg-sky-50/50 transition-all">
+                            <div class="w-10 h-10 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center shrink-0 group-hover:bg-sky-500 group-hover:text-white transition-colors">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
                                     <circle cx="9" cy="7" r="4" stroke-width="2"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
                                 </svg>
                             </div>
-                            <p class="text-2xl font-bold text-gray-900">{{ number_format($entityCounts['clients']) }}</p>
-                            <p class="text-xs text-gray-500">Clients</p>
+                            <div>
+                                <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['clients']) }}</p>
+                                <p class="text-xs text-gray-500">Clients</p>
+                            </div>
                         </a>
 
-                        <a href="{{ route('admin.sip-accounts.index') }}" class="group p-4 rounded-lg border border-gray-100 hover:border-violet-200 hover:bg-violet-50/50 transition-all">
-                            <div class="w-10 h-10 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center mb-3 group-hover:bg-violet-500 group-hover:text-white transition-colors">
+                        <a href="{{ route('admin.sip-accounts.index') }}" class="group flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-violet-200 hover:bg-violet-50/50 transition-all">
+                            <div class="w-10 h-10 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center shrink-0 group-hover:bg-violet-500 group-hover:text-white transition-colors">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                                 </svg>
                             </div>
-                            <p class="text-2xl font-bold text-gray-900">{{ number_format($entityCounts['sip_accounts']) }}</p>
-                            <p class="text-xs text-gray-500">SIP Accounts</p>
+                            <div>
+                                <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['sip_accounts']) }}</p>
+                                <p class="text-xs text-gray-500">SIP Accounts</p>
+                            </div>
                         </a>
 
                         @if(auth()->user()->isSuperAdmin())
-                            <a href="{{ route('admin.trunks.index') }}" class="group p-4 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50 transition-all">
-                                <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mb-3 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                            <a href="{{ route('admin.trunks.index') }}" class="group flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50 transition-all">
+                                <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                                     </svg>
                                 </div>
-                                <p class="text-2xl font-bold text-gray-900">{{ number_format($entityCounts['active_trunks']) }}</p>
-                                <p class="text-xs text-gray-500">Active Trunks</p>
+                                <div>
+                                    <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['active_trunks']) }}</p>
+                                    <p class="text-xs text-gray-500">Active Trunks</p>
+                                </div>
                             </a>
                         @endif
 
-                        <a href="{{ route('admin.dids.index') }}" class="group p-4 rounded-lg border border-gray-100 hover:border-cyan-200 hover:bg-cyan-50/50 transition-all">
-                            <div class="w-10 h-10 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center mb-3 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
+                        <a href="{{ route('admin.dids.index') }}" class="group flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-cyan-200 hover:bg-cyan-50/50 transition-all">
+                            <div class="w-10 h-10 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center shrink-0 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
                                 </svg>
                             </div>
-                            <p class="text-2xl font-bold text-gray-900">{{ number_format($entityCounts['active_dids']) }}</p>
-                            <p class="text-xs text-gray-500">Active DIDs</p>
+                            <div>
+                                <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['active_dids']) }}</p>
+                                <p class="text-xs text-gray-500">Active DIDs</p>
+                            </div>
                         </a>
 
                         @if(auth()->user()->isSuperAdmin())
-                            <a href="{{ route('admin.trunk-routes.index') }}" class="group p-4 rounded-lg border border-gray-100 hover:border-rose-200 hover:bg-rose-50/50 transition-all">
-                                <div class="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center mb-3 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                            <a href="{{ route('admin.trunk-routes.index') }}" class="group flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-rose-200 hover:bg-rose-50/50 transition-all">
+                                <div class="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 group-hover:bg-rose-500 group-hover:text-white transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
                                     </svg>
@@ -377,8 +387,10 @@
                                 @php
                                     $routeCount = \App\Models\TrunkRoute::where('status', 'active')->count();
                                 @endphp
-                                <p class="text-2xl font-bold text-gray-900">{{ number_format($routeCount) }}</p>
-                                <p class="text-xs text-gray-500">Routes</p>
+                                <div>
+                                    <p class="text-xl font-bold text-gray-900">{{ number_format($routeCount) }}</p>
+                                    <p class="text-xs text-gray-500">Routes</p>
+                                </div>
                             </a>
                         @endif
                     </div>
