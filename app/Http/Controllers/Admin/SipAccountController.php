@@ -10,6 +10,9 @@ use App\Services\AuditService;
 use App\Services\SipProvisioningService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class SipAccountController extends Controller
 {
@@ -20,7 +23,7 @@ class SipAccountController extends Controller
     public function index(Request $request)
     {
         $authUser = auth()->user();
-        $query = SipAccount::with('user');
+        $query = SipAccount::with('user:id,name,role,email,parent_id');
 
         // Apply scoping for non-super admins
         if (!$authUser->isSuperAdmin()) {
@@ -35,7 +38,7 @@ class SipAccountController extends Controller
                 abort(403);
             }
             $clientIds = User::where('parent_id', $resellerId)->pluck('id')->toArray();
-            $query->whereIn('user_id', array_merge([$resellerId], $clientIds));
+            $query->whereIn('user_id', array_merge([(int) $resellerId], $clientIds));
         }
 
         // Filter by specific client
@@ -50,57 +53,97 @@ class SipAccountController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('username', 'like', "%{$search}%")
-                  ->orWhere('caller_id_number', 'like', "%{$search}%")
-                  ->orWhereHas('user', fn ($q) => $q->where('name', 'like', "%{$search}%"));
+                $q->where('username', 'like', "{$search}%")
+                  ->orWhere('caller_id_number', 'like', "{$search}%")
+                  ->orWhereIn('user_id', User::where('name', 'like', "%{$search}%")->pluck('id'));
             });
         }
 
-        $sipAccounts = $query->orderByDesc('created_at')->paginate(20);
+        $sipAccounts = $query->orderByDesc('id')->paginate(20);
 
-        // Fetch live registration status from Asterisk CLI
-        $contacts = collect();
+        // Get resellers for filter (small dataset, safe to preload)
+        $resellerQuery = User::where('role', 'reseller')->orderBy('name');
+        if (!$authUser->isSuperAdmin()) {
+            $resellerQuery->whereIn('id', $authUser->managedResellerIds());
+        }
+        $resellers = $resellerQuery->get(['id', 'name', 'email']);
+
+        // Resolve selected client name for display
+        $selectedClient = $request->filled('client_id')
+            ? User::where('id', $request->client_id)->first(['id', 'name', 'email'])
+            : null;
+
+        return view('admin.sip-accounts.index', compact('sipAccounts', 'resellers', 'selectedClient'));
+    }
+
+    /**
+     * AJAX: Search clients for filter dropdown.
+     */
+    public function searchClients(Request $request)
+    {
+        $authUser = auth()->user();
+        $query = User::where('role', 'client')->orderBy('name');
+
+        if (!$authUser->isSuperAdmin()) {
+            $query->whereIn('id', $authUser->clientIds());
+        }
+
+        if ($request->filled('reseller_id')) {
+            $query->where('parent_id', $request->reseller_id);
+        }
+
+        if ($request->filled('q')) {
+            $search = $request->q;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "{$search}%")
+                  ->orWhere('email', 'like', "{$search}%");
+            });
+        }
+
+        return response()->json(
+            $query->limit(20)->get(['id', 'name', 'email', 'parent_id'])
+        );
+    }
+
+    /**
+     * AJAX: Check registration status for given SIP usernames.
+     */
+    public function registrationStatus(Request $request)
+    {
+        $usernames = $request->input('usernames', []);
+        if (empty($usernames) || !is_array($usernames)) {
+            return response()->json([]);
+        }
+
+        $contacts = [];
         try {
             $output = shell_exec('sudo asterisk -rx "pjsip show contacts" 2>/dev/null');
             if ($output) {
+                $lookup = array_flip($usernames);
                 foreach (explode("\n", $output) as $line) {
                     if (preg_match('/Contact:\s+(\S+)\/sip:\S+@([\d.]+):\d+\S*\s+\S+\s+(Avail|Unavail)/', $line, $m)) {
-                        $contacts->put($m[1], (object) ['ip' => $m[2], 'status' => $m[3]]);
+                        if (isset($lookup[$m[1]])) {
+                            $contacts[$m[1]] = ['ip' => $m[2], 'status' => $m[3]];
+                        }
                     }
                 }
             }
         } catch (\Throwable $e) {
-            // Silently fail — show all as unregistered if Asterisk unreachable
+            // Silently fail
         }
 
-        // Get resellers and clients for filters (scoped for non-super admins)
-        $resellerQuery = User::where('role', 'reseller')->orderBy('name');
-        $clientQuery = User::where('role', 'client')->orderBy('name');
-        if (!$authUser->isSuperAdmin()) {
-            $resellerQuery->whereIn('id', $authUser->managedResellerIds());
-            $clientQuery->whereIn('id', $authUser->clientIds());
-        }
-        $resellers = $resellerQuery->get(['id', 'name', 'email']);
-        $clients = $clientQuery->get(['id', 'name', 'email', 'parent_id']);
-
-        return view('admin.sip-accounts.index', compact('sipAccounts', 'resellers', 'clients', 'contacts'));
+        return response()->json($contacts);
     }
 
     public function create(Request $request)
     {
-        $authUser = auth()->user();
-
-        // Only clients can have SIP accounts (scoped for non-super admins)
-        $userQuery = User::where('role', 'client')->active()->orderBy('name');
-        if (!$authUser->isSuperAdmin()) {
-            $userQuery->whereIn('id', $authUser->clientIds());
-        }
-        $users = $userQuery->get();
-
         $selectedUserId = $request->query('user_id');
+        $selectedUser = $selectedUserId
+            ? User::where('id', $selectedUserId)->first(['id', 'name', 'email'])
+            : null;
         $availableCodecs = SystemSetting::get('default_codec_allow', 'ulaw,alaw,g729');
 
-        return view('admin.sip-accounts.create', compact('users', 'selectedUserId', 'availableCodecs'));
+        return view('admin.sip-accounts.create', compact('selectedUser', 'availableCodecs'));
     }
 
     public function store(Request $request)
@@ -132,6 +175,9 @@ class SipAccountController extends Controller
         $validated['allow_p2p'] = $request->boolean('allow_p2p');
         $validated['allow_recording'] = $request->boolean('allow_recording');
 
+        // Only super admin can enable random caller ID
+        $validated['random_caller_id'] = $authUser->isSuperAdmin() ? $request->boolean('random_caller_id') : false;
+
         $sip = SipAccount::create($validated);
 
         // Provision to Asterisk realtime tables
@@ -158,24 +204,11 @@ class SipAccountController extends Controller
     public function edit(SipAccount $sipAccount)
     {
         $this->authorizeAccess($sipAccount);
-
-        $authUser = auth()->user();
-
-        // Only clients can own SIP accounts (scoped for non-super admins)
-        $userQuery = User::where('role', 'client')->active()->orderBy('name');
-        if (!$authUser->isSuperAdmin()) {
-            $userQuery->whereIn('id', $authUser->clientIds());
-        }
-        $users = $userQuery->get();
-
-        // Ensure current owner is always in dropdown (even if inactive)
-        if (!$users->contains('id', $sipAccount->user_id)) {
-            $users->prepend($sipAccount->user);
-        }
+        $sipAccount->load('user:id,name,email');
 
         $availableCodecs = SystemSetting::get('default_codec_allow', 'ulaw,alaw,g729');
 
-        return view('admin.sip-accounts.edit', compact('sipAccount', 'users', 'availableCodecs'));
+        return view('admin.sip-accounts.edit', compact('sipAccount', 'availableCodecs'));
     }
 
     public function update(Request $request, SipAccount $sipAccount)
@@ -213,6 +246,11 @@ class SipAccountController extends Controller
         // Handle checkbox boolean conversion
         $validated['allow_p2p'] = $request->boolean('allow_p2p');
         $validated['allow_recording'] = $request->boolean('allow_recording');
+
+        // Only super admin can toggle random caller ID
+        if ($authUser->isSuperAdmin()) {
+            $validated['random_caller_id'] = $request->boolean('random_caller_id');
+        }
 
         $original = $sipAccount->getAttributes();
 
@@ -380,95 +418,127 @@ class SipAccountController extends Controller
      */
     public function importForm()
     {
-        return view('admin.sip-accounts.import');
+        $availableCodecs = SystemSetting::get('default_codec_allow', 'ulaw,alaw,g729');
+
+        return view('admin.sip-accounts.import', compact('availableCodecs'));
     }
 
     /**
-     * Import SIP accounts from CSV.
+     * Import SIP accounts from XLS/XLSX file.
      */
     public function import(Request $request)
     {
-        $request->validate([
-            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+        $authUser = auth()->user();
+
+        // Get only client IDs for validation (scoped for non-super admins)
+        $clientQuery = User::where('role', 'client');
+        if (!$authUser->isSuperAdmin()) {
+            $clientQuery->whereIn('id', $authUser->clientIds());
+        }
+        $clientIds = $clientQuery->pluck('id')->toArray();
+
+        $validated = $request->validate([
+            'xls_file' => ['required', 'file', 'mimes:xls,xlsx', 'max:5120'],
             'mode' => ['required', Rule::in(['add', 'update', 'add_update'])],
+            'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
+            'auth_type' => ['required', Rule::in(['password', 'ip', 'both'])],
+            'allowed_ips' => ['nullable', 'required_if:auth_type,ip', 'required_if:auth_type,both', 'string', 'max:500'],
+            'max_channels' => ['required', 'integer', 'min:1', 'max:100'],
+            'codec_allow' => ['required', 'string', 'max:100'],
+            'caller_id_name' => ['nullable', 'string', 'max:80'],
+            'caller_id_number' => ['nullable', 'string', 'max:20'],
+            'allow_p2p' => ['boolean'],
+            'allow_recording' => ['boolean'],
         ]);
 
-        $file = $request->file('csv_file');
-        $mode = $request->mode;
+        $mode = $validated['mode'];
+        $allowP2p = $request->boolean('allow_p2p');
+        $allowRecording = $request->boolean('allow_recording');
+        $randomCallerId = $authUser->isSuperAdmin() ? $request->boolean('random_caller_id') : false;
 
-        $handle = fopen($file->getRealPath(), 'r');
-        $header = fgetcsv($handle);
-
-        // Validate header
-        $requiredColumns = ['username', 'owner_email', 'password', 'auth_type', 'caller_id_name', 'caller_id_number', 'max_channels', 'codec_allow'];
-        $missingColumns = array_diff($requiredColumns, $header);
-
-        if (!empty($missingColumns)) {
-            fclose($handle);
-            return back()->with('error', 'Missing required columns: ' . implode(', ', $missingColumns));
+        try {
+            $spreadsheet = IOFactory::load($request->file('xls_file')->getRealPath());
+            $sheet = $spreadsheet->getActiveSheet();
+            $rows = $sheet->toArray(null, true, true, true);
+        } catch (\Exception $e) {
+            return back()->withInput()->with('error', 'Could not read the file. Please ensure it is a valid XLS/XLSX file.');
         }
 
-        $headerMap = array_flip($header);
+        if (count($rows) < 2) {
+            return back()->withInput()->with('error', 'The file appears to be empty (no data rows found).');
+        }
+
+        // Parse header row — find username and password columns
+        $header = array_map(fn ($v) => strtolower(trim((string) $v)), $rows[1]);
+        $colMap = array_flip($header);
+
+        if (!isset($colMap['username']) || !isset($colMap['password'])) {
+            return back()->withInput()->with('error', 'Missing required columns: username, password. The first row must contain column headers.');
+        }
+
+        $usernameCol = $colMap['username'];
+        $passwordCol = $colMap['password'];
+
         $results = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
-        $line = 1;
 
         \DB::beginTransaction();
 
         try {
-            while (($row = fgetcsv($handle)) !== false) {
-                $line++;
+            // Process data rows (skip header at index 1)
+            foreach ($rows as $rowNum => $row) {
+                if ($rowNum <= 1) {
+                    continue; // Skip header
+                }
+
+                $username = trim((string) ($row[$usernameCol] ?? ''));
+                $password = trim((string) ($row[$passwordCol] ?? ''));
 
                 // Skip empty rows
-                if (empty(array_filter($row))) {
+                if ($username === '' && $password === '') {
                     continue;
                 }
 
-                $data = [];
-                foreach ($header as $index => $column) {
-                    $data[$column] = $row[$index] ?? null;
-                }
-
-                // Find user by email
-                $user = User::where('email', $data['owner_email'])->first();
-                if (!$user) {
-                    $results['errors'][] = "Line {$line}: User not found with email '{$data['owner_email']}'";
+                if ($username === '') {
+                    $results['errors'][] = "Row {$rowNum}: Username is empty";
                     $results['skipped']++;
                     continue;
                 }
 
                 // Check if SIP account exists
-                $existing = SipAccount::where('username', $data['username'])->first();
+                $existing = SipAccount::where('username', $username)->first();
+
+                // Determine caller_id_name and caller_id_number: use form value, fallback to username
+                $callerIdName = !empty($validated['caller_id_name']) ? $validated['caller_id_name'] : $username;
+                $callerIdNumber = !empty($validated['caller_id_number']) ? $validated['caller_id_number'] : $username;
 
                 if ($existing) {
                     if ($mode === 'add') {
-                        $results['errors'][] = "Line {$line}: Username '{$data['username']}' already exists (skipped in add mode)";
+                        $results['errors'][] = "Row {$rowNum}: Username '{$username}' already exists (skipped in add mode)";
                         $results['skipped']++;
                         continue;
                     }
 
                     // Update existing
                     $updateData = [
-                        'user_id' => $user->id,
-                        'password' => !empty($data['password']) ? $data['password'] : $existing->password,
-                        'auth_type' => $data['auth_type'] ?? $existing->auth_type,
-                        'allowed_ips' => $data['allowed_ips'] ?? $existing->allowed_ips,
-                        'caller_id_name' => $data['caller_id_name'] ?? $existing->caller_id_name,
-                        'caller_id_number' => $data['caller_id_number'] ?? $existing->caller_id_number,
-                        'max_channels' => $data['max_channels'] ?? $existing->max_channels,
-                        'codec_allow' => $data['codec_allow'] ?? $existing->codec_allow,
-                        'status' => $data['status'] ?? $existing->status,
+                        'user_id' => $validated['user_id'],
+                        'auth_type' => $validated['auth_type'],
+                        'allowed_ips' => $validated['allowed_ips'] ?? null,
+                        'caller_id_name' => $callerIdName,
+                        'caller_id_number' => $callerIdNumber,
+                        'max_channels' => $validated['max_channels'],
+                        'codec_allow' => $validated['codec_allow'],
+                        'allow_p2p' => $allowP2p,
+                        'allow_recording' => $allowRecording,
+                        'random_caller_id' => $randomCallerId,
                     ];
 
-                    if (isset($headerMap['allow_p2p']) && isset($data['allow_p2p'])) {
-                        $updateData['allow_p2p'] = filter_var($data['allow_p2p'], FILTER_VALIDATE_BOOLEAN);
-                    }
-                    if (isset($headerMap['allow_recording']) && isset($data['allow_recording'])) {
-                        $updateData['allow_recording'] = filter_var($data['allow_recording'], FILTER_VALIDATE_BOOLEAN);
+                    // Only update password if provided in the spreadsheet
+                    if ($password !== '') {
+                        $updateData['password'] = $password;
                     }
 
                     $existing->update($updateData);
 
-                    // Re-provision
                     if ($existing->status === 'active') {
                         $this->provisioning->provision($existing);
                     }
@@ -476,54 +546,51 @@ class SipAccountController extends Controller
                     $results['updated']++;
                 } else {
                     if ($mode === 'update') {
-                        $results['errors'][] = "Line {$line}: Username '{$data['username']}' not found (skipped in update mode)";
+                        $results['errors'][] = "Row {$rowNum}: Username '{$username}' not found (skipped in update mode)";
                         $results['skipped']++;
                         continue;
                     }
 
-                    // Validate required fields for new account
-                    if (empty($data['password']) || strlen($data['password']) < 12) {
-                        $results['errors'][] = "Line {$line}: Password must be at least 12 characters";
+                    if ($password === '' || strlen($password) < 6) {
+                        $results['errors'][] = "Row {$rowNum}: Password must be at least 6 characters for new account '{$username}'";
                         $results['skipped']++;
                         continue;
                     }
 
-                    // Create new
-                    $createData = [
-                        'user_id' => $user->id,
-                        'username' => $data['username'],
-                        'password' => $data['password'],
-                        'auth_type' => $data['auth_type'] ?? 'password',
-                        'allowed_ips' => $data['allowed_ips'] ?? null,
-                        'caller_id_name' => $data['caller_id_name'],
-                        'caller_id_number' => $data['caller_id_number'],
-                        'max_channels' => $data['max_channels'] ?? 2,
-                        'codec_allow' => $data['codec_allow'] ?? 'ulaw,alaw,g729',
-                        'status' => $data['status'] ?? 'active',
-                    ];
-
-                    if (isset($headerMap['allow_p2p']) && isset($data['allow_p2p'])) {
-                        $createData['allow_p2p'] = filter_var($data['allow_p2p'], FILTER_VALIDATE_BOOLEAN);
-                    }
-                    if (isset($headerMap['allow_recording']) && isset($data['allow_recording'])) {
-                        $createData['allow_recording'] = filter_var($data['allow_recording'], FILTER_VALIDATE_BOOLEAN);
+                    // Validate username format
+                    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $username)) {
+                        $results['errors'][] = "Row {$rowNum}: Username '{$username}' contains invalid characters (alphanumeric, dashes, underscores only)";
+                        $results['skipped']++;
+                        continue;
                     }
 
-                    $sip = SipAccount::create($createData);
+                    $sip = SipAccount::create([
+                        'user_id' => $validated['user_id'],
+                        'username' => $username,
+                        'password' => $password,
+                        'auth_type' => $validated['auth_type'],
+                        'allowed_ips' => $validated['allowed_ips'] ?? null,
+                        'caller_id_name' => $callerIdName,
+                        'caller_id_number' => $callerIdNumber,
+                        'max_channels' => $validated['max_channels'],
+                        'codec_allow' => $validated['codec_allow'],
+                        'allow_p2p' => $allowP2p,
+                        'allow_recording' => $allowRecording,
+                        'random_caller_id' => $randomCallerId,
+                        'status' => 'active',
+                    ]);
 
-                    // Provision to Asterisk
-                    if ($sip->status === 'active') {
-                        $this->provisioning->provision($sip);
-                    }
+                    $this->provisioning->provision($sip);
 
                     $results['created']++;
                 }
             }
 
-            fclose($handle);
             \DB::commit();
 
             AuditService::logAction('sip_accounts.imported', null, [
+                'mode' => $mode,
+                'user_id' => $validated['user_id'],
                 'created' => $results['created'],
                 'updated' => $results['updated'],
                 'skipped' => $results['skipped'],
@@ -534,17 +601,57 @@ class SipAccountController extends Controller
             if (!empty($results['errors'])) {
                 return redirect()->route('admin.sip-accounts.index')
                     ->with('success', $message)
-                    ->with('warning', 'Some rows had errors: ' . implode('; ', array_slice($results['errors'], 0, 5)) .
+                    ->with('warning', 'Some rows had issues: ' . implode('; ', array_slice($results['errors'], 0, 5)) .
                         (count($results['errors']) > 5 ? '... and ' . (count($results['errors']) - 5) . ' more.' : ''));
             }
 
             return redirect()->route('admin.sip-accounts.index')->with('success', $message);
 
         } catch (\Exception $e) {
-            fclose($handle);
             \DB::rollBack();
 
-            return back()->with('error', 'Import failed: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Import failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Download a sample XLS import template.
+     */
+    public function importTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('SIP Accounts');
+
+        // Header row
+        $sheet->setCellValue('A1', 'username');
+        $sheet->setCellValue('B1', 'password');
+
+        // Style header
+        $headerStyle = [
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '4F46E5']],
+        ];
+        $sheet->getStyle('A1:B1')->applyFromArray($headerStyle);
+
+        // Example rows
+        $sheet->setCellValue('A2', '100001');
+        $sheet->setCellValue('B2', 'StrongP@ss123!');
+        $sheet->setCellValue('A3', '100002');
+        $sheet->setCellValue('B3', 'An0therP@ss456');
+
+        // Auto-size columns
+        $sheet->getColumnDimension('A')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setAutoSize(true);
+
+        $filename = 'sip-accounts-import-template.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'no-store, no-cache',
+        ]);
     }
 }

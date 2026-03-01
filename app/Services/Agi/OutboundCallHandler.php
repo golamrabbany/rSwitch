@@ -616,6 +616,14 @@ class OutboundCallHandler
         $cliName = $sipAccount->caller_id_name ?: $callerName;
         $cliNum = $sipAccount->caller_id_number ?: $callerNum;
 
+        // If random caller ID is enabled, pick from reseller's pool
+        if ($sipAccount->random_caller_id) {
+            $randomNum = $sipAccount->getRandomCallerIdFromPool();
+            if ($randomNum) {
+                $cliNum = $randomNum;
+            }
+        }
+
         switch ($trunk->cli_mode) {
             case 'passthrough':
                 break;

@@ -26,19 +26,29 @@
 
     <form method="POST" action="{{ route('admin.sip-accounts.store') }}" x-data="{
         ownerOpen: false,
-        ownerSearch: '{{ $users->firstWhere('id', old('user_id', $selectedUserId))?->name ?? '' }}',
-        ownerId: '{{ old('user_id', $selectedUserId) }}',
-        users: {{ $users->toJson() }},
+        ownerSearch: '{{ $selectedUser->name ?? old('user_id_name', '') }}',
+        ownerId: '{{ old('user_id', $selectedUser->id ?? '') }}',
+        ownerResults: [],
+        ownerLoading: false,
+        ownerDebounce: null,
         username: '{{ old('username') }}',
         callerIdNumber: '{{ old('caller_id_number') }}',
         syncCallerId: true,
-        get filteredUsers() {
-            if (!this.ownerSearch) return this.users;
-            const search = this.ownerSearch.toLowerCase();
-            return this.users.filter(u =>
-                u.name.toLowerCase().includes(search) ||
-                u.email.toLowerCase().includes(search)
-            );
+        searchOwners() {
+            clearTimeout(this.ownerDebounce);
+            this.ownerDebounce = setTimeout(() => {
+                if (!this.ownerSearch || this.ownerSearch.length < 2) {
+                    this.ownerResults = [];
+                    return;
+                }
+                this.ownerLoading = true;
+                fetch('{{ route('admin.sip-accounts.search-clients') }}?q=' + encodeURIComponent(this.ownerSearch), {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(r => r.json())
+                .then(data => { this.ownerResults = data; this.ownerLoading = false; })
+                .catch(() => { this.ownerLoading = false; });
+            }, 300);
         },
         selectOwner(user) {
             this.ownerSearch = user.name;
@@ -48,6 +58,7 @@
         clearOwner() {
             this.ownerSearch = '';
             this.ownerId = '';
+            this.ownerResults = [];
             this.$refs.ownerInput.focus();
         },
         updateUsername(val) {
@@ -80,14 +91,14 @@
                                                x-model="ownerSearch"
                                                @focus="ownerOpen = true"
                                                @click="ownerOpen = true"
-                                               @input="ownerOpen = true"
+                                               @input="ownerOpen = true; ownerId = ''; searchOwners()"
                                                @keydown.escape="ownerOpen = false"
                                                @keydown.tab="ownerOpen = false"
                                                class="form-input pr-16"
                                                placeholder="Search client by name or email..."
                                                autocomplete="off">
                                         <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                            <button type="button" x-show="ownerSearch" @click="clearOwner()" class="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
+                                            <button type="button" x-show="ownerSearch" x-cloak @click="clearOwner()" class="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                                                 </svg>
@@ -98,11 +109,11 @@
                                         </div>
                                     </div>
                                     {{-- Dropdown --}}
-                                    <div x-show="ownerOpen && filteredUsers.length > 0"
+                                    <div x-show="ownerOpen && ownerResults.length > 0"
                                          x-cloak
                                          @click.outside="ownerOpen = false"
                                          class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
-                                        <template x-for="user in filteredUsers" :key="user.id">
+                                        <template x-for="user in ownerResults" :key="user.id">
                                             <div @click="selectOwner(user)"
                                                  class="px-4 py-2 cursor-pointer hover:bg-indigo-50 flex items-center justify-between"
                                                  :class="{ 'bg-indigo-50': ownerId == user.id }">
@@ -119,9 +130,15 @@
                                             </div>
                                         </template>
                                     </div>
+                                    {{-- Loading --}}
+                                    <div x-show="ownerOpen && ownerLoading" x-cloak
+                                         class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                                        Searching...
+                                    </div>
                                     {{-- No results --}}
-                                    <div x-show="ownerOpen && ownerSearch && filteredUsers.length === 0"
+                                    <div x-show="ownerOpen && !ownerLoading && ownerSearch.length >= 2 && ownerResults.length === 0 && !ownerId"
                                          x-cloak
+                                         @click.outside="ownerOpen = false"
                                          class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
                                         No clients found matching "<span x-text="ownerSearch"></span>"
                                     </div>
@@ -221,7 +238,8 @@
                 {{-- Call Features --}}
                 <div class="form-card" x-data="{
                     allowP2p: {{ old('allow_p2p', '1') == '1' ? 'true' : 'false' }},
-                    allowRecording: {{ old('allow_recording', '0') == '1' ? 'true' : 'false' }}
+                    allowRecording: {{ old('allow_recording', '0') == '1' ? 'true' : 'false' }},
+                    randomCli: {{ old('random_caller_id', '0') == '1' ? 'true' : 'false' }}
                 }">
                     <div class="form-card-header">
                         <h3 class="form-card-title">Call Features</h3>
@@ -260,6 +278,24 @@
                                         :class="allowRecording ? 'translate-x-5' : 'translate-x-0'"></span>
                                 </button>
                             </div>
+
+                            {{-- Random Caller ID (Super Admin only) --}}
+                            @if(auth()->user()->isSuperAdmin())
+                                <div class="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900">Random Caller ID</p>
+                                        <p class="text-xs text-gray-500 mt-0.5">At call time, use a random caller ID from another SIP account under the same reseller</p>
+                                    </div>
+                                    <input type="hidden" name="random_caller_id" :value="randomCli ? '1' : '0'">
+                                    <button type="button" @click="randomCli = !randomCli"
+                                        class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                        :class="randomCli ? 'bg-indigo-600' : 'bg-gray-200'"
+                                        role="switch" :aria-checked="randomCli">
+                                        <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                            :class="randomCli ? 'translate-x-5' : 'translate-x-0'"></span>
+                                    </button>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -292,6 +328,7 @@
                                 <x-input-error :messages="$errors->get('caller_id_number')" class="mt-2" />
                             </div>
                         </div>
+
                     </div>
                 </div>
 

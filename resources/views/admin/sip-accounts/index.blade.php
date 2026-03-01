@@ -37,9 +37,11 @@
         resellers: {{ $resellers->toJson() }},
 
         clientOpen: false,
-        clientSearch: '{{ $clients->firstWhere('id', request('client_id'))?->name ?? '' }}',
+        clientSearch: '{{ $selectedClient->name ?? '' }}',
         clientId: '{{ request('client_id') }}',
-        clients: {{ $clients->toJson() }},
+        clientResults: [],
+        clientLoading: false,
+        clientDebounce: null,
 
         get filteredResellers() {
             if (!this.resellerSearch) return this.resellers;
@@ -49,24 +51,13 @@
             );
         },
 
-        get filteredClients() {
-            let filtered = this.clients;
-            if (this.resellerId) {
-                filtered = filtered.filter(c => c.parent_id == this.resellerId);
-            }
-            if (!this.clientSearch) return filtered;
-            return filtered.filter(c =>
-                c.name.toLowerCase().includes(this.clientSearch.toLowerCase()) ||
-                c.email.toLowerCase().includes(this.clientSearch.toLowerCase())
-            );
-        },
-
         selectReseller(reseller) {
             this.resellerSearch = reseller.name;
             this.resellerId = reseller.id;
             this.resellerOpen = false;
             this.clientSearch = '';
             this.clientId = '';
+            this.clientResults = [];
         },
 
         clearReseller() {
@@ -74,6 +65,24 @@
             this.resellerId = '';
             this.clientSearch = '';
             this.clientId = '';
+            this.clientResults = [];
+        },
+
+        searchClients() {
+            clearTimeout(this.clientDebounce);
+            this.clientDebounce = setTimeout(() => {
+                if (!this.clientSearch || this.clientSearch.length < 2) {
+                    this.clientResults = [];
+                    return;
+                }
+                this.clientLoading = true;
+                let url = '{{ route('admin.sip-accounts.search-clients') }}?q=' + encodeURIComponent(this.clientSearch);
+                if (this.resellerId) url += '&reseller_id=' + this.resellerId;
+                fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(r => r.json())
+                    .then(data => { this.clientResults = data; this.clientLoading = false; })
+                    .catch(() => { this.clientLoading = false; });
+            }, 300);
         },
 
         selectClient(client) {
@@ -85,6 +94,7 @@
         clearClient() {
             this.clientSearch = '';
             this.clientId = '';
+            this.clientResults = [];
         }
     }">
         <form method="GET" class="filter-row flex-wrap">
@@ -110,7 +120,7 @@
                                :class="resellerId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
                                autocomplete="off">
                         <button type="button"
-                                x-show="resellerSearch"
+                                x-show="resellerSearch" x-cloak
                                 @click="clearReseller()"
                                 class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 hover:text-indigo-700 transition-colors">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
@@ -119,6 +129,7 @@
                         </button>
                     </div>
                     <div x-show="resellerOpen && filteredResellers.length > 0"
+                         x-cloak
                          @click.away="resellerOpen = false"
                          x-transition
                          class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -138,51 +149,56 @@
                 </div>
             @endif
 
-            {{-- Client Filter --}}
-            @if($clients->count() > 0)
+            {{-- Client Filter (AJAX search) --}}
+            <div class="relative">
+                <input type="hidden" name="client_id" :value="clientId">
                 <div class="relative">
-                    <input type="hidden" name="client_id" :value="clientId">
-                    <div class="relative">
-                        <input type="text"
-                               x-model="clientSearch"
-                               @focus="clientOpen = true"
-                               @click="clientOpen = true"
-                               @input="clientOpen = true; clientId = ''"
-                               placeholder="Filter by Client..."
-                               class="filter-input pr-9 w-48"
-                               :class="clientId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
-                               autocomplete="off">
-                        <button type="button"
-                                x-show="clientSearch"
-                                @click="clearClient()"
-                                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 hover:text-indigo-700 transition-colors">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </div>
-                    <div x-show="clientOpen && filteredClients.length > 0"
-                         @click.away="clientOpen = false"
-                         x-transition
-                         class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        <template x-for="client in filteredClients" :key="client.id">
-                            <button type="button"
-                                    @click="selectClient(client)"
-                                    class="w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-sm font-medium flex-shrink-0"
-                                     x-text="client.name.charAt(0).toUpperCase()"></div>
-                                <div class="min-w-0">
-                                    <div class="text-sm font-medium text-gray-900 truncate" x-text="client.name"></div>
-                                    <div class="text-xs text-gray-500 truncate" x-text="client.email"></div>
-                                </div>
-                            </button>
-                        </template>
-                        <div x-show="filteredClients.length === 0 && resellerId" class="px-4 py-3 text-sm text-gray-500 text-center">
-                            No clients for this reseller
-                        </div>
-                    </div>
+                    <input type="text"
+                           x-model="clientSearch"
+                           @focus="clientOpen = true"
+                           @click="clientOpen = true"
+                           @input="clientOpen = true; clientId = ''; searchClients()"
+                           placeholder="Filter by Client..."
+                           class="filter-input pr-9 w-48"
+                           :class="clientId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
+                           autocomplete="off">
+                    <button type="button"
+                            x-show="clientSearch" x-cloak
+                            @click="clearClient()"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 hover:text-indigo-700 transition-colors">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
                 </div>
-            @endif
+                <div x-show="clientOpen && clientResults.length > 0"
+                     x-cloak
+                     @click.away="clientOpen = false"
+                     x-transition
+                     class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <template x-for="client in clientResults" :key="client.id">
+                        <button type="button"
+                                @click="selectClient(client)"
+                                class="w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-sm font-medium flex-shrink-0"
+                                 x-text="client.name.charAt(0).toUpperCase()"></div>
+                            <div class="min-w-0">
+                                <div class="text-sm font-medium text-gray-900 truncate" x-text="client.name"></div>
+                                <div class="text-xs text-gray-500 truncate" x-text="client.email"></div>
+                            </div>
+                        </button>
+                    </template>
+                </div>
+                <div x-show="clientOpen && clientLoading" x-cloak
+                     class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                    Searching...
+                </div>
+                <div x-show="clientOpen && !clientLoading && clientSearch.length >= 2 && clientResults.length === 0" x-cloak
+                     @click.away="clientOpen = false"
+                     class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                    No clients found
+                </div>
+            </div>
 
             <select name="status" class="filter-select">
                 <option value="">All Statuses</option>
@@ -229,12 +245,9 @@
                                 </div>
                                 <div>
                                     <div class="user-name font-mono">{{ $sip->username }}</div>
-                                    @php $contact = $contacts->get($sip->username); @endphp
-                                    @if($contact)
-                                        <div class="user-email text-emerald-600">Registered ({{ $contact->ip }})</div>
-                                    @else
-                                        <div class="user-email text-gray-400">Unregistered</div>
-                                    @endif
+                                    <div class="user-email text-gray-400 reg-status" data-username="{{ $sip->username }}">
+                                        <span class="text-gray-300">--</span>
+                                    </div>
                                 </div>
                             </div>
                         </td>
@@ -296,4 +309,40 @@
             {{ $sipAccounts->withQueryString()->links() }}
         </div>
     @endif
+
+    {{-- Lazy-load registration status via AJAX --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const cells = document.querySelectorAll('.reg-status');
+            if (!cells.length) return;
+
+            const usernames = Array.from(cells).map(el => el.dataset.username);
+
+            fetch('{{ route('admin.sip-accounts.registration-status') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ usernames: usernames })
+            })
+            .then(r => r.json())
+            .then(contacts => {
+                cells.forEach(cell => {
+                    const username = cell.dataset.username;
+                    if (contacts[username]) {
+                        cell.innerHTML = '<span class="text-emerald-600">Registered (' + contacts[username].ip + ')</span>';
+                    } else {
+                        cell.innerHTML = '<span class="text-gray-400">Unregistered</span>';
+                    }
+                });
+            })
+            .catch(() => {
+                cells.forEach(cell => {
+                    cell.innerHTML = '<span class="text-gray-400">Unregistered</span>';
+                });
+            });
+        });
+    </script>
 </x-admin-layout>

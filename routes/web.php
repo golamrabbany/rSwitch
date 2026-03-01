@@ -111,6 +111,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('sip-accounts-export', [Admin\SipAccountController::class, 'export'])->name('sip-accounts.export');
     Route::get('sip-accounts-import', [Admin\SipAccountController::class, 'importForm'])->name('sip-accounts.import-form');
     Route::post('sip-accounts-import', [Admin\SipAccountController::class, 'import'])->name('sip-accounts.import');
+    Route::get('sip-accounts-import-template', [Admin\SipAccountController::class, 'importTemplate'])->name('sip-accounts.import-template');
+    Route::get('sip-accounts-search-clients', [Admin\SipAccountController::class, 'searchClients'])->name('sip-accounts.search-clients');
+    Route::post('sip-accounts-registration-status', [Admin\SipAccountController::class, 'registrationStatus'])->name('sip-accounts.registration-status');
 
     Route::resource('ring-groups', Admin\RingGroupController::class);
     Route::resource('dids', Admin\DidController::class);
