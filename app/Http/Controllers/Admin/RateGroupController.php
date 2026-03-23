@@ -10,6 +10,7 @@ use App\Services\AuditService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Validation\Rule;
 
 class RateGroupController extends Controller
@@ -318,6 +319,9 @@ class RateGroupController extends Controller
             'status' => 'completed',
             'completed_at' => now(),
         ]);
+
+        // Notify Python billing service to clear rate cache after import
+        Redis::publish('rswitch:rate.updated', json_encode(['rate_group_id' => $rateGroup->id]));
 
         $message = "Import completed: {$imported} imported, {$skipped} skipped, " . count($errors) . " errors.";
 

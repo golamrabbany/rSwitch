@@ -246,6 +246,8 @@ install_system_dependencies() {
             htop \
             vim \
             nano \
+            python3 \
+            python3-pip \
             policycoreutils-python-utils
     else
         export DEBIAN_FRONTEND=noninteractive
@@ -273,7 +275,9 @@ install_system_dependencies() {
             fail2ban \
             htop \
             vim \
-            nano
+            nano \
+            python3-venv \
+            python3-pip
     fi
 
     log_success "System dependencies installed"
@@ -990,6 +994,71 @@ EOF
     log_success "rSwitch application installed"
 }
 
+install_python_services() {
+    log_step "Installing Python Billing + Call Control Services"
+
+    # Determine web user
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        WEB_USER="nginx"
+    else
+        WEB_USER="www-data"
+    fi
+
+    cd "${INSTALL_DIR}/python-services"
+
+    # Create virtual environment
+    log_info "Creating Python virtual environment..."
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install --upgrade pip --quiet
+    pip install -r requirements.txt --quiet
+    deactivate
+
+    # Create Python .env
+    log_info "Configuring Python services..."
+
+    # Generate a separate Python DB user password
+    PYTHON_DB_PASS=$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | head -c 16)
+
+    # Create Python DB user
+    mysql -e "
+        CREATE USER IF NOT EXISTS 'python_svc'@'localhost' IDENTIFIED BY '${PYTHON_DB_PASS}';
+        GRANT SELECT ON ${DB_NAME}.* TO 'python_svc'@'localhost';
+        GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.call_records TO 'python_svc'@'localhost';
+        GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.transactions TO 'python_svc'@'localhost';
+        GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.invoices TO 'python_svc'@'localhost';
+        GRANT SELECT, UPDATE ON ${DB_NAME}.users TO 'python_svc'@'localhost';
+        FLUSH PRIVILEGES;
+    " 2>/dev/null || log_warn "Python DB user may already exist"
+
+    # Read AMI secret from Asterisk manager.conf
+    AMI_SECRET_VALUE=$(grep '^secret' /etc/asterisk/manager.conf 2>/dev/null | head -1 | awk -F'= ' '{print $2}' | tr -d ' ')
+    if [[ -z "$AMI_SECRET_VALUE" ]]; then
+        AMI_SECRET_VALUE="${DB_PASS}"
+    fi
+
+    cat > .env << EOF
+DATABASE_URL=mysql+pymysql://python_svc:${PYTHON_DB_PASS}@127.0.0.1:3306/${DB_NAME}
+ASYNC_DATABASE_URL=mysql+aiomysql://python_svc:${PYTHON_DB_PASS}@127.0.0.1:3306/${DB_NAME}
+REDIS_URL=redis://127.0.0.1:6379/0
+ASTERISK_AMI_HOST=127.0.0.1
+ASTERISK_AMI_PORT=5038
+ASTERISK_AMI_USER=rswitch
+ASTERISK_AMI_SECRET=${AMI_SECRET_VALUE}
+DEBUG=false
+LOG_LEVEL=info
+EOF
+
+    # Fix ownership
+    chown -R ${WEB_USER}:${WEB_USER} "${INSTALL_DIR}/python-services"
+
+    # Save Python credentials
+    echo "PYTHON_DB_USER=python_svc" >> /root/rswitch-credentials.txt
+    echo "PYTHON_DB_PASS=${PYTHON_DB_PASS}" >> /root/rswitch-credentials.txt
+
+    log_success "Python billing + call control services installed"
+}
+
 configure_nginx_site() {
     log_step "Configuring Nginx for rSwitch"
 
@@ -1109,18 +1178,6 @@ numprocs=1
 redirect_stderr=true
 stdout_logfile=${INSTALL_DIR}/storage/logs/webhook-worker.log
 
-[program:rswitch-agi]
-process_name=%(program_name)s
-command=php ${INSTALL_DIR}/artisan agi:serve
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=${WEB_USER}
-numprocs=1
-redirect_stderr=true
-stdout_logfile=${INSTALL_DIR}/storage/logs/agi.log
-
 [program:rswitch-scheduler]
 process_name=%(program_name)s
 command=/bin/bash -c "while true; do php ${INSTALL_DIR}/artisan schedule:run >> /dev/null 2>&1; sleep 60; done"
@@ -1130,6 +1187,40 @@ user=${WEB_USER}
 numprocs=1
 redirect_stderr=true
 stdout_logfile=${INSTALL_DIR}/storage/logs/scheduler.log
+
+; --- Python Services (Billing + Call Control + Live Monitoring) ---
+
+[program:rswitch-api]
+command=${INSTALL_DIR}/python-services/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8001 --workers 1
+directory=${INSTALL_DIR}/python-services
+environment=PYTHONPATH="${INSTALL_DIR}/python-services"
+user=${WEB_USER}
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/rswitch-python-api.err.log
+stdout_logfile=/var/log/rswitch-python-api.out.log
+stopwaitsecs=10
+
+[program:rswitch-celery]
+command=${INSTALL_DIR}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring -c 4
+directory=${INSTALL_DIR}/python-services
+environment=PYTHONPATH="${INSTALL_DIR}/python-services"
+user=${WEB_USER}
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/rswitch-celery.err.log
+stdout_logfile=/var/log/rswitch-celery.out.log
+stopwaitsecs=30
+
+[program:rswitch-celery-beat]
+command=${INSTALL_DIR}/python-services/venv/bin/celery -A celery_app beat -l info
+directory=${INSTALL_DIR}/python-services
+environment=PYTHONPATH="${INSTALL_DIR}/python-services"
+user=${WEB_USER}
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/rswitch-celery-beat.err.log
+stdout_logfile=/var/log/rswitch-celery-beat.out.log
 EOF
 
     # Reload supervisor
@@ -1165,7 +1256,7 @@ configure_firewall() {
         firewall-cmd --permanent --add-port=5061/tcp
 
         # Allow RTP
-        firewall-cmd --permanent --add-port=10000-20000/udp
+        firewall-cmd --permanent --add-port=10000-30000/udp
 
         # Reload firewall
         firewall-cmd --reload
@@ -1186,7 +1277,7 @@ configure_firewall() {
         ufw allow 5061/tcp
 
         # Allow RTP
-        ufw allow 10000:20000/udp
+        ufw allow 10000:30000/udp
 
         # Reload firewall
         ufw reload
@@ -1650,6 +1741,7 @@ main() {
     configure_odbc
     configure_asterisk
     install_application
+    install_python_services
     configure_nginx_site
     configure_supervisor
     configure_firewall

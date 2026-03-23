@@ -303,8 +303,6 @@ class OperationalReportController extends Controller
         $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
         $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
-        $totalCost = (clone $statsQuery)->where('status', 'rated')->sum('total_cost');
-
         $trunks = Trunk::whereIn('direction', ['outgoing', 'both'])->orderBy('name')->get();
 
         return view('admin.operational-reports.outbound', compact(
@@ -313,7 +311,6 @@ class OperationalReportController extends Controller
             'answeredCalls',
             'asr',
             'totalMinutes',
-            'totalCost',
             'trunks'
         ));
     }
@@ -422,8 +419,6 @@ class OperationalReportController extends Controller
         $answeredCalls = (clone $baseQuery)->where('disposition', 'ANSWERED')->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
         $totalMinutes = round((clone $baseQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
-        $totalCost = (clone $baseQuery)->where('status', 'rated')->sum('total_cost');
-
         // Inbound Stats
         $inboundTotal = (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->count();
         $inboundAnswered = (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->count();
@@ -435,8 +430,6 @@ class OperationalReportController extends Controller
         $outboundAnswered = (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->count();
         $outboundAsr = $outboundTotal > 0 ? round(($outboundAnswered / $outboundTotal) * 100, 1) : 0;
         $outboundMinutes = round((clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
-        $outboundCost = (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('status', 'rated')->sum('total_cost');
-
         // Disposition breakdown
         $dispositions = (clone $baseQuery)
             ->selectRaw('disposition, COUNT(*) as count')
@@ -497,7 +490,6 @@ class OperationalReportController extends Controller
             'answeredCalls',
             'asr',
             'totalMinutes',
-            'totalCost',
             'inboundTotal',
             'inboundAnswered',
             'inboundAsr',
@@ -506,12 +498,325 @@ class OperationalReportController extends Controller
             'outboundAnswered',
             'outboundAsr',
             'outboundMinutes',
-            'outboundCost',
             'dispositions',
             'hourlyStats',
             'topDestinations',
             'topSipAccounts',
             'topTrunks'
         ));
+    }
+
+    /**
+     * Daily Summary Report
+     */
+    public function dailySummary(Request $request)
+    {
+        $authUser = auth()->user();
+
+        // Date range (default: last 30 days, max 365 days)
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfDay()
+            : Carbon::now()->subDays(29)->startOfDay();
+
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfDay()
+            : Carbon::today()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfDay();
+        }
+
+        if ($dateFrom->diffInDays($dateTo) > 365) {
+            $dateFrom = $dateTo->copy()->subDays(365)->startOfDay();
+        }
+
+        // Build base query with partition-aware WHERE
+        $query = CallRecord::query()
+            ->whereBetween('call_start', [$dateFrom, $dateTo]);
+
+        // Multi-tenant scoping
+        if (!$authUser->isSuperAdmin()) {
+            $query->whereIn('user_id', $authUser->descendantIds());
+        }
+
+        // Filters
+        $this->applyFilters($query, $request, $authUser);
+
+        // Group by date
+        $rows = (clone $query)
+            ->selectRaw('
+                DATE(call_start) as date,
+                COUNT(*) as total_calls,
+                SUM(disposition = "ANSWERED") as answered_calls,
+                SUM(disposition != "ANSWERED") as failed_calls,
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+            ')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
+        // Compute ASR per row
+        $rows->transform(function ($row) {
+            $row->asr = $row->total_calls > 0 ? round(($row->answered_calls / $row->total_calls) * 100, 1) : 0;
+            $row->minutes = round($row->total_billsec / 60, 1);
+            return $row;
+        });
+
+        // Totals
+        $totals = [
+            'total_calls' => $rows->sum('total_calls'),
+            'answered_calls' => $rows->sum('answered_calls'),
+            'failed_calls' => $rows->sum('failed_calls'),
+            'minutes' => round($rows->sum('total_billsec') / 60, 1),
+        ];
+        $totals['asr'] = $totals['total_calls'] > 0 ? round(($totals['answered_calls'] / $totals['total_calls']) * 100, 1) : 0;
+
+        // Chart data
+        $chartLabels = $rows->pluck('date')->map(fn($d) => Carbon::parse($d)->format('M d'))->values();
+        $chartTotal = $rows->pluck('total_calls')->values();
+        $chartAnswered = $rows->pluck('answered_calls')->values();
+
+        // Filter options
+        [$resellers, $trunks] = $this->getFilterOptions($authUser);
+
+        return view('admin.operational-reports.daily-summary', compact(
+            'rows', 'totals', 'dateFrom', 'dateTo',
+            'chartLabels', 'chartTotal', 'chartAnswered',
+            'resellers', 'trunks'
+        ));
+    }
+
+    /**
+     * Monthly Summary Report
+     */
+    public function monthlySummary(Request $request)
+    {
+        $authUser = auth()->user();
+
+        // Date range (default: last 12 months)
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfMonth()
+            : Carbon::now()->subMonths(11)->startOfMonth();
+
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfMonth()
+            : Carbon::now()->endOfMonth();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfMonth();
+        }
+
+        // Build query
+        $query = CallRecord::query()
+            ->whereBetween('call_start', [$dateFrom, $dateTo]);
+
+        // Multi-tenant scoping
+        if (!$authUser->isSuperAdmin()) {
+            $query->whereIn('user_id', $authUser->descendantIds());
+        }
+
+        // Filters
+        $this->applyFilters($query, $request, $authUser);
+
+        // Group by month
+        $rows = (clone $query)
+            ->selectRaw('
+                YEAR(call_start) as year,
+                MONTH(call_start) as month,
+                COUNT(*) as total_calls,
+                SUM(disposition = "ANSWERED") as answered_calls,
+                SUM(disposition != "ANSWERED") as failed_calls,
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+            ')
+            ->groupByRaw('YEAR(call_start), MONTH(call_start)')
+            ->orderByRaw('YEAR(call_start), MONTH(call_start)')
+            ->get();
+
+        // Compute ASR + month-over-month change
+        $prevTotal = null;
+        $rows->transform(function ($row) use (&$prevTotal) {
+            $row->asr = $row->total_calls > 0 ? round(($row->answered_calls / $row->total_calls) * 100, 1) : 0;
+            $row->minutes = round($row->total_billsec / 60, 1);
+            $row->month_label = Carbon::create($row->year, $row->month, 1)->format('M Y');
+
+            if ($prevTotal !== null && $prevTotal > 0) {
+                $row->change = round((($row->total_calls - $prevTotal) / $prevTotal) * 100, 1);
+            } else {
+                $row->change = null;
+            }
+            $prevTotal = $row->total_calls;
+
+            return $row;
+        });
+
+        // Totals
+        $totals = [
+            'total_calls' => $rows->sum('total_calls'),
+            'answered_calls' => $rows->sum('answered_calls'),
+            'failed_calls' => $rows->sum('failed_calls'),
+            'minutes' => round($rows->sum('total_billsec') / 60, 1),
+        ];
+        $totals['asr'] = $totals['total_calls'] > 0 ? round(($totals['answered_calls'] / $totals['total_calls']) * 100, 1) : 0;
+
+        // Chart data
+        $chartLabels = $rows->pluck('month_label')->values();
+        $chartTotal = $rows->pluck('total_calls')->values();
+        $chartAnswered = $rows->pluck('answered_calls')->values();
+
+        // Filter options
+        [$resellers, $trunks] = $this->getFilterOptions($authUser);
+
+        return view('admin.operational-reports.monthly-summary', compact(
+            'rows', 'totals', 'dateFrom', 'dateTo',
+            'chartLabels', 'chartTotal', 'chartAnswered',
+            'resellers', 'trunks'
+        ));
+    }
+
+    /**
+     * Hourly Summary Report
+     */
+    public function hourlySummary(Request $request)
+    {
+        $authUser = auth()->user();
+
+        // Date range (default: today)
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfDay()
+            : Carbon::today()->startOfDay();
+
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfDay()
+            : Carbon::today()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfDay();
+        }
+
+        // Limit to 31 days for hourly to keep results meaningful
+        if ($dateFrom->diffInDays($dateTo) > 31) {
+            $dateTo = $dateFrom->copy()->addDays(31)->endOfDay();
+        }
+
+        // Build query
+        $query = CallRecord::query()
+            ->whereBetween('call_start', [$dateFrom, $dateTo]);
+
+        // Multi-tenant scoping
+        if (!$authUser->isSuperAdmin()) {
+            $query->whereIn('user_id', $authUser->descendantIds());
+        }
+
+        // Filters
+        $this->applyFilters($query, $request, $authUser);
+
+        // Group by hour
+        $rawRows = (clone $query)
+            ->selectRaw('
+                HOUR(call_start) as hour,
+                COUNT(*) as total_calls,
+                SUM(disposition = "ANSWERED") as answered_calls,
+                SUM(disposition != "ANSWERED") as failed_calls,
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+            ')
+            ->groupByRaw('HOUR(call_start)')
+            ->orderByRaw('HOUR(call_start)')
+            ->get()
+            ->keyBy('hour');
+
+        // Build complete 24-hour array (zero-fill)
+        $rows = collect();
+        for ($h = 0; $h < 24; $h++) {
+            if ($rawRows->has($h)) {
+                $row = $rawRows[$h];
+            } else {
+                $row = (object) [
+                    'hour' => $h,
+                    'total_calls' => 0,
+                    'answered_calls' => 0,
+                    'failed_calls' => 0,
+                    'total_billsec' => 0,
+                ];
+            }
+            $row->asr = $row->total_calls > 0 ? round(($row->answered_calls / $row->total_calls) * 100, 1) : 0;
+            $row->minutes = round($row->total_billsec / 60, 1);
+            $row->hour_label = sprintf('%02d:00 – %02d:00', $h, ($h + 1) % 24);
+            $rows->push($row);
+        }
+
+        // Totals
+        $totals = [
+            'total_calls' => $rows->sum('total_calls'),
+            'answered_calls' => $rows->sum('answered_calls'),
+            'failed_calls' => $rows->sum('failed_calls'),
+            'minutes' => round($rows->sum('total_billsec') / 60, 1),
+        ];
+        $totals['asr'] = $totals['total_calls'] > 0 ? round(($totals['answered_calls'] / $totals['total_calls']) * 100, 1) : 0;
+
+        // Chart data
+        $chartLabels = $rows->map(fn($r) => sprintf('%02d:00', $r->hour))->values();
+        $chartAnswered = $rows->pluck('answered_calls')->values();
+        $chartFailed = $rows->pluck('failed_calls')->values();
+
+        // Filter options
+        [$resellers, $trunks] = $this->getFilterOptions($authUser);
+
+        return view('admin.operational-reports.hourly-summary', compact(
+            'rows', 'totals', 'dateFrom', 'dateTo',
+            'chartLabels', 'chartAnswered', 'chartFailed',
+            'resellers', 'trunks'
+        ));
+    }
+
+    /**
+     * Apply shared filters to a call_records query.
+     */
+    private function applyFilters($query, Request $request, User $authUser): void
+    {
+        // Reseller filter — include reseller + their clients
+        if ($request->filled('reseller_id')) {
+            $reseller = User::find($request->reseller_id);
+            if ($reseller) {
+                $query->whereIn('user_id', $reseller->descendantIds());
+            }
+        }
+
+        // Client filter
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+
+        // Trunk filter (incoming OR outgoing)
+        if ($request->filled('trunk_id')) {
+            $trunkId = $request->trunk_id;
+            $query->where(function ($q) use ($trunkId) {
+                $q->where('incoming_trunk_id', $trunkId)
+                  ->orWhere('outgoing_trunk_id', $trunkId);
+            });
+        }
+
+        // Disposition filter
+        if ($request->filled('disposition')) {
+            $query->where('disposition', $request->disposition);
+        }
+    }
+
+    /**
+     * Get reseller and trunk lists for filter dropdowns.
+     */
+    private function getFilterOptions(User $authUser): array
+    {
+        if ($authUser->isSuperAdmin()) {
+            $resellers = User::where('role', 'reseller')->orderBy('name')->get(['id', 'name']);
+        } else {
+            $resellers = User::where('role', 'reseller')
+                ->whereIn('id', $authUser->managedResellerIds())
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
+        $trunks = Trunk::orderBy('name')->get(['id', 'name']);
+
+        return [$resellers, $trunks];
     }
 }

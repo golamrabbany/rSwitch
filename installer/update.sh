@@ -165,10 +165,34 @@ SORCERYEOF
         asterisk -rx "dialplan reload" 2>/dev/null || true
     fi
 
-    # Restart queue workers and AGI
-    log_info "Restarting workers and AGI..."
+    # Update Python services
+    log_info "Updating Python billing + call control services..."
+    if [[ -d "$INSTALL_DIR/python-services" ]]; then
+        cd "$INSTALL_DIR/python-services"
+        if [[ -d "venv" ]]; then
+            source venv/bin/activate
+            pip install -r requirements.txt --quiet 2>/dev/null
+            deactivate
+        else
+            log_warning "Python venv not found — creating..."
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install --upgrade pip --quiet
+            pip install -r requirements.txt --quiet
+            deactivate
+        fi
+        chown -R www-data:www-data "$INSTALL_DIR/python-services"
+        log_success "Python services updated"
+    fi
+
+    # Restart all supervisor services
+    log_info "Restarting all services..."
+    supervisorctl reread 2>/dev/null || true
+    supervisorctl update 2>/dev/null || true
     supervisorctl restart rswitch-worker:* 2>/dev/null || true
-    supervisorctl restart rswitch-agi 2>/dev/null || true
+    supervisorctl restart rswitch-api 2>/dev/null || true
+    supervisorctl restart rswitch-celery 2>/dev/null || true
+    supervisorctl restart rswitch-celery-beat 2>/dev/null || true
 
     log_success "Application updated"
 }

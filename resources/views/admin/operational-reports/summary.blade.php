@@ -4,7 +4,7 @@
     {{-- Page Header --}}
     <div class="page-header-row">
         <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-200">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-200">
                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                 </svg>
@@ -28,10 +28,10 @@
     <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
         <form method="GET" class="flex flex-wrap items-center gap-3">
             <span class="text-sm text-gray-500 font-medium">Date Range:</span>
-            <input type="date" name="date_from" value="{{ $dateFrom }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
+            <input type="date" name="date_from" value="{{ $dateFrom }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
             <span class="text-gray-400">to</span>
-            <input type="date" name="date_to" value="{{ $dateTo }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
-            <button type="submit" class="px-4 py-2 bg-cyan-600 text-white text-sm font-medium rounded-lg hover:bg-cyan-700">
+            <input type="date" name="date_to" value="{{ $dateTo }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                 Apply
             </button>
             @if(request()->hasAny(['date_from', 'date_to']))
@@ -43,12 +43,12 @@
     </div>
 
     {{-- Overall Stats --}}
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {{-- Total Calls --}}
-        <div class="bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-4 text-white shadow-lg">
+        <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-4 text-white shadow-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-cyan-100 text-xs font-medium uppercase tracking-wide">Total Calls</p>
+                    <p class="text-indigo-100 text-xs font-medium uppercase tracking-wide">Total Calls</p>
                     <p class="text-3xl font-bold mt-1">{{ number_format($totalCalls) }}</p>
                 </div>
                 <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
@@ -104,20 +104,6 @@
             </div>
         </div>
 
-        {{-- Total Cost --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-500 text-xs font-medium uppercase tracking-wide">Cost</p>
-                    <p class="text-3xl font-bold text-emerald-600 mt-1">${{ number_format($totalCost, 2) }}</p>
-                </div>
-                <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-            </div>
-        </div>
     </div>
 
     {{-- Inbound vs Outbound Comparison --}}
@@ -197,8 +183,8 @@
                         <p class="text-xs text-gray-500 mt-1">ASR</p>
                     </div>
                     <div class="text-center p-4 bg-gray-50 rounded-lg">
-                        <p class="text-3xl font-bold text-emerald-600">${{ number_format($outboundCost, 2) }}</p>
-                        <p class="text-xs text-gray-500 mt-1">Cost</p>
+                        <p class="text-3xl font-bold text-indigo-600">{{ number_format($outboundMinutes, 0) }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Minutes</p>
                     </div>
                 </div>
                 <div class="mt-4 pt-4 border-t border-gray-100 text-center">

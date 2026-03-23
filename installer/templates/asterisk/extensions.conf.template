@@ -1,5 +1,5 @@
 ; rSwitch Extensions Configuration Template
-; Call routing is handled by AGI
+; Call routing is handled by Python FastAGI service (port 4573)
 ; Supports both internal (SIP-to-SIP) and external (SIP-to-Trunk) calls
 
 [general]

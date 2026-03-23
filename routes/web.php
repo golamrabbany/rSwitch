@@ -129,6 +129,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('operational-reports/outbound', [Admin\OperationalReportController::class, 'outboundCalls'])->name('operational-reports.outbound');
     Route::get('operational-reports/p2p', [Admin\OperationalReportController::class, 'p2pCalls'])->name('operational-reports.p2p');
     Route::get('operational-reports/summary', [Admin\OperationalReportController::class, 'summaryCalls'])->name('operational-reports.summary');
+    Route::get('operational-reports/daily', [Admin\OperationalReportController::class, 'dailySummary'])->name('operational-reports.daily');
+    Route::get('operational-reports/monthly', [Admin\OperationalReportController::class, 'monthlySummary'])->name('operational-reports.monthly');
+    Route::get('operational-reports/hourly', [Admin\OperationalReportController::class, 'hourlySummary'])->name('operational-reports.hourly');
 
     // Financial management (scoped)
     Route::get('transactions', [Admin\TransactionController::class, 'index'])->name('transactions.index');

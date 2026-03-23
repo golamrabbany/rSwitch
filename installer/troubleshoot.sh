@@ -362,6 +362,48 @@ show_quick_fixes() {
     echo ""
 }
 
+check_python_services() {
+    section "Python Billing + Call Control"
+
+    # Check Python API
+    HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/api/health 2>/dev/null)
+    if [ "$HTTP_CODE" = "200" ]; then
+        ok "Python API responding (HTTP 200)"
+        HEALTH=$(curl -s http://127.0.0.1:8001/api/health 2>/dev/null)
+        echo "    Health: $HEALTH"
+    else
+        fail "Python API not responding (HTTP $HTTP_CODE)"
+        echo "    Check: supervisorctl status rswitch-api"
+        echo "    Logs:  tail /var/log/rswitch-python-api.err.log"
+    fi
+
+    # Check AGI port
+    if ss -tlnp | grep -q ':4573'; then
+        ok "FastAGI server listening on port 4573"
+    else
+        fail "FastAGI server NOT listening on port 4573"
+        echo "    The Python API must be running for call routing to work"
+    fi
+
+    # Check Celery workers
+    CELERY_STATUS=$(supervisorctl status rswitch-celery 2>/dev/null | awk '{print $2}')
+    if [ "$CELERY_STATUS" = "RUNNING" ]; then
+        ok "Celery billing workers running"
+    else
+        fail "Celery billing workers: $CELERY_STATUS"
+    fi
+
+    # Check Python venv
+    INSTALL_DIR="/var/www/rswitch"
+    if [ -f "$INSTALL_DIR/python-services/venv/bin/python3" ]; then
+        ok "Python venv exists"
+    else
+        fail "Python venv missing — run: cd $INSTALL_DIR/python-services && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
+    fi
+
+    echo ""
+}
+
 main() {
     print_banner
 
@@ -370,6 +412,7 @@ main() {
     check_database
     check_redis
     check_asterisk
+    check_python_services
     check_permissions
     check_ports
     check_disk_space

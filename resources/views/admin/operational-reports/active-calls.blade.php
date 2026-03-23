@@ -4,7 +4,7 @@
     {{-- Page Header --}}
     <div class="page-header-row">
         <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-200">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-200">
                 <span class="relative flex h-4 w-4">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-4 w-4 bg-white"></span>
@@ -12,7 +12,7 @@
             </div>
             <div>
                 <h2 class="page-title">Active Calls</h2>
-                <p class="page-subtitle">Real-time monitoring of {{ number_format($totalActive) }} ongoing calls</p>
+                <p class="page-subtitle" id="page-subtitle">Real-time monitoring of {{ number_format($totalActive) }} ongoing calls</p>
             </div>
         </div>
         <div class="page-actions">
@@ -34,11 +34,11 @@
     {{-- Stats Cards --}}
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         {{-- Total Active --}}
-        <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-4 text-white shadow-lg">
+        <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-4 text-white shadow-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-green-100 text-xs font-medium uppercase tracking-wide">Total Active</p>
-                    <p class="text-3xl font-bold mt-1">{{ number_format($totalActive) }}</p>
+                    <p class="text-indigo-100 text-xs font-medium uppercase tracking-wide">Total Active</p>
+                    <p class="text-3xl font-bold mt-1" id="stat-total">{{ number_format($totalActive) }}</p>
                 </div>
                 <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
                     <span class="relative flex h-4 w-4">
@@ -54,7 +54,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-gray-500 text-xs font-medium uppercase tracking-wide">Answered</p>
-                    <p class="text-3xl font-bold text-emerald-600 mt-1">{{ number_format($answeredCount) }}</p>
+                    <p class="text-3xl font-bold text-emerald-600 mt-1" id="stat-answered">{{ number_format($answeredCount) }}</p>
                 </div>
                 <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
                     <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,7 +69,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-gray-500 text-xs font-medium uppercase tracking-wide">Ringing</p>
-                    <p class="text-3xl font-bold text-amber-600 mt-1">{{ number_format($ringingCount) }}</p>
+                    <p class="text-3xl font-bold text-amber-600 mt-1" id="stat-ringing">{{ number_format($ringingCount) }}</p>
                 </div>
                 <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
                     <svg class="w-6 h-6 text-amber-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,7 +84,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-gray-500 text-xs font-medium uppercase tracking-wide">Inbound</p>
-                    <p class="text-3xl font-bold text-blue-600 mt-1">{{ number_format($inboundActive) }}</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-1" id="stat-inbound">{{ number_format($inboundActive) }}</p>
                 </div>
                 <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                     <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,7 +99,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-gray-500 text-xs font-medium uppercase tracking-wide">Outbound</p>
-                    <p class="text-3xl font-bold text-purple-600 mt-1">{{ number_format($outboundActive) }}</p>
+                    <p class="text-3xl font-bold text-purple-600 mt-1" id="stat-outbound">{{ number_format($outboundActive) }}</p>
                 </div>
                 <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
                     <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -168,13 +168,12 @@
     </div>
 
     {{-- Calls Table --}}
-    @if($calls->count() > 0)
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div id="calls-table" class="bg-white rounded-xl border border-gray-200 overflow-hidden {{ $calls->count() === 0 ? 'hidden' : '' }}">
             {{-- Table Header Info --}}
             <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-600">
-                        Showing <span class="font-semibold">{{ $calls->firstItem() }}-{{ $calls->lastItem() }}</span> of <span class="font-semibold">{{ number_format($calls->total()) }}</span> calls
+                    <span class="text-sm text-gray-600" id="calls-count">
+                        Showing {{ $calls->count() }} live calls
                     </span>
                 </div>
                 <div class="flex items-center gap-3">
@@ -200,12 +199,11 @@
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Callee</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SIP Account</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="divide-y divide-gray-100" id="live-calls-tbody">
                         @foreach ($calls as $call)
                             <tr class="hover:bg-gray-50 transition-colors">
                                 {{-- Status --}}
@@ -273,17 +271,6 @@
                                     <span class="text-xs text-gray-400">{{ $call->call_start->format('H:i:s') }}</span>
                                 </td>
 
-                                {{-- User --}}
-                                <td class="px-4 py-3">
-                                    @if($call->user)
-                                        <a href="{{ route('admin.users.show', $call->user) }}" class="text-indigo-600 hover:text-indigo-500 font-medium">
-                                            {{ Str::limit($call->user->name, 15) }}
-                                        </a>
-                                    @else
-                                        <span class="text-gray-400">—</span>
-                                    @endif
-                                </td>
-
                                 {{-- SIP Account --}}
                                 <td class="px-4 py-3">
                                     @if($call->sipAccount)
@@ -315,39 +302,270 @@
                 </table>
             </div>
 
-            {{-- Pagination --}}
-            @if($calls->hasPages())
-                <div class="px-4 py-3 bg-gray-50 border-t border-gray-200">
-                    {{ $calls->withQueryString()->links() }}
-                </div>
-            @endif
         </div>
-    @else
-        {{-- Empty State --}}
-        <div class="bg-white rounded-xl border border-gray-200 py-16">
-            <div class="text-center">
-                <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                    <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                    </svg>
-                </div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-1">No Active Calls</h3>
-                <p class="text-gray-500 text-sm">All lines are currently idle</p>
-                <button type="button" onclick="location.reload()" class="mt-4 inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                    Refresh
-                </button>
+
+    {{-- Empty State --}}
+    <div id="empty-state" class="bg-white rounded-xl border border-gray-200 py-16 {{ $calls->count() > 0 ? 'hidden' : '' }}">
+        <div class="text-center">
+            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">No Active Calls</h3>
+            <p class="text-gray-500 text-sm">Waiting for calls — updates appear instantly</p>
+            <div class="mt-3 inline-flex items-center gap-2 text-xs text-gray-400">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                </span>
+                Live monitoring active
             </div>
         </div>
-    @endif
+    </div>
 
-    {{-- Auto-refresh script --}}
-    <script>
-        // Auto-refresh every 10 seconds
-        setTimeout(function() {
-            location.reload();
-        }, 10000);
-    </script>
+    {{-- Live Monitoring Connection Status --}}
+    <div id="ws-status" class="fixed bottom-4 right-4 z-50 hidden">
+        <div class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium shadow-lg" id="ws-status-badge">
+            <span class="w-2 h-2 rounded-full" id="ws-status-dot"></span>
+            <span id="ws-status-text"></span>
+        </div>
+    </div>
+
+@push('scripts')
+<script>
+(function() {
+    const WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws/live-calls';
+    let ws = null;
+    let reconnectAttempts = 0;
+    const maxReconnect = 10;
+
+    // DOM references
+    const statTotal = document.getElementById('stat-total');
+    const statAnswered = document.getElementById('stat-answered');
+    const statRinging = document.getElementById('stat-ringing');
+    const statInbound = document.getElementById('stat-inbound');
+    const statOutbound = document.getElementById('stat-outbound');
+    const callsTableBody = document.getElementById('live-calls-tbody');
+    const callsCount = document.getElementById('calls-count');
+    const emptyState = document.getElementById('empty-state');
+    const callsTable = document.getElementById('calls-table');
+    const wsStatus = document.getElementById('ws-status');
+    const wsStatusBadge = document.getElementById('ws-status-badge');
+    const wsStatusDot = document.getElementById('ws-status-dot');
+    const wsStatusText = document.getElementById('ws-status-text');
+    const subtitle = document.getElementById('page-subtitle');
+
+    function connect() {
+        ws = new WebSocket(WS_URL);
+
+        ws.onopen = function() {
+            reconnectAttempts = 0;
+            showStatus('connected', 'Live');
+            // Hide status badge after 3 seconds
+            setTimeout(() => { wsStatus.classList.add('hidden'); }, 3000);
+        };
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handleMessage(data);
+        };
+
+        ws.onclose = function() {
+            showStatus('disconnected', 'Reconnecting...');
+            if (reconnectAttempts < maxReconnect) {
+                reconnectAttempts++;
+                setTimeout(connect, Math.min(1000 * reconnectAttempts, 10000));
+            }
+        };
+
+        ws.onerror = function() {
+            showStatus('error', 'Connection error');
+        };
+    }
+
+    function handleMessage(data) {
+        switch (data.type) {
+            case 'snapshot':
+                updateStats(data.stats);
+                renderCallsTable(data.calls);
+                break;
+            case 'call_start':
+                updateStats(data.stats);
+                addCallRow(data.call);
+                break;
+            case 'call_answered':
+                updateStats(data.stats);
+                updateCallRow(data.call);
+                break;
+            case 'call_end':
+                updateStats(data.stats);
+                removeCallRow(data.unique_id);
+                break;
+            case 'pong':
+                break;
+        }
+    }
+
+    function updateStats(stats) {
+        if (!stats) return;
+        if (statTotal) statTotal.textContent = stats.total.toLocaleString();
+        if (statAnswered) statAnswered.textContent = stats.answered.toLocaleString();
+        if (statRinging) statRinging.textContent = stats.ringing.toLocaleString();
+        if (statInbound) statInbound.textContent = stats.inbound.toLocaleString();
+        if (statOutbound) statOutbound.textContent = stats.outbound.toLocaleString();
+        if (subtitle) subtitle.textContent = 'Real-time monitoring of ' + stats.total.toLocaleString() + ' ongoing calls';
+    }
+
+    function renderCallsTable(calls) {
+        if (!callsTableBody) return;
+
+        if (calls.length === 0) {
+            if (callsTable) callsTable.classList.add('hidden');
+            if (emptyState) emptyState.classList.remove('hidden');
+            return;
+        }
+
+        if (callsTable) callsTable.classList.remove('hidden');
+        if (emptyState) emptyState.classList.add('hidden');
+
+        callsTableBody.innerHTML = '';
+        calls.forEach(call => addCallRow(call));
+
+        if (callsCount) callsCount.textContent = 'Showing ' + calls.length + ' live calls';
+    }
+
+    function addCallRow(call) {
+        if (!callsTableBody) return;
+
+        // Show table, hide empty state
+        if (callsTable) callsTable.classList.remove('hidden');
+        if (emptyState) emptyState.classList.add('hidden');
+
+        // Remove existing row if present
+        const existing = document.getElementById('call-' + call.unique_id);
+        if (existing) existing.remove();
+
+        const tr = document.createElement('tr');
+        tr.id = 'call-' + call.unique_id;
+        tr.className = 'hover:bg-gray-50 transition-colors animate-fade-in';
+
+        const statusBadge = call.state === 'answered'
+            ? '<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>'
+            : '<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>Ringing</span>';
+
+        const dirBadge = call.call_flow === 'inbound'
+            ? '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-700">IN</span>'
+            : '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-purple-100 text-purple-700">OUT</span>';
+
+        const durationEl = call.state === 'answered'
+            ? '<span class="relative flex h-2 w-2 inline-block mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span><span class="font-medium text-green-600 call-duration" data-started="' + call.started_at + '">' + formatDuration(call.duration) + '</span>'
+            : '<span class="font-medium text-gray-600 call-duration" data-started="' + call.started_at + '">' + formatDuration(call.duration) + '</span>';
+
+        tr.innerHTML = `
+            <td class="px-4 py-3">${statusBadge}</td>
+            <td class="px-4 py-3">${dirBadge}</td>
+            <td class="px-4 py-3"><span class="font-mono text-gray-900">${escapeHtml(call.caller || '—')}</span></td>
+            <td class="px-4 py-3"><span class="font-mono text-gray-900">${escapeHtml(call.callee || '—')}</span></td>
+            <td class="px-4 py-3">${durationEl}</td>
+            <td class="px-4 py-3"><span class="text-gray-600">${escapeHtml(call.sip_account || '—')}</span></td>
+            <td class="px-4 py-3"><span class="text-gray-600">${escapeHtml(call.trunk || '—')}</span></td>
+        `;
+
+        callsTableBody.prepend(tr);
+        updateCallsCount();
+    }
+
+    function updateCallRow(call) {
+        const row = document.getElementById('call-' + call.unique_id);
+        if (row) {
+            // Update status badge to answered
+            const statusCell = row.querySelector('td:first-child');
+            if (statusCell) {
+                statusCell.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>';
+            }
+            // Flash green briefly
+            row.classList.add('bg-emerald-50');
+            setTimeout(() => row.classList.remove('bg-emerald-50'), 1500);
+        } else {
+            addCallRow(call);
+        }
+    }
+
+    function removeCallRow(uniqueId) {
+        const row = document.getElementById('call-' + uniqueId);
+        if (row) {
+            row.classList.add('bg-red-50', 'opacity-50');
+            setTimeout(() => {
+                row.remove();
+                updateCallsCount();
+                // Show empty state if no more rows
+                if (callsTableBody && callsTableBody.children.length === 0) {
+                    if (callsTable) callsTable.classList.add('hidden');
+                    if (emptyState) emptyState.classList.remove('hidden');
+                }
+            }, 800);
+        }
+    }
+
+    function updateCallsCount() {
+        if (callsCount && callsTableBody) {
+            const count = callsTableBody.children.length;
+            callsCount.textContent = 'Showing ' + count + ' live calls';
+        }
+    }
+
+    function formatDuration(seconds) {
+        if (!seconds || seconds < 0) return '0s';
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return m > 0 ? m + 'm ' + s + 's' : s + 's';
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function showStatus(state, text) {
+        if (!wsStatus) return;
+        wsStatus.classList.remove('hidden');
+        wsStatusText.textContent = text;
+
+        if (state === 'connected') {
+            wsStatusBadge.className = 'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium shadow-lg bg-emerald-100 text-emerald-700';
+            wsStatusDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        } else if (state === 'disconnected') {
+            wsStatusBadge.className = 'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium shadow-lg bg-amber-100 text-amber-700';
+            wsStatusDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+        } else {
+            wsStatusBadge.className = 'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium shadow-lg bg-red-100 text-red-700';
+            wsStatusDot.className = 'w-2 h-2 rounded-full bg-red-500';
+        }
+    }
+
+    // Update durations every second
+    setInterval(function() {
+        document.querySelectorAll('.call-duration').forEach(el => {
+            const started = parseFloat(el.dataset.started);
+            if (started) {
+                const elapsed = Math.floor(Date.now() / 1000 - started);
+                el.textContent = formatDuration(elapsed);
+            }
+        });
+    }, 1000);
+
+    // Send ping every 25 seconds to keep connection alive
+    setInterval(function() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send('ping');
+        }
+    }, 25000);
+
+    // Start connection
+    connect();
+})();
+</script>
+@endpush
 </x-admin-layout>

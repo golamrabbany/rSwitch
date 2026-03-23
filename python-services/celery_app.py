@@ -1,0 +1,53 @@
+"""
+Celery application configuration.
+
+Replaces Laravel's scheduled commands:
+- billing:rate-calls  → rate_and_charge task (triggered per CDR, real-time)
+- billing:generate-invoices → generate_invoices task (scheduled)
+- cdr:aggregate → aggregate_cdr task (scheduled)
+"""
+
+from celery import Celery
+from celery.schedules import crontab
+from shared.config import get_settings
+
+settings = get_settings()
+
+app = Celery(
+    "rswitch",
+    broker=settings.redis_url,
+    backend=settings.redis_url,
+)
+
+app.conf.update(
+    # Serialization
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="UTC",
+    enable_utc=True,
+
+    # Worker settings
+    worker_prefetch_multiplier=4,
+    worker_max_tasks_per_child=1000,
+    worker_concurrency=4,
+
+    # Task routing
+    task_routes={
+        "billing.tasks.rate_and_charge": {"queue": "billing"},
+        "billing.tasks.rate_batch": {"queue": "billing"},
+        "monitoring.tasks.*": {"queue": "monitoring"},
+    },
+
+    # Scheduled tasks (replaces Laravel cron)
+    beat_schedule={
+        # Rate any missed CDRs every 2 minutes (safety net)
+        "rate-unrated-cdrs": {
+            "task": "billing.tasks.rate_batch",
+            "schedule": 120.0,  # every 2 minutes
+        },
+    },
+)
+
+# Auto-discover tasks in these modules
+app.autodiscover_tasks(["billing", "monitoring"])

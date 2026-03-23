@@ -7,6 +7,7 @@ use App\Models\Rate;
 use App\Models\RateGroup;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Validation\Rule;
 
 class RateController extends Controller
@@ -32,6 +33,9 @@ class RateController extends Controller
 
         AuditService::logCreated($rate);
 
+        // Notify Python billing service to clear rate cache
+        Redis::publish('rswitch:rate.updated', json_encode(['rate_group_id' => $rateGroup->id]));
+
         return redirect()->route('admin.rate-groups.show', $rateGroup)
             ->with('success', "Rate for prefix \"{$rate->prefix}\" created.");
     }
@@ -50,6 +54,9 @@ class RateController extends Controller
 
         AuditService::logUpdated($rate, $original);
 
+        // Notify Python billing service to clear rate cache
+        Redis::publish('rswitch:rate.updated', json_encode(['rate_group_id' => $rateGroup->id]));
+
         return redirect()->route('admin.rate-groups.show', $rateGroup)
             ->with('success', "Rate for prefix \"{$rate->prefix}\" updated.");
     }
@@ -58,6 +65,9 @@ class RateController extends Controller
     {
         AuditService::logAction('deleted', $rate, $rate->toArray());
         $rate->delete();
+
+        // Notify Python billing service to clear rate cache
+        Redis::publish('rswitch:rate.updated', json_encode(['rate_group_id' => $rateGroup->id]));
 
         return redirect()->route('admin.rate-groups.show', $rateGroup)
             ->with('success', "Rate for prefix \"{$rate->prefix}\" deleted.");

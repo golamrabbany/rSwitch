@@ -97,6 +97,71 @@ services:
             - mysql
             - redis
             - laravel.test
+    python-api:
+        build:
+            context: ./python-services
+            dockerfile: docker/Dockerfile
+        image: 'rswitch/python-api:1.0'
+        ports:
+            - '${PYTHON_API_PORT:-8001}:8000'
+        environment:
+            PYTHONPATH: /app
+            DATABASE_URL: 'mysql+pymysql://${DB_USERNAME}:${DB_PASSWORD}@mysql:3306/${DB_DATABASE}'
+            ASYNC_DATABASE_URL: 'mysql+aiomysql://${DB_USERNAME}:${DB_PASSWORD}@mysql:3306/${DB_DATABASE}'
+            REDIS_URL: 'redis://redis:6379/0'
+            ASTERISK_AMI_HOST: asterisk
+            ASTERISK_AMI_PORT: 5038
+            ASTERISK_AMI_USER: laravel
+            ASTERISK_AMI_SECRET: rSwitch_AMI_s3cret_2024
+            LOG_LEVEL: info
+        volumes:
+            - './python-services:/app'
+        networks:
+            - sail
+        depends_on:
+            mysql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+            asterisk:
+                condition: service_started
+    python-worker:
+        build:
+            context: ./python-services
+            dockerfile: docker/Dockerfile
+        image: 'rswitch/python-api:1.0'
+        command: 'celery -A celery_app worker -l info -Q billing,monitoring -c 4'
+        environment:
+            PYTHONPATH: /app
+            DATABASE_URL: 'mysql+pymysql://${DB_USERNAME}:${DB_PASSWORD}@mysql:3306/${DB_DATABASE}'
+            REDIS_URL: 'redis://redis:6379/0'
+            LOG_LEVEL: info
+        volumes:
+            - './python-services:/app'
+        networks:
+            - sail
+        depends_on:
+            mysql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+    python-beat:
+        build:
+            context: ./python-services
+            dockerfile: docker/Dockerfile
+        image: 'rswitch/python-api:1.0'
+        command: 'celery -A celery_app beat -l info'
+        environment:
+            PYTHONPATH: /app
+            REDIS_URL: 'redis://redis:6379/0'
+            LOG_LEVEL: info
+        volumes:
+            - './python-services:/app'
+        networks:
+            - sail
+        depends_on:
+            redis:
+                condition: service_healthy
     asterisk:
         build:
             context: ./docker/asterisk
@@ -122,6 +187,8 @@ services:
             - './docker/asterisk/conf/res_odbc.conf:/etc/asterisk/res_odbc.conf'
             - './docker/asterisk/conf/logger.conf:/etc/asterisk/logger.conf'
             - './docker/asterisk/conf/manager.conf:/etc/asterisk/manager.conf'
+            - './docker/asterisk/conf/sorcery.conf:/etc/asterisk/sorcery.conf'
+            - './docker/asterisk/conf/rtp.conf:/etc/asterisk/rtp.conf'
         networks:
             - sail
         depends_on:

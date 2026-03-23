@@ -11,16 +11,31 @@ Automated installation scripts for rSwitch VoIP Billing & Routing Platform.
 - Debian 12 (Bookworm)
 
 ### Minimum Hardware
-- **CPU:** 2 cores
-- **RAM:** 4 GB
-- **Storage:** 20 GB SSD
+- **CPU:** 4 cores
+- **RAM:** 8 GB
+- **Storage:** 40 GB SSD
 - **Network:** 1 Gbps
 
-### Recommended Hardware (Production)
-- **CPU:** 4+ cores
-- **RAM:** 8+ GB
+### Recommended Hardware (1000+ concurrent calls)
+- **CPU:** 16+ cores
+- **RAM:** 32+ GB
 - **Storage:** 100+ GB SSD
 - **Network:** 1 Gbps with low latency
+
+### Software Components Installed
+- PHP 8.3 + FPM + extensions
+- MySQL 8.x
+- Redis 7.x
+- Nginx
+- Node.js 20.x
+- Composer
+- Asterisk 20/21 (PJSIP + ODBC)
+- Python 3.12 + FastAPI + Celery (Billing Engine + Call Control + Live Monitoring)
+- Supervisor (process management)
+- Fail2Ban (SSH + SIP + Nginx protection)
+- UFW Firewall
+- Let's Encrypt SSL (optional)
+- Monitoring + Backup scripts
 
 ## Quick Start
 

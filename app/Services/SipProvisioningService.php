@@ -4,10 +4,17 @@ namespace App\Services;
 
 use App\Models\SipAccount;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class SipProvisioningService
 {
+    /**
+     * Default codec for all endpoints.
+     * Using a single codec eliminates transcoding overhead (~2x capacity gain).
+     * ulaw (G.711 µ-law) is chosen for widest compatibility and zero CPU transcoding.
+     */
+    public const DEFAULT_CODEC = 'ulaw';
     /**
      * Provision a SIP account into Asterisk realtime tables.
      */
@@ -15,6 +22,9 @@ class SipProvisioningService
     {
         DB::transaction(function () use ($sip) {
             $id = $sip->username;
+
+            // Force single codec to prevent transcoding (biggest performance gain)
+            $codec = self::DEFAULT_CODEC;
 
             // ps_endpoints
             DB::table('ps_endpoints')->updateOrInsert(
@@ -25,7 +35,7 @@ class SipProvisioningService
                     'auth' => in_array($sip->auth_type, ['password', 'both']) ? $id : null,
                     'context' => 'from-internal',
                     'disallow' => 'all',
-                    'allow' => $sip->codec_allow,
+                    'allow' => $codec,
                     'direct_media' => 'no',
                     'rtp_symmetric' => 'yes',
                     'force_rport' => 'yes',
@@ -74,6 +84,9 @@ class SipProvisioningService
                 }
             }
         });
+
+        // Invalidate Sorcery memory cache so Asterisk picks up the changes
+        $this->reloadPjsip();
     }
 
     /**
@@ -90,6 +103,71 @@ class SipProvisioningService
             DB::table('ps_auths')->where('id', $id)->delete();
             DB::table('ps_endpoints')->where('id', $id)->delete();
         });
+
+        // Invalidate Sorcery memory cache
+        $this->reloadPjsip();
+    }
+
+    /**
+     * Reload PJSIP module to invalidate Sorcery memory cache.
+     * This forces Asterisk to re-read endpoints from the database
+     * on next access, ensuring provisioning changes take effect immediately.
+     */
+    private function reloadPjsip(): void
+    {
+        try {
+            $asteriskHost = config('services.asterisk.host', 'asterisk');
+
+            // Connect to Asterisk AMI and send reload command
+            $socket = @fsockopen($asteriskHost, 5038, $errno, $errstr, 3);
+
+            if (!$socket) {
+                Log::warning("SipProvisioning: AMI connect failed ({$errstr})");
+                return;
+            }
+
+            // Read banner
+            fgets($socket);
+
+            // Login
+            fwrite($socket, "Action: Login\r\n");
+            fwrite($socket, "Username: laravel\r\n");
+            fwrite($socket, "Secret: " . config('services.asterisk.ami_secret', 'rSwitch_AMI_s3cret_2024') . "\r\n");
+            fwrite($socket, "\r\n");
+
+            // Read login response
+            $this->readAmiResponse($socket);
+
+            // Send PJSIP reload to flush sorcery cache
+            fwrite($socket, "Action: Command\r\n");
+            fwrite($socket, "Command: pjsip reload\r\n");
+            fwrite($socket, "\r\n");
+
+            $this->readAmiResponse($socket);
+
+            // Logoff
+            fwrite($socket, "Action: Logoff\r\n\r\n");
+
+            fclose($socket);
+        } catch (\Throwable $e) {
+            Log::warning("SipProvisioning: PJSIP reload failed - {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Read an AMI response until empty line.
+     */
+    private function readAmiResponse($socket): string
+    {
+        $response = '';
+        stream_set_timeout($socket, 3);
+        while ($line = fgets($socket)) {
+            $response .= $line;
+            if (trim($line) === '') {
+                break;
+            }
+        }
+        return $response;
     }
 
     /**

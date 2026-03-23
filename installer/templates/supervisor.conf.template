@@ -30,20 +30,6 @@ stdout_logfile={{INSTALL_DIR}}/storage/logs/webhook-worker.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=3
 
-[program:rswitch-agi]
-process_name=%(program_name)s
-command=php {{INSTALL_DIR}}/artisan agi:serve
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-numprocs=1
-redirect_stderr=true
-stdout_logfile={{INSTALL_DIR}}/storage/logs/agi.log
-stdout_logfile_maxbytes=10MB
-stdout_logfile_backups=3
-
 [program:rswitch-scheduler]
 process_name=%(program_name)s
 command=/bin/bash -c "while true; do php {{INSTALL_DIR}}/artisan schedule:run >> /dev/null 2>&1; sleep 60; done"
@@ -56,5 +42,45 @@ stdout_logfile={{INSTALL_DIR}}/storage/logs/scheduler.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=3
 
+; --- Python Services (Billing Engine + Call Control + Live Monitoring) ---
+
+[program:rswitch-api]
+command={{INSTALL_DIR}}/python-services/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8001 --workers 1
+directory={{INSTALL_DIR}}/python-services
+environment=PYTHONPATH="{{INSTALL_DIR}}/python-services"
+user=www-data
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/rswitch-python-api.err.log
+stdout_logfile=/var/log/rswitch-python-api.out.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=3
+stopwaitsecs=10
+
+[program:rswitch-celery]
+command={{INSTALL_DIR}}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring -c 4
+directory={{INSTALL_DIR}}/python-services
+environment=PYTHONPATH="{{INSTALL_DIR}}/python-services"
+user=www-data
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/rswitch-celery.err.log
+stdout_logfile=/var/log/rswitch-celery.out.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=3
+stopwaitsecs=30
+
+[program:rswitch-celery-beat]
+command={{INSTALL_DIR}}/python-services/venv/bin/celery -A celery_app beat -l info
+directory={{INSTALL_DIR}}/python-services
+environment=PYTHONPATH="{{INSTALL_DIR}}/python-services"
+user=www-data
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/rswitch-celery-beat.err.log
+stdout_logfile=/var/log/rswitch-celery-beat.out.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=3
+
 [group:rswitch]
-programs=rswitch-worker,rswitch-webhook-worker,rswitch-agi,rswitch-scheduler
+programs=rswitch-worker,rswitch-webhook-worker,rswitch-scheduler,rswitch-api,rswitch-celery,rswitch-celery-beat
