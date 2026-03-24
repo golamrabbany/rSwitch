@@ -229,6 +229,9 @@
                                     @break
                                 @case('FAILED')
                                     <span class="badge badge-danger">FAILED</span>
+                                    @if($record->hangup_cause)
+                                        <div class="text-xs text-red-400 mt-0.5">{{ str_replace('_', ' ', $record->hangup_cause) }}</div>
+                                    @endif
                                     @break
                                 @case('CANCEL')
                                     <span class="badge badge-gray">CANCEL</span>

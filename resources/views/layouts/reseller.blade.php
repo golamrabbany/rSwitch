@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>[x-cloak] { display: none !important; }</style>
 </head>
 <body class="font-sans antialiased bg-gray-50">
     <div class="min-h-screen flex theme-reseller">
@@ -39,6 +40,26 @@
                 </a>
 
                 <div class="my-3 border-t border-gray-100"></div>
+
+                <!-- Rate Plan Menu -->
+                @php $ratePlanActive = request()->routeIs('reseller.tariffs.*', 'reseller.base-tariff'); @endphp
+                <div x-data="{ open: {{ $ratePlanActive ? 'true' : 'false' }} }" class="mb-1">
+                    <button @click="open = !open" class="nav-parent {{ $ratePlanActive ? 'has-active' : 'text-gray-600' }}">
+                        <div class="flex items-center">
+                            <svg class="nav-icon {{ $ratePlanActive ? 'text-emerald-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <span class="nav-text">Rate Plan</span>
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-collapse class="nav-children">
+                        <a href="{{ route('reseller.base-tariff') }}" class="nav-child {{ request()->routeIs('reseller.base-tariff') ? 'active' : 'text-gray-500' }}">Base Rate Group</a>
+                        <a href="{{ route('reseller.tariffs.index') }}" class="nav-child {{ request()->routeIs('reseller.tariffs.*') ? 'active' : 'text-gray-500' }}">My Rate Groups</a>
+                    </div>
+                </div>
 
                 <!-- Accounts Menu -->
                 @php $accountsActive = request()->routeIs('reseller.clients.*', 'reseller.sip-accounts.*'); @endphp
@@ -270,5 +291,7 @@
 
     {{-- Impersonation Banner --}}
     <x-impersonation-banner />
+
+    @stack('scripts')
 </body>
 </html>

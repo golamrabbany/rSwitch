@@ -207,12 +207,12 @@ class OutboundCallHandler:
                         (uuid, sip_account_id, user_id, reseller_id, call_flow,
                          caller, callee, destination_sip_account_id,
                          call_start, call_end, duration, billsec,
-                         disposition, status, created_at)
+                         disposition, hangup_cause, status, created_at)
                         VALUES
                         (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
                          :caller, :callee, :dest_sip_id,
                          NOW(), NOW(), 0, 0,
-                         'FAILED', 'unbillable', NOW())
+                         'FAILED', 'CALLEE_NOT_REGISTERED', 'unbillable', NOW())
                     """),
                     {
                         "uuid": cdr_uuid,
@@ -228,7 +228,7 @@ class OutboundCallHandler:
 
                 await agi.set_variable("CDR_UUID", cdr_uuid)
 
-                # Play announcement directly from AGI (caller may hang up before dialplan)
+                # Play announcement directly from AGI
                 await agi.answer()
                 await agi.exec("Wait", "0.5")
                 await agi.exec("Playback", "IVR/wrong_number")
@@ -266,12 +266,12 @@ class OutboundCallHandler:
                     (uuid, sip_account_id, user_id, reseller_id, call_flow,
                      caller, callee, destination,
                      call_start, call_end, duration, billsec,
-                     disposition, status, created_at)
+                     disposition, hangup_cause, status, created_at)
                     VALUES
                     (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
                      :caller, :callee, :callee,
                      NOW(), NOW(), 0, 0,
-                     'FAILED', 'unbillable', NOW())
+                     'FAILED', 'NO_ROUTE_FOUND', 'unbillable', NOW())
                 """),
                 {
                     "uuid": cdr_uuid,

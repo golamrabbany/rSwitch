@@ -59,12 +59,13 @@
             <thead>
                 <tr>
                     <th>Account</th>
-                    <th>Balance</th>
-                    <th>Tariff</th>
-                    <th>Type</th>
-                    <th>Chn/SIP</th>
+                    <th class="text-right">Balance</th>
+                    <th>Rate Group</th>
+                    <th>Billing</th>
+                    <th class="text-center">Chn/SIP</th>
+                    <th>KYC</th>
                     <th>Status</th>
-                    <th class="text-center">Actions</th>
+                    <th style="text-align: center">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -81,8 +82,8 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="font-medium">{{ format_currency($client->balance) }}</td>
-                        <td>{{ $client->rateGroup?->name ?? '-' }}</td>
+                        <td class="text-right font-mono font-medium">{{ format_currency($client->balance) }}</td>
+                        <td class="text-gray-700">{{ $client->rateGroup?->name ?? '—' }}</td>
                         <td>
                             @if($client->billing_type === 'prepaid')
                                 <span class="badge badge-blue">Prepaid</span>
@@ -90,7 +91,22 @@
                                 <span class="badge badge-purple">Postpaid</span>
                             @endif
                         </td>
-                        <td>{{ $client->max_channels }}/{{ $client->sip_accounts_count ?? 0 }}</td>
+                        <td class="text-center text-gray-600">{{ $client->max_channels }}/{{ $client->sip_accounts_count ?? 0 }}</td>
+                        <td>
+                            @switch($client->kyc_status)
+                                @case('approved')
+                                    <span class="badge badge-success">Approved</span>
+                                    @break
+                                @case('pending')
+                                    <span class="badge badge-warning">Pending</span>
+                                    @break
+                                @case('rejected')
+                                    <span class="badge badge-danger">Rejected</span>
+                                    @break
+                                @default
+                                    <span class="badge badge-gray">Not Submitted</span>
+                            @endswitch
+                        </td>
                         <td>
                             @if($client->status === 'active')
                                 <span class="badge badge-success">Active</span>
@@ -98,23 +114,25 @@
                                 <span class="badge badge-warning">Suspended</span>
                             @endif
                         </td>
-                        <td class="text-center whitespace-nowrap">
-                            <a href="{{ route('reseller.clients.show', $client) }}" class="action-icon" title="View">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                            </a>
-                            <a href="{{ route('reseller.clients.edit', $client) }}" class="action-icon" title="Edit">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                </svg>
-                            </a>
+                        <td>
+                            <div class="flex items-center justify-center gap-1">
+                                <a href="{{ route('reseller.clients.show', $client) }}" class="action-icon" title="View">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </a>
+                                <a href="{{ route('reseller.clients.edit', $client) }}" class="action-icon" title="Edit">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center py-12">
+                        <td colspan="8" class="text-center py-12">
                             <div class="empty-state">
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>

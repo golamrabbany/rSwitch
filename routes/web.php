@@ -183,6 +183,18 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::resource('sip-accounts', Reseller\SipAccountController::class)->except(['destroy']);
         Route::post('sip-accounts/{sip_account}/reprovision', [Reseller\SipAccountController::class, 'reprovision'])->name('sip-accounts.reprovision');
 
+        // Rate Plan
+        Route::get('base-tariff', [Reseller\TariffController::class, 'baseTariff'])->name('base-tariff');
+        Route::get('base-tariff/export', [Reseller\TariffController::class, 'exportBaseTariff'])->name('base-tariff.export');
+        Route::resource('tariffs', Reseller\TariffController::class);
+        Route::get('tariffs/{tariff}/export', [Reseller\TariffController::class, 'exportTariff'])->name('tariffs.export');
+        Route::post('tariffs/{tariff}/import', [Reseller\TariffController::class, 'importTariff'])->name('tariffs.import');
+        Route::get('tariffs/{tariff}/rates/create', [Reseller\TariffController::class, 'createRate'])->name('tariffs.create-rate');
+        Route::post('tariffs/{tariff}/rates', [Reseller\TariffController::class, 'addRate'])->name('tariffs.add-rate');
+        Route::get('tariffs/{tariff}/rates/{rate}/edit', [Reseller\TariffController::class, 'editRate'])->name('tariffs.edit-rate');
+        Route::put('tariffs/{tariff}/rates/{rate}', [Reseller\TariffController::class, 'updateRate'])->name('tariffs.update-rate');
+        Route::delete('tariffs/{tariff}/rates/{rate}', [Reseller\TariffController::class, 'deleteRate'])->name('tariffs.delete-rate');
+
         Route::get('cdr', [Reseller\CdrController::class, 'index'])->name('cdr.index');
         Route::get('cdr/export', [Reseller\CdrController::class, 'export'])->name('cdr.export');
         Route::get('cdr/{uuid}', [Reseller\CdrController::class, 'show'])->name('cdr.show');

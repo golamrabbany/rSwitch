@@ -15,11 +15,13 @@ class DashboardController extends Controller
 
         $entityCounts = $service->getEntityCounts($user);
         $weekStats = $service->getCallStats($childIds, 7);
+        $prevWeekStats = $service->getPreviousPeriodStats($childIds, 7);
         $todayStats = $service->getTodayCallStats($childIds);
+        $dailyData = $service->getDailyCallData($childIds, 7);
         $recentCalls = $service->getRecentCalls($childIds, 10);
 
         return view('reseller.dashboard', compact(
-            'entityCounts', 'weekStats', 'todayStats', 'recentCalls'
+            'entityCounts', 'weekStats', 'prevWeekStats', 'todayStats', 'dailyData', 'recentCalls'
         ));
     }
 }
