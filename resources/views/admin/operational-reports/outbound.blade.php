@@ -15,6 +15,12 @@
             </div>
         </div>
         <div class="page-actions">
+            <a href="{{ route('admin.operational-reports.outbound.export', request()->query()) }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Export
+            </a>
             <a href="{{ route('admin.operational-reports.index') }}" class="btn-action-secondary">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -90,62 +96,109 @@
 
     {{-- Filter Bar --}}
     <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-        <form method="GET" class="flex flex-wrap items-center gap-3">
-            {{-- Search --}}
-            <div class="flex-1 min-w-[180px] max-w-xs">
-                <div class="relative">
-                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search destination..." class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        <form method="GET" class="space-y-3">
+            {{-- Row 1: Destination + Dates + Disposition + Trunk --}}
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto auto; gap: 0.75rem; align-items: center;">
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search destination..." class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                <input type="date" name="date_from" value="{{ request('date_from', now()->format('Y-m-d')) }}" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                <input type="date" name="date_to" value="{{ request('date_to') }}" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                    <a href="{{ route('admin.operational-reports.outbound', array_merge(request()->except('disposition'), [])) }}" class="px-3 py-2 text-sm font-medium {{ !request('disposition') ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
+                    <a href="{{ route('admin.operational-reports.outbound', array_merge(request()->except('disposition'), ['disposition' => 'ANSWERED'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'ANSWERED' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Answered</a>
+                    <a href="{{ route('admin.operational-reports.outbound', array_merge(request()->except('disposition'), ['disposition' => 'NO ANSWER'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'NO ANSWER' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">No Answer</a>
+                    <a href="{{ route('admin.operational-reports.outbound', array_merge(request()->except('disposition'), ['disposition' => 'FAILED'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'FAILED' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Failed</a>
+                </div>
+                <select name="trunk_id" class="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer">
+                    <option value="">All Trunks</option>
+                    @foreach($trunks as $trunk)
+                        <option value="{{ $trunk->id }}" {{ request('trunk_id') == $trunk->id ? 'selected' : '' }}>{{ $trunk->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            {{-- Row 2: Reseller + Client + Source IP + Caller ID + Buttons --}}
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 0.75rem; align-items: center;">
+                {{-- Reseller --}}
+                <div class="relative" x-data="resellerFilter()" @click.away="open = false">
+                    <input type="hidden" name="reseller_id" :value="selectedId">
+                    <input type="text" x-model="query" @focus="open = true" @click="open = true" @input="open = true; selectedId = ''" placeholder="All Resellers" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" autocomplete="off">
+                    <div x-show="open" x-cloak class="absolute z-20 mt-1 w-64 bg-white rounded-lg border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
+                        <button type="button" @click="selectedId = ''; query = ''; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 text-gray-500">All Resellers</button>
+                        <template x-for="r in filtered" :key="r.id">
+                            <button type="button" @click="selectedId = String(r.id); query = r.name; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 flex items-center justify-between">
+                                <span class="font-medium text-gray-900" x-text="r.name"></span>
+                                <span class="text-xs text-gray-400" x-text="r.email"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                {{-- Client --}}
+                <div class="relative" x-data="clientFilter()" @click.away="open = false">
+                    <input type="hidden" name="user_id" :value="selectedId">
+                    <input type="text" x-model="query" @focus="open = true" @click="open = true" @input="open = true; selectedId = ''" placeholder="All Clients" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" autocomplete="off">
+                    <div x-show="open" x-cloak class="absolute z-20 mt-1 w-64 bg-white rounded-lg border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
+                        <button type="button" @click="selectedId = ''; query = ''; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 text-gray-500">All Clients</button>
+                        <template x-for="c in filtered" :key="c.id">
+                            <button type="button" @click="selectedId = String(c.id); query = c.name; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 flex items-center justify-between">
+                                <span class="font-medium text-gray-900" x-text="c.name"></span>
+                                <span class="text-xs text-gray-400" x-text="c.email"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                {{-- Source IP --}}
+                <input type="text" name="source_ip" value="{{ request('source_ip') }}" placeholder="Source IP" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+
+                {{-- Caller ID --}}
+                <input type="text" name="caller_id" value="{{ request('caller_id') }}" placeholder="Caller ID" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+
+                {{-- Buttons --}}
+                <div class="flex items-center gap-2">
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 whitespace-nowrap">Search</button>
+                    @if(request()->hasAny(['search', 'disposition', 'trunk_id', 'date_to', 'reseller_id', 'user_id', 'source_ip', 'caller_id']))
+                        <a href="{{ route('admin.operational-reports.outbound') }}" class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap">Clear</a>
+                    @endif
                 </div>
             </div>
-
-            {{-- Date Range --}}
-            <input type="date" name="date_from" value="{{ request('date_from', now()->format('Y-m-d')) }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <input type="date" name="date_to" value="{{ request('date_to') }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="End date">
-
-            {{-- Disposition Filter --}}
-            <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-                <a href="{{ route('admin.operational-reports.outbound', array_merge(request()->except('disposition'), [])) }}"
-                   class="px-3 py-2 text-sm font-medium {{ !request('disposition') ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">
-                    All
-                </a>
-                <a href="{{ route('admin.operational-reports.outbound', array_merge(request()->except('disposition'), ['disposition' => 'ANSWERED'])) }}"
-                   class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'ANSWERED' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">
-                    Answered
-                </a>
-                <a href="{{ route('admin.operational-reports.outbound', array_merge(request()->except('disposition'), ['disposition' => 'NO ANSWER'])) }}"
-                   class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'NO ANSWER' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">
-                    No Answer
-                </a>
-                <a href="{{ route('admin.operational-reports.outbound', array_merge(request()->except('disposition'), ['disposition' => 'FAILED'])) }}"
-                   class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'FAILED' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">
-                    Failed
-                </a>
-            </div>
-
-            {{-- Trunk Filter --}}
-            <select name="trunk_id" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="">All Trunks</option>
-                @foreach($trunks as $trunk)
-                    <option value="{{ $trunk->id }}" {{ request('trunk_id') == $trunk->id ? 'selected' : '' }}>
-                        {{ $trunk->name }}
-                    </option>
-                @endforeach
-            </select>
-
-            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                Search
-            </button>
-
-            @if(request()->hasAny(['search', 'disposition', 'trunk_id', 'date_to']))
-                <a href="{{ route('admin.operational-reports.outbound') }}" class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">
-                    Clear
-                </a>
-            @endif
         </form>
     </div>
+
+    @push('scripts')
+    <script>
+    var _resellers = @json($resellers->map(function ($r) { return ['id' => $r->id, 'name' => $r->name, 'email' => $r->email]; }));
+    var _clients = @json($clients->map(function ($c) { return ['id' => $c->id, 'name' => $c->name, 'email' => $c->email]; }));
+
+    function resellerFilter() {
+        return {
+            open: false, query: '', selectedId: '{{ request('reseller_id') }}', filtered: _resellers.slice(0, 5),
+            init() {
+                if (this.selectedId) { var f = _resellers.find(function(r) { return String(r.id) === String(this.selectedId); }.bind(this)); if (f) this.query = f.name; }
+                this.$watch('query', function(val) {
+                    if (!val) { this.filtered = _resellers.slice(0, 5); return; }
+                    var q = val.toLowerCase();
+                    this.filtered = _resellers.filter(function(r) { return r.name.toLowerCase().indexOf(q) > -1 || r.email.toLowerCase().indexOf(q) > -1; }).slice(0, 5);
+                }.bind(this));
+            }
+        }
+    }
+
+    function clientFilter() {
+        return {
+            open: false, query: '', selectedId: '{{ request('user_id') }}', filtered: _clients.slice(0, 5),
+            init() {
+                if (this.selectedId) { var f = _clients.find(function(c) { return String(c.id) === String(this.selectedId); }.bind(this)); if (f) this.query = f.name; }
+                this.$watch('query', function(val) {
+                    if (!val) { this.filtered = _clients.slice(0, 5); return; }
+                    var q = val.toLowerCase();
+                    this.filtered = _clients.filter(function(c) { return c.name.toLowerCase().indexOf(q) > -1 || c.email.toLowerCase().indexOf(q) > -1; }).slice(0, 5);
+                }.bind(this));
+            }
+        }
+    }
+    </script>
+    @endpush
 
     {{-- Calls Table --}}
     @if($calls->count() > 0)
@@ -175,19 +228,86 @@
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-200">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SL</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SIP Account</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller ID</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Destination</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Call Time</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">CDR Dur.</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Bill Dur.</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @foreach ($calls as $call)
                             <tr class="hover:bg-gray-50 transition-colors">
+                                {{-- SL --}}
+                                <td class="px-4 py-3 text-gray-500 text-xs">{{ $calls->firstItem() + $loop->index }}</td>
+
+                                {{-- SIP Account + User --}}
+                                <td class="px-4 py-3">
+                                    @if($call->sipAccount)
+                                        <a href="{{ route('admin.sip-accounts.show', $call->sipAccount) }}" class="text-indigo-600 hover:text-indigo-500 font-mono font-medium">
+                                            {{ $call->sipAccount->username }}
+                                        </a>
+                                        @if($call->user)
+                                            <div class="text-xs text-gray-400">{{ Str::limit($call->user->name, 20) }}</div>
+                                        @endif
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                </td>
+
+                                {{-- Caller ID + Source IP --}}
+                                <td class="px-4 py-3">
+                                    <span class="font-mono text-gray-900">{{ $call->caller_id ?: $call->caller }}</span>
+                                    @if($call->sipAccount?->last_registered_ip)
+                                        <div class="text-xs text-gray-400 font-mono">{{ $call->sipAccount->last_registered_ip }}</div>
+                                    @endif
+                                </td>
+
+                                {{-- Destination --}}
+                                <td class="px-4 py-3">
+                                    <span class="font-mono text-gray-900">{{ $call->callee }}</span>
+                                </td>
+
+                                {{-- Call Time --}}
+                                <td class="px-4 py-3">
+                                    <div class="text-gray-900 text-xs font-mono">{{ $call->call_start->format('Y-m-d H:i:s') }}</div>
+                                    <div class="text-xs text-gray-400 font-mono">{{ $call->call_end?->format('Y-m-d H:i:s') ?? '-' }}</div>
+                                </td>
+
+                                {{-- CDR Duration --}}
+                                <td class="px-4 py-3">
+                                    @if($call->duration > 0)
+                                        <span class="font-medium text-gray-900">{{ gmdate('H:i:s', $call->duration) }}</span>
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                </td>
+
+                                {{-- Bill Duration --}}
+                                <td class="px-4 py-3">
+                                    @if($call->billable_duration > 0)
+                                        <span class="font-medium text-gray-900">{{ gmdate('H:i:s', $call->billable_duration) }}</span>
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                </td>
+
+                                {{-- Trunk --}}
+                                <td class="px-4 py-3">
+                                    @if($call->outgoingTrunk)
+                                        <a href="{{ route('admin.trunks.show', $call->outgoingTrunk) }}" class="text-indigo-600 hover:text-indigo-500 font-medium">
+                                            {{ Str::limit($call->outgoingTrunk->name, 20) }}
+                                        </a>
+                                        <div class="text-xs text-gray-400 font-mono">{{ $call->outgoingTrunk->host }}</div>
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                </td>
+
                                 {{-- Status --}}
                                 <td class="px-4 py-3">
                                     @switch($call->disposition)
@@ -223,65 +343,6 @@
                                             </span>
                                     @endswitch
                                 </td>
-
-                                {{-- Time --}}
-                                <td class="px-4 py-3">
-                                    <span class="text-gray-900">{{ $call->call_start->format('H:i:s') }}</span>
-                                    <span class="text-xs text-gray-400 block">{{ $call->call_start->format('M d') }}</span>
-                                </td>
-
-                                {{-- User --}}
-                                <td class="px-4 py-3">
-                                    @if($call->user)
-                                        <a href="{{ route('admin.users.show', $call->user) }}" class="text-indigo-600 hover:text-indigo-500 font-medium">
-                                            {{ Str::limit($call->user->name, 15) }}
-                                        </a>
-                                    @else
-                                        <span class="text-gray-400">-</span>
-                                    @endif
-                                </td>
-
-                                {{-- SIP Account --}}
-                                <td class="px-4 py-3">
-                                    @if($call->sipAccount)
-                                        <a href="{{ route('admin.sip-accounts.show', $call->sipAccount) }}" class="text-indigo-600 hover:text-indigo-500 font-medium">
-                                            {{ $call->sipAccount->username }}
-                                        </a>
-                                    @else
-                                        <span class="text-gray-400">-</span>
-                                    @endif
-                                </td>
-
-                                {{-- Caller ID --}}
-                                <td class="px-4 py-3">
-                                    <span class="font-mono text-gray-900">{{ $call->caller_id ?: $call->caller }}</span>
-                                </td>
-
-                                {{-- Destination --}}
-                                <td class="px-4 py-3">
-                                    <span class="font-mono text-gray-900">{{ $call->callee }}</span>
-                                </td>
-
-                                {{-- Trunk --}}
-                                <td class="px-4 py-3">
-                                    @if($call->outgoingTrunk)
-                                        <a href="{{ route('admin.trunks.show', $call->outgoingTrunk) }}" class="text-indigo-600 hover:text-indigo-500 font-medium">
-                                            {{ Str::limit($call->outgoingTrunk->name, 15) }}
-                                        </a>
-                                    @else
-                                        <span class="text-gray-400">-</span>
-                                    @endif
-                                </td>
-
-                                {{-- Duration --}}
-                                <td class="px-4 py-3">
-                                    @if($call->billsec > 0)
-                                        <span class="font-medium text-gray-900">{{ gmdate('H:i:s', $call->billsec) }}</span>
-                                    @else
-                                        <span class="text-gray-400">-</span>
-                                    @endif
-                                </td>
-
                             </tr>
                         @endforeach
                     </tbody>

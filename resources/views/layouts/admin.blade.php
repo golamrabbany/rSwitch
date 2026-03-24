@@ -260,6 +260,7 @@
                         <!-- User Dropdown -->
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span class="text-sm font-medium text-gray-700">{{ auth()->user()->name }}</span>
                                 <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
                                     <span class="text-white font-semibold text-sm">{{ substr(auth()->user()->name, 0, 1) }}</span>
                                 </div>
@@ -280,11 +281,17 @@
                                     <p class="text-sm font-medium text-gray-800">{{ auth()->user()->name }}</p>
                                     <p class="text-xs text-gray-500">{{ auth()->user()->email }}</p>
                                 </div>
-                                <a href="{{ route('profile') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                <a href="{{ route('admin.profile') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <svg class="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                     </svg>
                                     My Profile
+                                </a>
+                                <a href="{{ route('admin.profile') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <svg class="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                                    </svg>
+                                    Change Password
                                 </a>
                                 <div class="border-t border-gray-100 mt-2 pt-2">
                                     <form method="POST" action="{{ route('logout') }}">

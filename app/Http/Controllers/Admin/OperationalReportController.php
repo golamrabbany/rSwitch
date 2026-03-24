@@ -10,6 +10,11 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 
 class OperationalReportController extends Controller
 {
@@ -212,6 +217,24 @@ class OperationalReportController extends Controller
             $query->where('incoming_trunk_id', $request->trunk_id);
         }
 
+        // Reseller filter
+        if ($request->filled('reseller_id')) {
+            $reseller = User::find($request->reseller_id);
+            if ($reseller) {
+                $query->whereIn('user_id', $reseller->descendantIds());
+            }
+        }
+
+        // Client filter
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+
+        // Caller ID filter
+        if ($request->filled('caller_id')) {
+            $query->where('caller', 'like', $request->caller_id . '%');
+        }
+
         $calls = $query->orderBy('call_start', 'desc')->paginate(50);
 
         // Stats for the filtered period
@@ -231,6 +254,8 @@ class OperationalReportController extends Controller
         $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
 
         $trunks = Trunk::whereIn('direction', ['incoming', 'both'])->orderBy('name')->get();
+        $resellers = User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email']);
+        $clients = User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email']);
 
         return view('admin.operational-reports.inbound', compact(
             'calls',
@@ -238,8 +263,90 @@ class OperationalReportController extends Controller
             'answeredCalls',
             'asr',
             'totalMinutes',
-            'trunks'
+            'trunks',
+            'resellers',
+            'clients'
         ));
+    }
+
+    public function exportInboundCalls(Request $request)
+    {
+        $query = CallRecord::with(['user', 'sipAccount', 'incomingTrunk', 'did'])
+            ->where('call_flow', 'trunk_to_sip');
+
+        if ($request->filled('date_from')) {
+            $query->where('call_start', '>=', $request->date_from);
+        } else {
+            $query->where('call_start', '>=', now()->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $query->where('call_start', '<=', $request->date_to . ' 23:59:59');
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('caller', 'like', $search . '%')->orWhere('callee', 'like', $search . '%');
+            });
+        }
+        if ($request->filled('disposition')) {
+            $query->where('disposition', $request->disposition);
+        }
+        if ($request->filled('trunk_id')) {
+            $query->where('incoming_trunk_id', $request->trunk_id);
+        }
+
+        $records = $query->orderByDesc('call_start')->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Inbound Calls');
+
+        $headers = ['SL', 'Caller', 'Client', 'DID', 'Destination', 'Call Start', 'Call End', 'CDR Dur.', 'Bill Dur.', 'Trunk', 'Trunk IP', 'Status'];
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue(chr(65 + $col) . '1', $header);
+        }
+        $lastCol = chr(64 + count($headers));
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4338CA']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        $row = 2;
+        foreach ($records as $i => $r) {
+            $sheet->setCellValue("A{$row}", $i + 1);
+            $sheet->setCellValue("B{$row}", $r->caller);
+            $sheet->setCellValue("C{$row}", $r->user?->name ?? '');
+            $sheet->setCellValue("D{$row}", $r->did?->number ?? $r->callee);
+            $sheet->setCellValue("E{$row}", $r->sipAccount?->username ?? '');
+            $sheet->setCellValue("F{$row}", $r->call_start?->format('Y-m-d H:i:s'));
+            $sheet->setCellValue("G{$row}", $r->call_end?->format('Y-m-d H:i:s') ?? '');
+            $sheet->setCellValue("H{$row}", $r->duration > 0 ? gmdate('H:i:s', $r->duration) : '');
+            $sheet->setCellValue("I{$row}", $r->billable_duration > 0 ? gmdate('H:i:s', $r->billable_duration) : '');
+            $sheet->setCellValue("J{$row}", $r->incomingTrunk?->name ?? '');
+            $sheet->setCellValue("K{$row}", $r->incomingTrunk?->host ?? '');
+            $sheet->setCellValue("L{$row}", $r->disposition);
+
+            if ($row % 2 === 0) {
+                $sheet->getStyle("A{$row}:L{$row}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('EEF2FF');
+            }
+            $row++;
+        }
+
+        foreach (range('A', 'L') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $dateStr = $request->filled('date_from') ? $request->date_from : now()->format('Y-m-d');
+        $filename = 'inbound-calls-' . $dateStr . '.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
     /**
@@ -281,9 +388,28 @@ class OperationalReportController extends Controller
             $query->where('outgoing_trunk_id', $request->trunk_id);
         }
 
-        // User filter
+        // User (client) filter
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->user_id);
+        }
+
+        // Reseller filter — show calls from all clients of a reseller
+        if ($request->filled('reseller_id')) {
+            $reseller = \App\Models\User::find($request->reseller_id);
+            if ($reseller) {
+                $query->whereIn('user_id', $reseller->descendantIds());
+            }
+        }
+
+        // Source IP filter
+        if ($request->filled('source_ip')) {
+            $sipIds = \App\Models\SipAccount::where('last_registered_ip', $request->source_ip)->pluck('id');
+            $query->whereIn('sip_account_id', $sipIds);
+        }
+
+        // Caller ID filter
+        if ($request->filled('caller_id')) {
+            $query->where('caller', 'like', $request->caller_id . '%');
         }
 
         $calls = $query->orderBy('call_start', 'desc')->paginate(50);
@@ -304,6 +430,8 @@ class OperationalReportController extends Controller
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
         $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
         $trunks = Trunk::whereIn('direction', ['outgoing', 'both'])->orderBy('name')->get();
+        $resellers = \App\Models\User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email']);
+        $clients = \App\Models\User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email']);
 
         return view('admin.operational-reports.outbound', compact(
             'calls',
@@ -311,8 +439,107 @@ class OperationalReportController extends Controller
             'answeredCalls',
             'asr',
             'totalMinutes',
-            'trunks'
+            'trunks',
+            'resellers',
+            'clients'
         ));
+    }
+
+    public function exportOutboundCalls(Request $request)
+    {
+        $query = CallRecord::with(['user', 'sipAccount', 'outgoingTrunk'])
+            ->where('call_flow', 'sip_to_trunk');
+
+        if ($request->filled('date_from')) {
+            $query->where('call_start', '>=', $request->date_from);
+        } else {
+            $query->where('call_start', '>=', now()->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $query->where('call_start', '<=', $request->date_to . ' 23:59:59');
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('caller', 'like', $search . '%')->orWhere('callee', 'like', $search . '%');
+            });
+        }
+        if ($request->filled('disposition')) {
+            $query->where('disposition', $request->disposition);
+        }
+        if ($request->filled('trunk_id')) {
+            $query->where('outgoing_trunk_id', $request->trunk_id);
+        }
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+        if ($request->filled('reseller_id')) {
+            $reseller = User::find($request->reseller_id);
+            if ($reseller) {
+                $query->whereIn('user_id', $reseller->descendantIds());
+            }
+        }
+        if ($request->filled('source_ip')) {
+            $sipIds = SipAccount::where('last_registered_ip', $request->source_ip)->pluck('id');
+            $query->whereIn('sip_account_id', $sipIds);
+        }
+        if ($request->filled('caller_id')) {
+            $query->where('caller', 'like', $request->caller_id . '%');
+        }
+
+        $records = $query->orderByDesc('call_start')->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Outbound Calls');
+
+        $headers = ['SL', 'SIP Account', 'Client', 'Caller ID', 'Source IP', 'Destination', 'Call Start', 'Call End', 'CDR Dur.', 'Bill Dur.', 'Trunk', 'Trunk IP', 'Status'];
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue(chr(65 + $col) . '1', $header);
+        }
+        $lastCol = chr(64 + count($headers));
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4338CA']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        $row = 2;
+        foreach ($records as $i => $r) {
+            $sheet->setCellValue("A{$row}", $i + 1);
+            $sheet->setCellValue("B{$row}", $r->sipAccount?->username ?? '');
+            $sheet->setCellValue("C{$row}", $r->user?->name ?? '');
+            $sheet->setCellValue("D{$row}", $r->caller_id ?: $r->caller);
+            $sheet->setCellValue("E{$row}", $r->sipAccount?->last_registered_ip ?? '');
+            $sheet->setCellValue("F{$row}", $r->callee);
+            $sheet->setCellValue("G{$row}", $r->call_start?->format('Y-m-d H:i:s'));
+            $sheet->setCellValue("H{$row}", $r->call_end?->format('Y-m-d H:i:s') ?? '');
+            $sheet->setCellValue("I{$row}", $r->duration > 0 ? gmdate('H:i:s', $r->duration) : '');
+            $sheet->setCellValue("J{$row}", $r->billable_duration > 0 ? gmdate('H:i:s', $r->billable_duration) : '');
+            $sheet->setCellValue("K{$row}", $r->outgoingTrunk?->name ?? '');
+            $sheet->setCellValue("L{$row}", $r->outgoingTrunk?->host ?? '');
+            $sheet->setCellValue("M{$row}", $r->disposition);
+
+            if ($row % 2 === 0) {
+                $sheet->getStyle("A{$row}:M{$row}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('EEF2FF');
+            }
+            $row++;
+        }
+
+        foreach (range('A', 'M') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $dateStr = $request->filled('date_from') ? $request->date_from : now()->format('Y-m-d');
+        $filename = 'outbound-calls-' . $dateStr . '.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
     /**
@@ -513,10 +740,10 @@ class OperationalReportController extends Controller
     {
         $authUser = auth()->user();
 
-        // Date range (default: last 30 days, max 365 days)
+        // Date range (default: last 7 days, max 365 days)
         $dateFrom = $request->filled('date_from')
             ? Carbon::parse($request->date_from)->startOfDay()
-            : Carbon::now()->subDays(29)->startOfDay();
+            : Carbon::now()->subDays(6)->startOfDay();
 
         $dateTo = $request->filled('date_to')
             ? Carbon::parse($request->date_to)->endOfDay()
@@ -555,9 +782,10 @@ class OperationalReportController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Compute ASR per row
+        // Compute ASR and ACD per row
         $rows->transform(function ($row) {
             $row->asr = $row->total_calls > 0 ? round(($row->answered_calls / $row->total_calls) * 100, 1) : 0;
+            $row->acd = $row->answered_calls > 0 ? round($row->total_billsec / $row->answered_calls) : 0;
             $row->minutes = round($row->total_billsec / 60, 1);
             return $row;
         });
@@ -579,10 +807,12 @@ class OperationalReportController extends Controller
         // Filter options
         [$resellers, $trunks] = $this->getFilterOptions($authUser);
 
+        $clients = User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email']);
+
         return view('admin.operational-reports.daily-summary', compact(
             'rows', 'totals', 'dateFrom', 'dateTo',
             'chartLabels', 'chartTotal', 'chartAnswered',
-            'resellers', 'trunks'
+            'resellers', 'clients', 'trunks'
         ));
     }
 
@@ -593,10 +823,10 @@ class OperationalReportController extends Controller
     {
         $authUser = auth()->user();
 
-        // Date range (default: last 12 months)
+        // Date range (default: last 7 months)
         $dateFrom = $request->filled('date_from')
             ? Carbon::parse($request->date_from)->startOfMonth()
-            : Carbon::now()->subMonths(11)->startOfMonth();
+            : Carbon::now()->subMonths(6)->startOfMonth();
 
         $dateTo = $request->filled('date_to')
             ? Carbon::parse($request->date_to)->endOfMonth()
@@ -632,10 +862,11 @@ class OperationalReportController extends Controller
             ->orderByRaw('YEAR(call_start), MONTH(call_start)')
             ->get();
 
-        // Compute ASR + month-over-month change
+        // Compute ASR, ACD + month-over-month change
         $prevTotal = null;
         $rows->transform(function ($row) use (&$prevTotal) {
             $row->asr = $row->total_calls > 0 ? round(($row->answered_calls / $row->total_calls) * 100, 1) : 0;
+            $row->acd = $row->answered_calls > 0 ? round($row->total_billsec / $row->answered_calls) : 0;
             $row->minutes = round($row->total_billsec / 60, 1);
             $row->month_label = Carbon::create($row->year, $row->month, 1)->format('M Y');
 
@@ -666,10 +897,12 @@ class OperationalReportController extends Controller
         // Filter options
         [$resellers, $trunks] = $this->getFilterOptions($authUser);
 
+        $clients = User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email']);
+
         return view('admin.operational-reports.monthly-summary', compact(
             'rows', 'totals', 'dateFrom', 'dateTo',
             'chartLabels', 'chartTotal', 'chartAnswered',
-            'resellers', 'trunks'
+            'resellers', 'clients', 'trunks'
         ));
     }
 
@@ -739,6 +972,7 @@ class OperationalReportController extends Controller
                 ];
             }
             $row->asr = $row->total_calls > 0 ? round(($row->answered_calls / $row->total_calls) * 100, 1) : 0;
+            $row->acd = $row->answered_calls > 0 ? round($row->total_billsec / $row->answered_calls) : 0;
             $row->minutes = round($row->total_billsec / 60, 1);
             $row->hour_label = sprintf('%02d:00 – %02d:00', $h, ($h + 1) % 24);
             $rows->push($row);
@@ -761,11 +995,308 @@ class OperationalReportController extends Controller
         // Filter options
         [$resellers, $trunks] = $this->getFilterOptions($authUser);
 
+        $clients = User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email']);
+
         return view('admin.operational-reports.hourly-summary', compact(
             'rows', 'totals', 'dateFrom', 'dateTo',
             'chartLabels', 'chartAnswered', 'chartFailed',
-            'resellers', 'trunks'
+            'resellers', 'clients', 'trunks'
         ));
+    }
+
+    /**
+     * Export Daily Summary as XLSX
+     */
+    public function exportDailySummary(Request $request)
+    {
+        $authUser = auth()->user();
+
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfDay()
+            : Carbon::now()->subDays(6)->startOfDay();
+
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfDay()
+            : Carbon::today()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfDay();
+        }
+        if ($dateFrom->diffInDays($dateTo) > 365) {
+            $dateFrom = $dateTo->copy()->subDays(365)->startOfDay();
+        }
+
+        $query = CallRecord::query()->whereBetween('call_start', [$dateFrom, $dateTo]);
+        if (!$authUser->isSuperAdmin()) {
+            $query->whereIn('user_id', $authUser->descendantIds());
+        }
+        $this->applyFilters($query, $request, $authUser);
+
+        $rows = (clone $query)
+            ->selectRaw('
+                DATE(call_start) as date,
+                COUNT(*) as total_calls,
+                SUM(disposition = "ANSWERED") as answered_calls,
+                SUM(disposition != "ANSWERED") as failed_calls,
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+            ')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
+        $rows->transform(function ($row) {
+            $row->asr = $row->total_calls > 0 ? round(($row->answered_calls / $row->total_calls) * 100, 1) : 0;
+            $row->acd = $row->answered_calls > 0 ? round($row->total_billsec / $row->answered_calls) : 0;
+            $row->minutes = round($row->total_billsec / 60, 1);
+            return $row;
+        });
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Daily Summary');
+
+        $headers = ['#', 'Date', 'Total Calls', 'Answered', 'Failed', 'ASR%', 'ACD', 'Minutes'];
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue(chr(65 + $col) . '1', $header);
+        }
+        $lastCol = chr(64 + count($headers));
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4338CA']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        $rowNum = 2;
+        foreach ($rows as $i => $r) {
+            $sheet->setCellValue("A{$rowNum}", $i + 1);
+            $sheet->setCellValue("B{$rowNum}", Carbon::parse($r->date)->format('Y-m-d'));
+            $sheet->setCellValue("C{$rowNum}", $r->total_calls);
+            $sheet->setCellValue("D{$rowNum}", $r->answered_calls);
+            $sheet->setCellValue("E{$rowNum}", $r->failed_calls);
+            $sheet->setCellValue("F{$rowNum}", $r->asr . '%');
+            $sheet->setCellValue("G{$rowNum}", $r->acd > 0 ? sprintf('%d:%02d', intdiv($r->acd, 60), $r->acd % 60) : '0:00');
+            $sheet->setCellValue("H{$rowNum}", $r->minutes);
+
+            if ($rowNum % 2 === 0) {
+                $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('EEF2FF');
+            }
+            $rowNum++;
+        }
+
+        foreach (range('A', $lastCol) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'daily-summary-' . $dateFrom->format('Y-m-d') . '.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    /**
+     * Export Monthly Summary as XLSX
+     */
+    public function exportMonthlySummary(Request $request)
+    {
+        $authUser = auth()->user();
+
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfMonth()
+            : Carbon::now()->subMonths(6)->startOfMonth();
+
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfMonth()
+            : Carbon::now()->endOfMonth();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfMonth();
+        }
+
+        $query = CallRecord::query()->whereBetween('call_start', [$dateFrom, $dateTo]);
+        if (!$authUser->isSuperAdmin()) {
+            $query->whereIn('user_id', $authUser->descendantIds());
+        }
+        $this->applyFilters($query, $request, $authUser);
+
+        $rows = (clone $query)
+            ->selectRaw('
+                YEAR(call_start) as year,
+                MONTH(call_start) as month,
+                COUNT(*) as total_calls,
+                SUM(disposition = "ANSWERED") as answered_calls,
+                SUM(disposition != "ANSWERED") as failed_calls,
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+            ')
+            ->groupByRaw('YEAR(call_start), MONTH(call_start)')
+            ->orderByRaw('YEAR(call_start), MONTH(call_start)')
+            ->get();
+
+        $rows->transform(function ($row) {
+            $row->asr = $row->total_calls > 0 ? round(($row->answered_calls / $row->total_calls) * 100, 1) : 0;
+            $row->acd = $row->answered_calls > 0 ? round($row->total_billsec / $row->answered_calls) : 0;
+            $row->minutes = round($row->total_billsec / 60, 1);
+            $row->month_label = Carbon::create($row->year, $row->month, 1)->format('M Y');
+            return $row;
+        });
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Monthly Summary');
+
+        $headers = ['#', 'Month', 'Total Calls', 'Answered', 'Failed', 'ASR%', 'ACD', 'Minutes'];
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue(chr(65 + $col) . '1', $header);
+        }
+        $lastCol = chr(64 + count($headers));
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4338CA']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        $rowNum = 2;
+        foreach ($rows as $i => $r) {
+            $sheet->setCellValue("A{$rowNum}", $i + 1);
+            $sheet->setCellValue("B{$rowNum}", $r->month_label);
+            $sheet->setCellValue("C{$rowNum}", $r->total_calls);
+            $sheet->setCellValue("D{$rowNum}", $r->answered_calls);
+            $sheet->setCellValue("E{$rowNum}", $r->failed_calls);
+            $sheet->setCellValue("F{$rowNum}", $r->asr . '%');
+            $sheet->setCellValue("G{$rowNum}", $r->acd > 0 ? sprintf('%d:%02d', intdiv($r->acd, 60), $r->acd % 60) : '0:00');
+            $sheet->setCellValue("H{$rowNum}", $r->minutes);
+
+            if ($rowNum % 2 === 0) {
+                $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('EEF2FF');
+            }
+            $rowNum++;
+        }
+
+        foreach (range('A', $lastCol) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'monthly-summary-' . $dateFrom->format('Y-m') . '.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    /**
+     * Export Hourly Summary as XLSX
+     */
+    public function exportHourlySummary(Request $request)
+    {
+        $authUser = auth()->user();
+
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfDay()
+            : Carbon::today()->startOfDay();
+
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfDay()
+            : Carbon::today()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfDay();
+        }
+        if ($dateFrom->diffInDays($dateTo) > 31) {
+            $dateTo = $dateFrom->copy()->addDays(31)->endOfDay();
+        }
+
+        $query = CallRecord::query()->whereBetween('call_start', [$dateFrom, $dateTo]);
+        if (!$authUser->isSuperAdmin()) {
+            $query->whereIn('user_id', $authUser->descendantIds());
+        }
+        $this->applyFilters($query, $request, $authUser);
+
+        $rawRows = (clone $query)
+            ->selectRaw('
+                HOUR(call_start) as hour,
+                COUNT(*) as total_calls,
+                SUM(disposition = "ANSWERED") as answered_calls,
+                SUM(disposition != "ANSWERED") as failed_calls,
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+            ')
+            ->groupByRaw('HOUR(call_start)')
+            ->orderByRaw('HOUR(call_start)')
+            ->get()
+            ->keyBy('hour');
+
+        $rows = collect();
+        for ($h = 0; $h < 24; $h++) {
+            if ($rawRows->has($h)) {
+                $row = $rawRows[$h];
+            } else {
+                $row = (object) [
+                    'hour' => $h,
+                    'total_calls' => 0,
+                    'answered_calls' => 0,
+                    'failed_calls' => 0,
+                    'total_billsec' => 0,
+                ];
+            }
+            $row->asr = $row->total_calls > 0 ? round(($row->answered_calls / $row->total_calls) * 100, 1) : 0;
+            $row->acd = $row->answered_calls > 0 ? round($row->total_billsec / $row->answered_calls) : 0;
+            $row->minutes = round($row->total_billsec / 60, 1);
+            $row->hour_label = sprintf('%02d:00 - %02d:00', $h, ($h + 1) % 24);
+            $rows->push($row);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Hourly Summary');
+
+        $headers = ['#', 'Hour', 'Total Calls', 'Answered', 'Failed', 'ASR%', 'ACD', 'Minutes'];
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue(chr(65 + $col) . '1', $header);
+        }
+        $lastCol = chr(64 + count($headers));
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4338CA']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        $rowNum = 2;
+        foreach ($rows as $i => $r) {
+            $sheet->setCellValue("A{$rowNum}", $i + 1);
+            $sheet->setCellValue("B{$rowNum}", $r->hour_label);
+            $sheet->setCellValue("C{$rowNum}", $r->total_calls);
+            $sheet->setCellValue("D{$rowNum}", $r->answered_calls);
+            $sheet->setCellValue("E{$rowNum}", $r->failed_calls);
+            $sheet->setCellValue("F{$rowNum}", $r->asr . '%');
+            $sheet->setCellValue("G{$rowNum}", $r->acd > 0 ? sprintf('%d:%02d', intdiv($r->acd, 60), $r->acd % 60) : '0:00');
+            $sheet->setCellValue("H{$rowNum}", $r->minutes);
+
+            if ($rowNum % 2 === 0) {
+                $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('EEF2FF');
+            }
+            $rowNum++;
+        }
+
+        foreach (range('A', $lastCol) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'hourly-summary-' . $dateFrom->format('Y-m-d') . '.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
     /**
@@ -798,6 +1329,11 @@ class OperationalReportController extends Controller
         // Disposition filter
         if ($request->filled('disposition')) {
             $query->where('disposition', $request->disposition);
+        }
+
+        // Call flow filter (inbound/outbound/p2p)
+        if ($request->filled('call_flow')) {
+            $query->where('call_flow', $request->call_flow);
         }
     }
 

@@ -15,6 +15,12 @@
             </div>
         </div>
         <div class="page-actions">
+            <a href="{{ route('admin.operational-reports.hourly.export', request()->query()) }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Export
+            </a>
             <a href="{{ route('admin.operational-reports.index') }}" class="btn-action-secondary">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -25,57 +31,62 @@
     </div>
 
     {{-- Filter Bar --}}
-    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6" x-data="clientSearch()">
-        <form method="GET" class="flex flex-wrap items-center gap-3">
-            {{-- Date Range --}}
-            <input type="date" name="date_from" value="{{ request('date_from', $dateFrom->format('Y-m-d')) }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <span class="text-gray-400">to</span>
-            <input type="date" name="date_to" value="{{ request('date_to', $dateTo->format('Y-m-d')) }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-
-            {{-- Reseller Filter --}}
-            <select name="reseller_id" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" @change="onResellerChange($event)">
-                <option value="">All Resellers</option>
-                @foreach($resellers as $reseller)
-                    <option value="{{ $reseller->id }}" {{ request('reseller_id') == $reseller->id ? 'selected' : '' }}>{{ $reseller->name }}</option>
-                @endforeach
-            </select>
-
-            {{-- Client Search --}}
-            <div class="relative" @click.away="showDropdown = false">
-                <input type="text" x-model="search" @input.debounce.300ms="fetchClients" @focus="showDropdown = results.length > 0" placeholder="Search client..." class="w-44 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" autocomplete="off">
-                <input type="hidden" name="user_id" :value="selectedId">
-                <div x-show="showDropdown && results.length > 0" class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    <template x-for="client in results" :key="client.id">
-                        <button type="button" @click="selectClient(client)" class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50" x-text="client.name + ' (' + client.email + ')'"></button>
-                    </template>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+        <form method="GET" class="space-y-3">
+            <div style="display: grid; grid-template-columns: 1fr 1fr auto auto auto; gap: 0.75rem; align-items: center;">
+                <input type="date" name="date_from" value="{{ request('date_from', $dateFrom->format('Y-m-d')) }}" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                <input type="date" name="date_to" value="{{ request('date_to', $dateTo->format('Y-m-d')) }}" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), [])) }}" class="px-3 py-2 text-sm font-medium {{ !request('call_flow') ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'trunk_to_sip'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('call_flow') === 'trunk_to_sip' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Inbound</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'sip_to_trunk'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('call_flow') === 'sip_to_trunk' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Outbound</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'sip_to_sip'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('call_flow') === 'sip_to_sip' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">P2P</a>
+                </div>
+                <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('disposition'), [])) }}" class="px-3 py-2 text-sm font-medium {{ !request('disposition') ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('disposition'), ['disposition' => 'ANSWERED'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'ANSWERED' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Answered</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('disposition'), ['disposition' => 'NO ANSWER'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'NO ANSWER' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">No Answer</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('disposition'), ['disposition' => 'FAILED'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'FAILED' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Failed</a>
+                </div>
+                <select name="trunk_id" class="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer">
+                    <option value="">All Trunks</option>
+                    @foreach($trunks as $trunk)
+                        <option value="{{ $trunk->id }}" {{ request('trunk_id') == $trunk->id ? 'selected' : '' }}>{{ $trunk->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.75rem; align-items: center;">
+                <div class="relative" x-data="resellerFilter()" @click.away="open = false">
+                    <input type="hidden" name="reseller_id" :value="selectedId">
+                    <input type="text" x-model="query" @focus="open = true" @click="open = true" @input="open = true; selectedId = ''" placeholder="All Resellers" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" autocomplete="off">
+                    <div x-show="open && filtered.length > 0" x-cloak class="absolute z-20 mt-1 w-64 bg-white rounded-lg border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
+                        <button type="button" @click="selectedId = ''; query = ''; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 text-gray-500">All Resellers</button>
+                        <template x-for="r in filtered" :key="r.id">
+                            <button type="button" @click="selectedId = String(r.id); query = r.name; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 flex items-center justify-between">
+                                <span class="font-medium text-gray-900" x-text="r.name"></span><span class="text-xs text-gray-400" x-text="r.email"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+                <div class="relative" x-data="clientFilter()" @click.away="open = false">
+                    <input type="hidden" name="user_id" :value="selectedId">
+                    <input type="text" x-model="query" @focus="open = true" @click="open = true" @input="open = true; selectedId = ''" placeholder="All Clients" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" autocomplete="off">
+                    <div x-show="open && filtered.length > 0" x-cloak class="absolute z-20 mt-1 w-64 bg-white rounded-lg border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
+                        <button type="button" @click="selectedId = ''; query = ''; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 text-gray-500">All Clients</button>
+                        <template x-for="c in filtered" :key="c.id">
+                            <button type="button" @click="selectedId = String(c.id); query = c.name; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 flex items-center justify-between">
+                                <span class="font-medium text-gray-900" x-text="c.name"></span><span class="text-xs text-gray-400" x-text="c.email"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 whitespace-nowrap">Search</button>
+                    @if(request()->hasAny(['reseller_id', 'user_id', 'trunk_id', 'disposition', 'call_flow', 'date_from', 'date_to']))
+                        <a href="{{ route('admin.operational-reports.hourly') }}" class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap">Clear</a>
+                    @endif
                 </div>
             </div>
-
-            {{-- Trunk Filter --}}
-            <select name="trunk_id" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="">All Trunks</option>
-                @foreach($trunks as $trunk)
-                    <option value="{{ $trunk->id }}" {{ request('trunk_id') == $trunk->id ? 'selected' : '' }}>{{ $trunk->name }}</option>
-                @endforeach
-            </select>
-
-            {{-- Disposition Toggle --}}
-            <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-                <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('disposition'), [])) }}"
-                   class="px-3 py-2 text-sm font-medium {{ !request('disposition') ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
-                <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('disposition'), ['disposition' => 'ANSWERED'])) }}"
-                   class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'ANSWERED' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Answered</a>
-                <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('disposition'), ['disposition' => 'NO ANSWER'])) }}"
-                   class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'NO ANSWER' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">No Answer</a>
-                <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('disposition'), ['disposition' => 'FAILED'])) }}"
-                   class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'FAILED' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Failed</a>
-            </div>
-
-            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Apply</button>
-
-            @if(request()->hasAny(['reseller_id', 'user_id', 'trunk_id', 'disposition', 'date_from', 'date_to']))
-                <a href="{{ route('admin.operational-reports.hourly') }}" class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">Clear</a>
-            @endif
         </form>
     </div>
 
@@ -166,11 +177,12 @@
                     <tr>
                         <th class="w-12">#</th>
                         <th>Hour</th>
-                        <th class="text-right">Total Calls</th>
-                        <th class="text-right">Answered</th>
-                        <th class="text-right">Failed</th>
-                        <th class="text-right">ASR%</th>
-                        <th class="text-right">Minutes</th>
+                        <th style="text-align: right">Total Calls</th>
+                        <th style="text-align: right">Answered</th>
+                        <th style="text-align: right">Failed</th>
+                        <th style="text-align: right">ASR%</th>
+                        <th style="text-align: right">ACD</th>
+                        <th style="text-align: right">Minutes</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -178,17 +190,18 @@
                         <tr class="{{ $row->total_calls === 0 ? 'text-gray-400' : '' }}">
                             <td class="text-gray-400">{{ $index + 1 }}</td>
                             <td class="font-medium {{ $row->total_calls > 0 ? 'text-gray-900' : '' }}">{{ $row->hour_label }}</td>
-                            <td class="text-right {{ $row->total_calls > 0 ? 'font-medium' : '' }}">{{ number_format($row->total_calls) }}</td>
-                            <td class="text-right {{ $row->answered_calls > 0 ? 'text-emerald-600' : '' }}">{{ number_format($row->answered_calls) }}</td>
-                            <td class="text-right {{ $row->failed_calls > 0 ? 'text-red-500' : '' }}">{{ number_format($row->failed_calls) }}</td>
-                            <td class="text-right">
+                            <td style="text-align: right" class="{{ $row->total_calls > 0 ? 'font-medium' : '' }}">{{ number_format($row->total_calls) }}</td>
+                            <td style="text-align: right" class="{{ $row->answered_calls > 0 ? 'text-emerald-600' : '' }}">{{ number_format($row->answered_calls) }}</td>
+                            <td style="text-align: right" class="{{ $row->failed_calls > 0 ? 'text-red-500' : '' }}">{{ number_format($row->failed_calls) }}</td>
+                            <td style="text-align: right">
                                 @if($row->total_calls > 0)
                                     <span class="{{ $row->asr >= 50 ? 'text-emerald-600' : 'text-amber-600' }} font-medium">{{ $row->asr }}%</span>
                                 @else
                                     &mdash;
                                 @endif
                             </td>
-                            <td class="text-right">{{ number_format($row->minutes, 0) }}</td>
+                            <td style="text-align: right" class="text-gray-600">{{ $row->acd > 0 ? sprintf('%dm %ds', intdiv($row->acd, 60), $row->acd % 60) : '-' }}</td>
+                            <td style="text-align: right">{{ number_format($row->minutes, 0) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -196,13 +209,15 @@
                     <tr class="bg-gray-50 font-bold">
                         <td></td>
                         <td>Totals</td>
-                        <td class="text-right">{{ number_format($totals['total_calls']) }}</td>
-                        <td class="text-right text-emerald-600">{{ number_format($totals['answered_calls']) }}</td>
-                        <td class="text-right text-red-500">{{ number_format($totals['failed_calls']) }}</td>
-                        <td class="text-right">
+                        <td style="text-align: right">{{ number_format($totals['total_calls']) }}</td>
+                        <td style="text-align: right" class="text-emerald-600">{{ number_format($totals['answered_calls']) }}</td>
+                        <td style="text-align: right" class="text-red-500">{{ number_format($totals['failed_calls']) }}</td>
+                        <td style="text-align: right">
                             <span class="{{ $totals['asr'] >= 50 ? 'text-emerald-600' : 'text-amber-600' }}">{{ $totals['asr'] }}%</span>
                         </td>
-                        <td class="text-right">{{ number_format($totals['minutes'], 0) }}</td>
+                        @php $totalAcd = $totals['answered_calls'] > 0 ? round($rows->sum('total_billsec') / $totals['answered_calls']) : 0; @endphp
+                        <td style="text-align: right" class="text-gray-600">{{ $totalAcd > 0 ? sprintf('%dm %ds', intdiv($totalAcd, 60), $totalAcd % 60) : '-' }}</td>
+                        <td style="text-align: right">{{ number_format($totals['minutes'], 0) }}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -218,32 +233,10 @@
     @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script>
-        function clientSearch() {
-            return {
-                search: '{{ request('user_id') ? \App\Models\User::find(request('user_id'))?->name : '' }}',
-                selectedId: '{{ request('user_id') }}',
-                results: [],
-                showDropdown: false,
-                async fetchClients() {
-                    if (this.search.length < 2) { this.results = []; this.showDropdown = false; return; }
-                    const resellerId = document.querySelector('[name=reseller_id]')?.value || '';
-                    const res = await fetch(`{{ route('admin.sip-accounts.search-clients') }}?q=${encodeURIComponent(this.search)}&reseller_id=${resellerId}`);
-                    const data = await res.json();
-                    this.results = data;
-                    this.showDropdown = true;
-                },
-                selectClient(client) {
-                    this.search = client.name;
-                    this.selectedId = client.id;
-                    this.showDropdown = false;
-                },
-                onResellerChange(e) {
-                    this.search = '';
-                    this.selectedId = '';
-                    this.results = [];
-                }
-            };
-        }
+        var _resellers = @json($resellers->map(function ($r) { return ['id' => $r->id, 'name' => $r->name, 'email' => $r->email]; }));
+        var _clients = @json($clients->map(function ($c) { return ['id' => $c->id, 'name' => $c->name, 'email' => $c->email]; }));
+        function resellerFilter() { return { open: false, query: '', selectedId: '{{ request('reseller_id') }}', filtered: _resellers.slice(0, 5), init() { if (this.selectedId) { var f = _resellers.find(function(r) { return String(r.id) === String(this.selectedId); }.bind(this)); if (f) this.query = f.name; } this.$watch('query', function(val) { if (!val) { this.filtered = _resellers.slice(0, 5); return; } var q = val.toLowerCase(); this.filtered = _resellers.filter(function(r) { return r.name.toLowerCase().indexOf(q) > -1 || r.email.toLowerCase().indexOf(q) > -1; }).slice(0, 5); }.bind(this)); } } }
+        function clientFilter() { return { open: false, query: '', selectedId: '{{ request('user_id') }}', filtered: _clients.slice(0, 5), init() { if (this.selectedId) { var f = _clients.find(function(c) { return String(c.id) === String(this.selectedId); }.bind(this)); if (f) this.query = f.name; } this.$watch('query', function(val) { if (!val) { this.filtered = _clients.slice(0, 5); return; } var q = val.toLowerCase(); this.filtered = _clients.filter(function(c) { return c.name.toLowerCase().indexOf(q) > -1 || c.email.toLowerCase().indexOf(q) > -1; }).slice(0, 5); }.bind(this)); } } }
 
         new Chart(document.getElementById('hourlyChart'), {
             type: 'bar',

@@ -97,6 +97,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:super_admin'])
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->group(function () {
     Route::get('dashboard', Admin\DashboardController::class)->name('dashboard');
 
+    Route::get('profile', [Admin\ProfileController::class, 'index'])->name('profile');
+    Route::put('profile/password', [Admin\ProfileController::class, 'updatePassword'])->name('profile.password');
+
     Route::resource('users', Admin\UserController::class);
     Route::post('users/{user}/toggle-status', [Admin\UserController::class, 'toggleStatus'])->name('users.toggle-status');
     Route::post('users/{user}/adjust-balance', [Admin\UserController::class, 'adjustBalance'])->name('users.adjust-balance');
@@ -126,12 +129,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('operational-reports', [Admin\OperationalReportController::class, 'index'])->name('operational-reports.index');
     Route::get('operational-reports/active', [Admin\OperationalReportController::class, 'activeCalls'])->name('operational-reports.active');
     Route::get('operational-reports/inbound', [Admin\OperationalReportController::class, 'inboundCalls'])->name('operational-reports.inbound');
+    Route::get('operational-reports/inbound/export', [Admin\OperationalReportController::class, 'exportInboundCalls'])->name('operational-reports.inbound.export');
     Route::get('operational-reports/outbound', [Admin\OperationalReportController::class, 'outboundCalls'])->name('operational-reports.outbound');
+    Route::get('operational-reports/outbound/export', [Admin\OperationalReportController::class, 'exportOutboundCalls'])->name('operational-reports.outbound.export');
     Route::get('operational-reports/p2p', [Admin\OperationalReportController::class, 'p2pCalls'])->name('operational-reports.p2p');
     Route::get('operational-reports/summary', [Admin\OperationalReportController::class, 'summaryCalls'])->name('operational-reports.summary');
     Route::get('operational-reports/daily', [Admin\OperationalReportController::class, 'dailySummary'])->name('operational-reports.daily');
+    Route::get('operational-reports/daily/export', [Admin\OperationalReportController::class, 'exportDailySummary'])->name('operational-reports.daily.export');
     Route::get('operational-reports/monthly', [Admin\OperationalReportController::class, 'monthlySummary'])->name('operational-reports.monthly');
+    Route::get('operational-reports/monthly/export', [Admin\OperationalReportController::class, 'exportMonthlySummary'])->name('operational-reports.monthly.export');
     Route::get('operational-reports/hourly', [Admin\OperationalReportController::class, 'hourlySummary'])->name('operational-reports.hourly');
+    Route::get('operational-reports/hourly/export', [Admin\OperationalReportController::class, 'exportHourlySummary'])->name('operational-reports.hourly.export');
 
     // Financial management (scoped)
     Route::get('transactions', [Admin\TransactionController::class, 'index'])->name('transactions.index');
