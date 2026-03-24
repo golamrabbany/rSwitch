@@ -144,44 +144,97 @@ class OutboundCallHandler:
         # 6. Check for internal SIP-to-SIP call
         internal_target = session.execute(
             text("""
-                SELECT s.username FROM sip_accounts s
+                SELECT s.id, s.username, s.user_id FROM sip_accounts s
                 WHERE s.username = :ext AND s.status = 'active'
                 LIMIT 1
             """),
             {"ext": extension},
         ).first()
 
-        if internal_target and row.allow_p2p:
-            # SIP-to-SIP call
-            cdr_uuid = str(uuid.uuid4())
-            session.execute(
-                text("""
-                    INSERT INTO call_records
-                    (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                     caller, callee, call_start, disposition, status, created_at)
-                    VALUES
-                    (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
-                     :caller, :callee, NOW(), 'ANSWERED', 'in_progress', NOW())
-                """),
-                {
-                    "uuid": cdr_uuid,
-                    "sip_id": row.id,
-                    "user_id": row.uid,
-                    "reseller_id": row.parent_id,
-                    "caller": caller_id,
-                    "callee": extension,
-                },
-            )
-            session.commit()
+        if internal_target:
+            if not row.allow_p2p:
+                await agi.verbose("rSwitch: P2P calls not allowed for this account")
+                await agi.set_variable("ROUTE_ACTION", "REJECT")
+                return
 
-            await agi.set_variable("ROUTE_ACTION", "DIAL_INTERNAL")
-            await agi.set_variable("ROUTE_DIAL_STRING", f"PJSIP/{extension}")
-            await agi.set_variable("ROUTE_DIAL_TIMEOUT", "60")
-            await agi.set_variable("ROUTE_CLI_NAME", row.caller_id_name or username)
-            await agi.set_variable("ROUTE_CLI_NUM", row.caller_id_number or caller_id)
-            await agi.set_variable("CDR_UUID", cdr_uuid)
-            await agi.set_variable("RECORD_CALL", "1" if row.allow_recording else "0")
-            await agi.verbose(f"rSwitch: Internal call to {extension}")
+            # Check if callee is registered (has contact in ps_contacts)
+            contact = session.execute(
+                text("SELECT id FROM ps_contacts WHERE endpoint = :ext LIMIT 1"),
+                {"ext": extension},
+            ).first()
+
+            # Create CDR regardless of registration status
+            cdr_uuid = str(uuid.uuid4())
+
+            if contact:
+                # Callee is registered — normal P2P call
+                session.execute(
+                    text("""
+                        INSERT INTO call_records
+                        (uuid, sip_account_id, user_id, reseller_id, call_flow,
+                         caller, callee, destination_sip_account_id,
+                         call_start, disposition, status, created_at)
+                        VALUES
+                        (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
+                         :caller, :callee, :dest_sip_id,
+                         NOW(), 'ANSWERED', 'in_progress', NOW())
+                    """),
+                    {
+                        "uuid": cdr_uuid,
+                        "sip_id": row.id,
+                        "user_id": row.uid,
+                        "reseller_id": row.parent_id,
+                        "caller": caller_id,
+                        "callee": extension,
+                        "dest_sip_id": internal_target.id,
+                    },
+                )
+                session.commit()
+
+                await agi.set_variable("ROUTE_ACTION", "DIAL_INTERNAL")
+                await agi.set_variable("ROUTE_DIAL_STRING", f"PJSIP/{extension}")
+                await agi.set_variable("ROUTE_DIAL_TIMEOUT", "60")
+                await agi.set_variable("ROUTE_CLI_NAME", row.caller_id_name or username)
+                await agi.set_variable("ROUTE_CLI_NUM", row.caller_id_number or caller_id)
+                await agi.set_variable("CDR_UUID", cdr_uuid)
+                await agi.set_variable("RECORD_CALL", "1" if row.allow_recording else "0")
+                await agi.verbose(f"rSwitch: Internal call to {extension}")
+            else:
+                # Callee NOT registered — play wrong_number, CDR with FAILED
+                session.execute(
+                    text("""
+                        INSERT INTO call_records
+                        (uuid, sip_account_id, user_id, reseller_id, call_flow,
+                         caller, callee, destination_sip_account_id,
+                         call_start, call_end, duration, billsec,
+                         disposition, status, created_at)
+                        VALUES
+                        (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
+                         :caller, :callee, :dest_sip_id,
+                         NOW(), NOW(), 0, 0,
+                         'FAILED', 'unbillable', NOW())
+                    """),
+                    {
+                        "uuid": cdr_uuid,
+                        "sip_id": row.id,
+                        "user_id": row.uid,
+                        "reseller_id": row.parent_id,
+                        "caller": caller_id,
+                        "callee": extension,
+                        "dest_sip_id": internal_target.id,
+                    },
+                )
+                session.commit()
+
+                await agi.set_variable("CDR_UUID", cdr_uuid)
+
+                # Play announcement directly from AGI (caller may hang up before dialplan)
+                await agi.answer()
+                await agi.exec("Wait", "0.5")
+                await agi.exec("Playback", "IVR/wrong_number")
+                await agi.set_variable("ROUTE_ACTION", "REJECT")
+                await agi.verbose(f"rSwitch: {extension} not registered — played wrong_number")
+
             return
 
         # 7. Select trunk via route selection
@@ -205,9 +258,40 @@ class OutboundCallHandler:
         ).fetchall()
 
         if not routes:
-            await agi.verbose(f"rSwitch: No route for {extension}")
+            # No trunk route — create CDR with FAILED and play wrong_number
+            cdr_uuid = str(uuid.uuid4())
+            session.execute(
+                text("""
+                    INSERT INTO call_records
+                    (uuid, sip_account_id, user_id, reseller_id, call_flow,
+                     caller, callee, destination,
+                     call_start, call_end, duration, billsec,
+                     disposition, status, created_at)
+                    VALUES
+                    (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
+                     :caller, :callee, :callee,
+                     NOW(), NOW(), 0, 0,
+                     'FAILED', 'unbillable', NOW())
+                """),
+                {
+                    "uuid": cdr_uuid,
+                    "sip_id": row.id,
+                    "user_id": row.uid,
+                    "reseller_id": row.parent_id,
+                    "caller": caller_id,
+                    "callee": extension,
+                },
+            )
+            session.commit()
+
+            await agi.set_variable("CDR_UUID", cdr_uuid)
+
+            # Play announcement directly from AGI
+            await agi.answer()
+            await agi.exec("Wait", "0.5")
+            await agi.exec("Playback", "IVR/wrong_number")
             await agi.set_variable("ROUTE_ACTION", "REJECT")
-            await agi.set_variable("ROUTE_REJECT_REASON", "no_route")
+            await agi.verbose(f"rSwitch: No route for {extension} — played wrong_number")
             return
 
         # Filter by time window (simplified — check first matching)

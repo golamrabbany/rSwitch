@@ -126,6 +126,16 @@ update_application() {
     mkdir -p /var/spool/asterisk/recording
     chown asterisk:asterisk /var/spool/asterisk/recording
 
+    # Update IVR sound files
+    if [[ -d "$INSTALL_DIR/IVR" ]]; then
+        AST_SOUNDS="/usr/share/asterisk/sounds/en"
+        [[ ! -d "$AST_SOUNDS" ]] && AST_SOUNDS="/var/lib/asterisk/sounds/en"
+        mkdir -p "${AST_SOUNDS}/IVR"
+        cp -f "$INSTALL_DIR"/IVR/*.gsm "${AST_SOUNDS}/IVR/" 2>/dev/null
+        chown -R asterisk:asterisk "${AST_SOUNDS}/IVR"
+        log_success "IVR sound files updated"
+    fi
+
     # Ensure sorcery.conf has PJSIP realtime mappings
     log_info "Checking Asterisk sorcery configuration..."
     if ! grep -q "endpoint=realtime,ps_endpoints" /etc/asterisk/sorcery.conf 2>/dev/null; then

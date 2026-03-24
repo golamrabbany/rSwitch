@@ -67,12 +67,17 @@ class CallEndHandler:
         # 4. Determine status
         # Check call flow to decide billing status
         cdr = session.execute(
-            text("SELECT id, call_flow FROM call_records WHERE uuid = :uuid LIMIT 1"),
+            text("SELECT id, call_flow, status, disposition FROM call_records WHERE uuid = :uuid LIMIT 1"),
             {"uuid": cdr_uuid},
         ).first()
 
         if not cdr:
             await agi.verbose(f"rSwitch: CDR {cdr_uuid} not found")
+            return
+
+        # Skip if CDR is already finalized (e.g., FAILED for unregistered callee)
+        if cdr.status in ("unbillable", "completed", "rated", "failed") and cdr.disposition == "FAILED":
+            await agi.verbose(f"rSwitch: CDR {cdr_uuid} already finalized ({cdr.disposition})")
             return
 
         # Determine final status

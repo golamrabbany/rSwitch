@@ -995,6 +995,18 @@ LIMEOF
     # Set ownership
     chown -R asterisk:asterisk /etc/asterisk
 
+    # Deploy IVR sound files
+    log_info "Deploying IVR sound files..."
+    AST_SOUNDS="/usr/share/asterisk/sounds/en"
+    if [[ ! -d "$AST_SOUNDS" ]]; then
+        AST_SOUNDS="/var/lib/asterisk/sounds/en"
+    fi
+    mkdir -p "${AST_SOUNDS}/IVR"
+    if [[ -f "${INSTALL_DIR}/IVR/wrong_number.gsm" ]]; then
+        cp "${INSTALL_DIR}/IVR/wrong_number.gsm" "${AST_SOUNDS}/IVR/wrong_number.gsm"
+    fi
+    chown -R asterisk:asterisk "${AST_SOUNDS}/IVR"
+
     # Enable Asterisk service
     systemctl enable asterisk
 
