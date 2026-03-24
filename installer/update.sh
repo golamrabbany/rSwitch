@@ -87,6 +87,18 @@ update_application() {
     log_info "Updating application..."
     cd $INSTALL_DIR
 
+    # Pull latest code from git
+    if [[ -d "$INSTALL_DIR/.git" ]]; then
+        log_info "Pulling latest code from git..."
+        git stash --quiet 2>/dev/null || true
+        git pull origin master --no-edit
+        git stash pop --quiet 2>/dev/null || true
+        log_success "Code updated from git"
+    else
+        log_warning "Not a git repository — skipping git pull"
+        log_info "To enable git updates, run: cd $INSTALL_DIR && git init && git remote add origin https://github.com/golamrabbany/rSwitch.git"
+    fi
+
     # Clear caches
     log_info "Clearing caches..."
     sudo -u www-data php artisan optimize:clear
