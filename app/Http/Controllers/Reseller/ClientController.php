@@ -144,7 +144,13 @@ class ClientController extends Controller
 
         $client->load('rateGroup', 'sipAccounts', 'kycProfile');
 
-        return view('reseller.clients.show', compact('client'));
+        $recentTopups = \App\Models\Transaction::where('user_id', $client->id)
+            ->where('type', 'topup')
+            ->orderByDesc('created_at')
+            ->limit(20)
+            ->get();
+
+        return view('reseller.clients.show', compact('client', 'recentTopups'));
     }
 
     public function edit(User $client)
