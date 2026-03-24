@@ -1,59 +1,92 @@
 <x-client-layout>
     <x-slot name="header">Invoices</x-slot>
 
-    <div class="mb-6 flex flex-wrap items-center gap-3">
-        <form method="GET" class="flex flex-wrap items-center gap-3">
-            <select name="status" onchange="this.form.submit()" class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+    <div class="page-header-row">
+        <div>
+            <h2 class="page-title">My Invoices</h2>
+            <p class="page-subtitle">Billing history and invoice details</p>
+        </div>
+    </div>
+
+    {{-- Filter --}}
+    <div class="filter-card">
+        <form method="GET" class="filter-row flex-wrap">
+            <select name="status" class="filter-select">
                 <option value="">All Statuses</option>
                 @foreach (['draft', 'issued', 'paid', 'overdue', 'cancelled'] as $s)
                     <option value="{{ $s }}" {{ request('status') === $s ? 'selected' : '' }}>{{ ucfirst($s) }}</option>
                 @endforeach
             </select>
+            <button type="submit" class="btn-search">Filter</button>
             @if(request('status'))
-                <a href="{{ route('client.invoices.index') }}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+                <a href="{{ route('client.invoices.index') }}" class="btn-clear">Clear</a>
             @endif
         </form>
     </div>
 
-    <div class="bg-white shadow sm:rounded-lg overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+    <div class="data-table-container">
+        @if($invoices->total() > 0)
+            <div class="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                <span class="text-sm text-gray-600">
+                    Showing <span class="font-semibold">{{ $invoices->firstItem() }}–{{ $invoices->lastItem() }}</span> of <span class="font-semibold">{{ number_format($invoices->total()) }}</span> invoices
+                </span>
+            </div>
+        @endif
+        <table class="data-table data-table-compact">
+            <thead>
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                    <th>Invoice #</th>
+                    <th>Period</th>
+                    <th style="text-align: right">Amount</th>
+                    <th>Status</th>
+                    <th>Due Date</th>
+                    <th style="text-align: center">Actions</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody>
                 @forelse ($invoices as $invoice)
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $invoice->invoice_number }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ $invoice->period_start?->format('M d') }} - {{ $invoice->period_end?->format('M d, Y') }}
+                        <td class="font-medium text-gray-900">{{ $invoice->invoice_number }}</td>
+                        <td class="text-gray-500">
+                            {{ $invoice->period_start?->format('M d') }} – {{ $invoice->period_end?->format('M d, Y') }}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{{ format_currency($invoice->total_amount) }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            @php $colors = ['draft' => 'bg-gray-100 text-gray-800', 'issued' => 'bg-blue-100 text-blue-800', 'paid' => 'bg-green-100 text-green-800', 'overdue' => 'bg-red-100 text-red-800', 'cancelled' => 'bg-gray-100 text-gray-500']; @endphp
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $colors[$invoice->status] ?? 'bg-gray-100 text-gray-800' }}">
-                                {{ ucfirst($invoice->status) }}
-                            </span>
+                        <td style="text-align: right" class="tabular-nums font-mono font-medium text-gray-900">{{ format_currency($invoice->total_amount) }}</td>
+                        <td>
+                            @switch($invoice->status)
+                                @case('paid') <span class="badge badge-success">Paid</span> @break
+                                @case('issued') <span class="badge badge-blue">Issued</span> @break
+                                @case('overdue') <span class="badge badge-danger">Overdue</span> @break
+                                @case('cancelled') <span class="badge badge-gray">Cancelled</span> @break
+                                @default <span class="badge badge-gray">Draft</span>
+                            @endswitch
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $invoice->due_date?->format('M d, Y') }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <a href="{{ route('client.invoices.show', $invoice) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
+                        <td class="text-gray-500">{{ $invoice->due_date?->format('M d, Y') }}</td>
+                        <td>
+                            <div class="flex items-center justify-center gap-1">
+                                <a href="{{ route('client.invoices.show', $invoice) }}" class="action-icon" title="View">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </a>
+                                <a href="{{ route('client.invoices.pdf', $invoice) }}" class="action-icon" title="Download PDF">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 @empty
-                    <tr>
-                        <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">No invoices found.</td>
-                    </tr>
+                    <tr><td colspan="6" class="text-center py-12"><div class="empty-state"><p class="empty-text">No invoices found</p></div></td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="mt-4">{{ $invoices->withQueryString()->links() }}</div>
+    @if($invoices->hasPages())
+        <div class="mt-4 flex justify-end">
+            {{ $invoices->withQueryString()->onEachSide(1)->links('pagination::simple-tailwind') }}
+        </div>
+    @endif
 </x-client-layout>

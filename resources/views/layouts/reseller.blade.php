@@ -81,18 +81,32 @@
                     </div>
                 </div>
 
-                <!-- CDR -->
-                <a href="{{ route('reseller.cdr.index') }}" class="nav-item {{ request()->routeIs('reseller.cdr.*') ? 'active' : 'text-gray-600' }}">
-                    <svg class="nav-icon {{ request()->routeIs('reseller.cdr.*') ? 'text-emerald-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                    <span class="nav-text">CDR / Reports</span>
-                </a>
+                <!-- Reports Menu -->
+                @php $reportsActive = request()->routeIs('reseller.reports.*'); @endphp
+                <div x-data="{ open: {{ $reportsActive ? 'true' : 'false' }} }" class="mb-1">
+                    <button @click="open = !open" class="nav-parent {{ $reportsActive ? 'has-active' : 'text-gray-600' }}">
+                        <div class="flex items-center">
+                            <svg class="nav-icon {{ $reportsActive ? 'text-emerald-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <span class="nav-text">Reports</span>
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-collapse class="nav-children">
+                        <a href="{{ route('reseller.reports.active-calls') }}" class="nav-child {{ request()->routeIs('reseller.reports.active-calls') ? 'active' : 'text-gray-500' }}">Active Calls</a>
+                        <a href="{{ route('reseller.reports.success-calls') }}" class="nav-child {{ request()->routeIs('reseller.reports.success-calls') ? 'active' : 'text-gray-500' }}">Success Calls</a>
+                        <a href="{{ route('reseller.reports.failed-calls') }}" class="nav-child {{ request()->routeIs('reseller.reports.failed-calls') ? 'active' : 'text-gray-500' }}">Failed Calls</a>
+                        <a href="{{ route('reseller.reports.call-summary') }}" class="nav-child {{ request()->routeIs('reseller.reports.call-summary') ? 'active' : 'text-gray-500' }}">Call Summary</a>
+                    </div>
+                </div>
 
                 <div class="my-3 border-t border-gray-100"></div>
 
                 <!-- Finance Menu -->
-                @php $financeActive = request()->routeIs('reseller.transactions.*', 'reseller.balance.*'); @endphp
+                @php $financeActive = request()->routeIs('reseller.transactions.*', 'reseller.payments.*', 'reseller.balance.*'); @endphp
                 <div x-data="{ open: {{ $financeActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $financeActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
@@ -106,8 +120,9 @@
                         </svg>
                     </button>
                     <div x-show="open" x-collapse class="nav-children">
-                        <a href="{{ route('reseller.transactions.index') }}" class="nav-child {{ request()->routeIs('reseller.transactions.*') ? 'active' : 'text-gray-500' }}">Transactions</a>
                         <a href="{{ route('reseller.balance.create') }}" class="nav-child {{ request()->routeIs('reseller.balance.*') ? 'active' : 'text-gray-500' }}">Topup Client</a>
+                        <a href="{{ route('reseller.transactions.index') }}" class="nav-child {{ request()->routeIs('reseller.transactions.*') ? 'active' : 'text-gray-500' }}">Client Transactions</a>
+                        <a href="{{ route('reseller.payments.index') }}" class="nav-child {{ request()->routeIs('reseller.payments.*') ? 'active' : 'text-gray-500' }}">My Payments</a>
                     </div>
                 </div>
             </nav>
@@ -151,6 +166,7 @@
                         <!-- User Dropdown -->
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                                <span class="text-sm font-medium text-gray-700">{{ auth()->user()->name }}</span>
                                 <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center">
                                     <span class="text-white font-semibold text-sm">{{ substr(auth()->user()->name, 0, 1) }}</span>
                                 </div>
@@ -171,11 +187,17 @@
                                     <p class="text-sm font-medium text-gray-800">{{ auth()->user()->name }}</p>
                                     <p class="text-xs text-gray-500">{{ auth()->user()->email }}</p>
                                 </div>
-                                <a href="{{ route('profile') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                <a href="{{ route('reseller.profile') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <svg class="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                     </svg>
                                     My Profile
+                                </a>
+                                <a href="{{ route('reseller.profile') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <svg class="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                                    </svg>
+                                    Change Password
                                 </a>
                                 <div class="border-t border-gray-100 mt-2 pt-2">
                                     <form method="POST" action="{{ route('logout') }}">
@@ -197,7 +219,7 @@
             <!-- Page Content -->
             <main class="p-4 lg:p-6">
                 {{-- KYC Banner --}}
-                @if(auth()->user()->kyc_status !== 'approved')
+                @if(auth()->user()->kyc_status !== 'approved' && !request()->routeIs('kyc.*'))
                     <div class="mb-6 alert-warning">
                         <svg class="w-5 h-5 mr-3 text-amber-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>

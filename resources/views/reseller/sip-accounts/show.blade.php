@@ -1,137 +1,266 @@
 <x-reseller-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <span>SIP Account: {{ $sipAccount->username }}</span>
-            <div class="flex items-center gap-x-3">
-                <a href="{{ route('reseller.sip-accounts.edit', $sipAccount) }}" class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">Edit</a>
-                <form method="POST" action="{{ route('reseller.sip-accounts.reprovision', $sipAccount) }}">
-                    @csrf
-                    <button type="submit" class="rounded-md bg-gray-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-500">
-                        Re-provision
-                    </button>
-                </form>
+    <x-slot name="header">{{ $sipAccount->username }}</x-slot>
+
+    {{-- Page Header --}}
+    <div class="page-header-row">
+        <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <svg class="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="page-title font-mono">{{ $sipAccount->username }}</h2>
+                <div class="flex items-center gap-2 mt-1">
+                    @switch($sipAccount->status)
+                        @case('active') <span class="badge badge-success">Active</span> @break
+                        @case('suspended') <span class="badge badge-warning">Suspended</span> @break
+                        @default <span class="badge badge-danger">Disabled</span>
+                    @endswitch
+                    @if($provisioned)
+                        <span class="badge badge-info">Provisioned</span>
+                    @else
+                        <span class="badge badge-gray">Not Provisioned</span>
+                    @endif
+                    <span class="text-sm text-gray-500">{{ $sipAccount->user->name }}</span>
+                </div>
             </div>
         </div>
-    </x-slot>
-
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {{-- SIP Details --}}
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 class="text-base font-semibold text-gray-900">SIP Configuration</h3>
-            </div>
-            <dl class="divide-y divide-gray-200">
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Username</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $sipAccount->username }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Password</dt>
-                    <dd class="mt-1 text-sm sm:col-span-2 sm:mt-0" x-data="{ show: false }">
-                        <span x-show="!show" class="text-gray-400">••••••••••••</span>
-                        <span x-show="show" x-cloak class="font-mono text-gray-900">{{ $sipAccount->password }}</span>
-                        <button @click="show = !show" class="ml-2 text-xs text-indigo-600 hover:text-indigo-900" x-text="show ? 'Hide' : 'Show'"></button>
-                    </dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Auth Type</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ ucfirst($sipAccount->auth_type) }}</dd>
-                </div>
-                @if($sipAccount->allowed_ips)
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Allowed IPs</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $sipAccount->allowed_ips }}</dd>
-                </div>
-                @endif
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Caller ID</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">"{{ $sipAccount->caller_id_name }}" &lt;{{ $sipAccount->caller_id_number }}&gt;</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Max Channels</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $sipAccount->max_channels }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Codecs</dt>
-                    <dd class="mt-1 text-sm font-mono text-gray-900 sm:col-span-2 sm:mt-0">{{ $sipAccount->codec_allow }}</dd>
-                </div>
-                <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt class="text-sm font-medium text-gray-500">Status</dt>
-                    <dd class="mt-1 sm:col-span-2 sm:mt-0">
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                            {{ $sipAccount->status === 'active' ? 'bg-green-100 text-green-800' : ($sipAccount->status === 'suspended' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
-                            {{ ucfirst($sipAccount->status) }}
-                        </span>
-                    </dd>
-                </div>
-            </dl>
+        <div class="page-actions">
+            <a href="{{ route('reseller.sip-accounts.index') }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back
+            </a>
+            <form method="POST" action="{{ route('reseller.sip-accounts.reprovision', $sipAccount) }}" class="inline">
+                @csrf
+                <button type="submit" class="btn-action-secondary">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Re-provision
+                </button>
+            </form>
         </div>
+    </div>
 
-        {{-- Owner & Registration --}}
-        <div class="space-y-6">
-            <div class="bg-white shadow sm:rounded-lg">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 class="text-base font-semibold text-gray-900">Owner</h3>
-                </div>
-                <dl class="divide-y divide-gray-200">
-                    <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Name</dt>
-                        <dd class="mt-1 text-sm sm:col-span-2 sm:mt-0">
-                            @if($sipAccount->user_id === auth()->id())
-                                <span class="text-gray-900">You ({{ $sipAccount->user->name }})</span>
-                            @else
-                                <a href="{{ route('reseller.clients.show', $sipAccount->user) }}" class="text-indigo-600 hover:text-indigo-900">{{ $sipAccount->user->name }}</a>
-                            @endif
-                        </dd>
-                    </div>
-                    <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Role</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ ucfirst($sipAccount->user->role) }}</dd>
-                    </div>
-                    <div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Email</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{{ $sipAccount->user->email }}</dd>
-                    </div>
-                </dl>
+    {{-- Stat Cards --}}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card">
+            <div class="stat-icon bg-emerald-100">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
             </div>
+            <div class="stat-content">
+                <a href="{{ route('reseller.clients.show', $sipAccount->user) }}" class="stat-value text-base text-emerald-600 hover:text-emerald-500">{{ $sipAccount->user->name }}</a>
+                <p class="stat-label">Owner</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-blue-100">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <p class="stat-value">{{ $sipAccount->max_channels }}</p>
+                <p class="stat-label">Max Channels</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-purple-100">
+                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <p class="stat-value text-base">{{ ucfirst($sipAccount->auth_type) }}</p>
+                <p class="stat-label">Auth Type</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-gray-100">
+                <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <div class="stat-content">
+                <p class="stat-value text-base">{{ $sipAccount->created_at?->format('M d, Y') }}</p>
+                <p class="stat-label">Created</p>
+            </div>
+        </div>
+    </div>
 
-            <div class="bg-white shadow sm:rounded-lg">
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 class="text-base font-semibold text-gray-900">Provisioning Status</h3>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {{-- Main Content (2/3) --}}
+        <div class="lg:col-span-2 space-y-6">
+
+            {{-- SIP Configuration --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">SIP Configuration</h3>
                 </div>
-                <div class="p-6">
-                    <div class="flex items-center gap-3">
-                        @if($provisioned)
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
-                                <svg class="mr-1.5 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
-                                </svg>
-                                Provisioned in Asterisk
-                            </span>
-                        @else
-                            <span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
-                                <svg class="mr-1.5 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
-                                </svg>
-                                Not in Asterisk
-                            </span>
+                <div class="detail-card-body">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-y-5 gap-x-6">
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase tracking-wide">Username</p>
+                            <p class="text-sm font-mono font-semibold text-gray-900 mt-1">{{ $sipAccount->username }}</p>
+                        </div>
+                        <div x-data="{ show: false }">
+                            <p class="text-xs text-gray-400 uppercase tracking-wide">Password</p>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-sm font-mono text-gray-900" x-text="show ? '{{ $sipAccount->password }}' : '••••••••••'"></span>
+                                <button @click="show = !show" class="text-gray-400 hover:text-emerald-600 transition-colors">
+                                    <svg x-show="!show" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    <svg x-show="show" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase tracking-wide">Codecs</p>
+                            <div class="flex gap-1.5 mt-1">
+                                @foreach(explode(',', $sipAccount->codec_allow) as $codec)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">{{ trim($codec) }}</span>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase tracking-wide">Caller ID Name</p>
+                            <p class="text-sm text-gray-900 mt-1">{{ $sipAccount->caller_id_name ?: '—' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase tracking-wide">Caller ID Number</p>
+                            <p class="text-sm font-mono text-gray-900 mt-1">{{ $sipAccount->caller_id_number ?: '—' }}</p>
+                        </div>
+                        @if($sipAccount->allowed_ips)
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase tracking-wide">Allowed IPs</p>
+                            <p class="text-sm font-mono text-gray-900 mt-1">{{ $sipAccount->allowed_ips }}</p>
+                        </div>
                         @endif
                     </div>
+                </div>
+            </div>
 
+            {{-- Registration Status --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Registration</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="reg-status" data-username="{{ $sipAccount->username }}">
+                        <span class="text-gray-300">Checking...</span>
+                    </div>
                     @if($sipAccount->last_registered_at)
-                        <div class="mt-4 text-sm text-gray-600">
-                            <p>Last registered: {{ $sipAccount->last_registered_at->format('M d, Y H:i:s') }}</p>
-                            <p>From IP: <span class="font-mono">{{ $sipAccount->last_registered_ip }}</span></p>
+                        <div class="mt-3 grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Last Registered</p>
+                                <p class="text-sm text-gray-900 mt-1">{{ $sipAccount->last_registered_at->format('M d, Y h:i A') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">From IP</p>
+                                <p class="text-sm font-mono text-gray-900 mt-1">{{ $sipAccount->last_registered_ip }}</p>
+                            </div>
                         </div>
-                    @else
-                        <p class="mt-4 text-sm text-gray-500">Never registered.</p>
                     @endif
                 </div>
             </div>
         </div>
+
+        {{-- Sidebar (1/3) --}}
+        <div class="space-y-6">
+            {{-- Quick Actions --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Quick Actions</h3>
+                </div>
+                <div class="detail-card-body space-y-2">
+                    <a href="{{ route('reseller.clients.show', $sipAccount->user) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors group">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                        </div>
+                        <span class="text-sm text-gray-700 group-hover:text-gray-900">View Client</span>
+                    </a>
+                    <form method="POST" action="{{ route('reseller.sip-accounts.reprovision', $sipAccount) }}">
+                        @csrf
+                        <button type="submit" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors group text-left">
+                            <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200">
+                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                            </div>
+                            <span class="text-sm text-gray-700 group-hover:text-gray-900">Re-provision</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            {{-- Owner Info --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Owner</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Name</span>
+                            <a href="{{ route('reseller.clients.show', $sipAccount->user) }}" class="text-sm font-medium text-emerald-600 hover:text-emerald-500">{{ $sipAccount->user->name }}</a>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Email</span>
+                            <span class="text-sm text-gray-900">{{ $sipAccount->user->email }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Balance</span>
+                            <span class="text-sm font-semibold text-gray-900">{{ format_currency($sipAccount->user->balance) }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Billing</span>
+                            @if($sipAccount->user->billing_type === 'prepaid')
+                                <span class="badge badge-blue">Prepaid</span>
+                            @else
+                                <span class="badge badge-purple">Postpaid</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
 
-    <div class="mt-6">
-        <a href="{{ route('reseller.sip-accounts.index') }}" class="text-sm font-semibold text-gray-600 hover:text-gray-900">&larr; Back to SIP accounts</a>
-    </div>
+    {{-- Registration status check --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const cell = document.querySelector('.reg-status');
+            if (!cell) return;
+            const username = cell.dataset.username;
+
+            fetch('{{ route("reseller.sip-accounts.registration-status") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ usernames: [username] })
+            })
+            .then(r => r.json())
+            .then(c => {
+                if (c[username]) {
+                    cell.innerHTML = '<span class="inline-flex items-center gap-2 text-emerald-600"><span class="relative flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span><span class="font-medium">Registered</span><span class="text-gray-400 font-mono text-xs">' + c[username].ip + '</span></span>';
+                } else {
+                    cell.innerHTML = '<span class="inline-flex items-center gap-2 text-gray-400"><span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>Unregistered</span>';
+                }
+            })
+            .catch(() => {
+                cell.innerHTML = '<span class="inline-flex items-center gap-2 text-gray-400"><span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>Unregistered</span>';
+            });
+        });
+    </script>
 </x-reseller-layout>

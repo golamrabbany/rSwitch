@@ -7,6 +7,11 @@ use App\Models\CallRecord;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 
 class CdrController extends Controller
 {
@@ -63,61 +68,62 @@ class CdrController extends Controller
         $userId = auth()->id();
         [$dateFrom, $dateTo] = $this->resolveDateRange($request, maxDays: 7);
 
-        if ($dateFrom->diffInDays($dateTo) > 7) {
-            return back()->with('warning', 'CSV export is limited to 7 days. Please narrow your date range.');
-        }
-
         $query = CallRecord::query()
             ->whereBetween('call_start', [$dateFrom, $dateTo])
             ->where('user_id', $userId);
 
         $this->applyFilters($query, $request);
 
-        $filename = 'cdr_' . $dateFrom->format('Ymd') . '_' . $dateTo->format('Ymd') . '.csv';
+        $records = $query->with('sipAccount:id,username')->orderByDesc('call_start')->get();
 
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Call Records');
 
-        $callback = function () use ($query) {
-            $handle = fopen('php://output', 'w');
+        $headers = ['Date/Time', 'Caller', 'Callee', 'Destination', 'Duration', 'Billable', 'Rate/Min', 'Cost', 'Disposition', 'SIP Account'];
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue(chr(65 + $col) . '1', $header);
+        }
+        $lastCol = chr(64 + count($headers));
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4F46E5']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(28);
 
-            fputcsv($handle, [
-                'UUID', 'Date/Time', 'Caller', 'Callee', 'Caller ID',
-                'Disposition',
-                'Duration (s)', 'Billsec (s)', 'Billable (s)',
-                'Rate/Min', 'Connection Fee', 'Cost',
-                'Destination', 'SIP Account',
-            ]);
+        $row = 2;
+        foreach ($records as $r) {
+            $sheet->setCellValue("A{$row}", $r->call_start?->format('Y-m-d H:i:s'));
+            $sheet->setCellValue("B{$row}", $r->caller);
+            $sheet->setCellValue("C{$row}", $r->callee);
+            $sheet->setCellValue("D{$row}", $r->destination ?: '');
+            $sheet->setCellValue("E{$row}", sprintf('%d:%02d', intdiv($r->duration, 60), $r->duration % 60));
+            $sheet->setCellValue("F{$row}", sprintf('%d:%02d', intdiv($r->billable_duration, 60), $r->billable_duration % 60));
+            $sheet->setCellValue("G{$row}", (float) $r->rate_per_minute);
+            $sheet->setCellValue("H{$row}", (float) $r->total_cost);
+            $sheet->setCellValue("I{$row}", $r->disposition);
+            $sheet->setCellValue("J{$row}", $r->sipAccount?->username ?? '');
 
-            $query->with('sipAccount:id,username')
-                ->orderBy('call_start')
-                ->chunk(1000, function ($records) use ($handle) {
-                    foreach ($records as $r) {
-                        fputcsv($handle, [
-                            $r->uuid,
-                            $r->call_start?->format('Y-m-d H:i:s'),
-                            $r->caller,
-                            $r->callee,
-                            $r->caller_id,
-                            $r->disposition,
-                            $r->duration,
-                            $r->billsec,
-                            $r->billable_duration,
-                            $r->rate_per_minute,
-                            $r->connection_fee,
-                            $r->total_cost,
-                            $r->destination,
-                            $r->sipAccount?->username,
-                        ]);
-                    }
-                });
+            if ($row % 2 === 0) {
+                $sheet->getStyle("A{$row}:J{$row}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('EEF2FF');
+            }
+            $row++;
+        }
 
-            fclose($handle);
-        };
+        foreach (range('A', 'J') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+        $sheet->getStyle('G2:H' . max($row - 1, 2))->getNumberFormat()->setFormatCode('#,##0.0000');
 
-        return response()->stream($callback, 200, $headers);
+        $filename = 'call-records-' . $dateFrom->format('Y-m-d') . '-to-' . $dateTo->format('Y-m-d') . '.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
     private function resolveDateRange(Request $request, int $maxDays = 31): array

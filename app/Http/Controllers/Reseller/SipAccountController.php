@@ -84,7 +84,12 @@ class SipAccountController extends Controller
 
         AuditService::logCreated($sip, 'reseller.sip_account.created');
 
-        return redirect()->route('reseller.sip-accounts.show', $sip)
+        if ($request->has('redirect_to_client')) {
+            return redirect()->route('reseller.clients.show', $validated['user_id'])
+                ->with('success', "SIP account {$sip->username} created and provisioned.");
+        }
+
+        return redirect()->route('reseller.sip-accounts.index')
             ->with('success', "SIP account {$sip->username} created and provisioned.");
     }
 
@@ -144,7 +149,7 @@ class SipAccountController extends Controller
 
         AuditService::logUpdated($sipAccount, $original, 'reseller.sip_account.updated');
 
-        return redirect()->route('reseller.sip-accounts.show', $sipAccount)
+        return redirect()->route('reseller.sip-accounts.index')
             ->with('success', "SIP account {$sipAccount->username} updated.");
     }
 
@@ -163,5 +168,47 @@ class SipAccountController extends Controller
         AuditService::logAction('reseller.sip_account.reprovisioned', $sipAccount);
 
         return back()->with('success', $message);
+    }
+
+    /**
+     * AJAX: Check registration status for SIP usernames.
+     */
+    public function registrationStatus(Request $request)
+    {
+        $usernames = $request->input('usernames', []);
+        if (empty($usernames) || !is_array($usernames)) {
+            return response()->json([]);
+        }
+
+        $contacts = [];
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(3)
+                ->post('http://127.0.0.1:8001/api/contacts/status', [
+                    'usernames' => $usernames,
+                ]);
+
+            if ($response->successful()) {
+                $contacts = $response->json();
+            }
+        } catch (\Throwable $e) {
+            // Fallback to Asterisk CLI
+            try {
+                $output = shell_exec('sudo asterisk -rx "pjsip show contacts" 2>/dev/null');
+                if ($output) {
+                    $lookup = array_flip($usernames);
+                    foreach (explode("\n", $output) as $line) {
+                        if (preg_match('/Contact:\s+(\S+)\/sip:\S+@([\d.]+):\d+\S*\s+\S+\s+(Avail|Unavail)/', $line, $m)) {
+                            if (isset($lookup[$m[1]])) {
+                                $contacts[$m[1]] = ['ip' => $m[2], 'status' => $m[3]];
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e2) {
+                // Silently fail
+            }
+        }
+
+        return response()->json($contacts);
     }
 }

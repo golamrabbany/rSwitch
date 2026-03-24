@@ -142,6 +142,13 @@
 
     {{-- Section 3: Table --}}
     <div class="data-table-container">
+        @if($users->total() > 0)
+            <div class="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                <span class="text-sm text-gray-600">
+                    Showing <span class="font-semibold">{{ $users->firstItem() }}–{{ $users->lastItem() }}</span> of <span class="font-semibold">{{ number_format($users->total()) }}</span> results
+                </span>
+            </div>
+        @endif
         <table class="data-table">
             <thead>
                 <tr>
@@ -151,12 +158,13 @@
                     @endif
                     <th>Balance</th>
                     <th>Tariff</th>
-                    <th>Type</th>
-                    @if($roleFilter === 'client')
-                        <th>Chn/SIP</th>
-                    @else
+                    @if($roleFilter !== 'client')
+                        <th>Type</th>
                         <th>Channels</th>
                         <th>Clients/SIP</th>
+                    @else
+                        <th>Chn/SIP</th>
+                        <th>KYC</th>
                     @endif
                     <th>Status</th>
                     <th class="text-center">Actions</th>
@@ -189,18 +197,26 @@
                         @endif
                         <td class="font-medium">{{ format_currency($user->balance) }}</td>
                         <td>{{ $user->rateGroup?->name ?? '-' }}</td>
-                        <td>
-                            @if($user->billing_type === 'prepaid')
-                                <span class="badge badge-blue">Prepaid</span>
-                            @else
-                                <span class="badge badge-purple">Postpaid</span>
-                            @endif
-                        </td>
-                        @if($roleFilter === 'client')
-                            <td>{{ $user->max_channels }}/{{ $user->sip_accounts_count }}</td>
-                        @else
+                        @if($roleFilter !== 'client')
+                            <td>
+                                @if($user->billing_type === 'prepaid')
+                                    <span class="badge badge-blue">Prepaid</span>
+                                @else
+                                    <span class="badge badge-purple">Postpaid</span>
+                                @endif
+                            </td>
                             <td>{{ $user->max_channels }}</td>
                             <td>{{ $user->children_count }}/{{ $user->sip_accounts_count }}</td>
+                        @else
+                            <td>{{ $user->max_channels }}/{{ $user->sip_accounts_count }}</td>
+                            <td>
+                                @switch($user->kyc_status)
+                                    @case('approved') <span class="badge badge-success">Approved</span> @break
+                                    @case('pending') <span class="badge badge-warning">Pending</span> @break
+                                    @case('rejected') <span class="badge badge-danger">Rejected</span> @break
+                                    @default <span class="badge badge-gray">Not Submitted</span>
+                                @endswitch
+                            </td>
                         @endif
                         <td>
                             @if($user->status === 'active')
@@ -245,8 +261,8 @@
     </div>
 
     @if($users->hasPages())
-        <div class="mt-6">
-            {{ $users->withQueryString()->links() }}
+        <div class="mt-4 flex justify-end">
+            {{ $users->withQueryString()->onEachSide(1)->links('pagination::simple-tailwind') }}
         </div>
     @endif
 </x-admin-layout>

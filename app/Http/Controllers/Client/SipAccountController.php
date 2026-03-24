@@ -8,6 +8,7 @@ use App\Services\AuditService;
 use App\Services\SipProvisioningService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 class SipAccountController extends Controller
 {
@@ -80,5 +81,39 @@ class SipAccountController extends Controller
 
         return redirect()->route('client.sip-accounts.show', $sipAccount)
             ->with('success', 'SIP account updated.');
+    }
+
+    public function registrationStatus(Request $request)
+    {
+        $usernames = $request->input('usernames', []);
+        if (empty($usernames) || !is_array($usernames)) {
+            return response()->json([]);
+        }
+
+        // Only allow checking own SIP accounts
+        $ownUsernames = SipAccount::where('user_id', auth()->id())
+            ->whereIn('username', $usernames)
+            ->pluck('username')
+            ->toArray();
+
+        if (empty($ownUsernames)) {
+            return response()->json([]);
+        }
+
+        $contacts = [];
+        try {
+            $response = Http::timeout(3)
+                ->post('http://127.0.0.1:8001/api/contacts/status', [
+                    'usernames' => $ownUsernames,
+                ]);
+
+            if ($response->successful()) {
+                $contacts = $response->json();
+            }
+        } catch (\Exception $e) {
+            // Python API unavailable
+        }
+
+        return response()->json($contacts);
     }
 }

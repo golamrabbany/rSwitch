@@ -182,6 +182,7 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
 
         Route::resource('sip-accounts', Reseller\SipAccountController::class)->except(['destroy']);
         Route::post('sip-accounts/{sip_account}/reprovision', [Reseller\SipAccountController::class, 'reprovision'])->name('sip-accounts.reprovision');
+        Route::post('sip-accounts-registration-status', [Reseller\SipAccountController::class, 'registrationStatus'])->name('sip-accounts.registration-status');
 
         // Rate Plan
         Route::get('base-tariff', [Reseller\TariffController::class, 'baseTariff'])->name('base-tariff');
@@ -195,15 +196,30 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::put('tariffs/{tariff}/rates/{rate}', [Reseller\TariffController::class, 'updateRate'])->name('tariffs.update-rate');
         Route::delete('tariffs/{tariff}/rates/{rate}', [Reseller\TariffController::class, 'deleteRate'])->name('tariffs.delete-rate');
 
+        // Reports
+        Route::get('reports/active-calls', [Reseller\ReportController::class, 'activeCalls'])->name('reports.active-calls');
+        Route::get('reports/success-calls', [Reseller\ReportController::class, 'successCalls'])->name('reports.success-calls');
+        Route::get('reports/failed-calls', [Reseller\ReportController::class, 'failedCalls'])->name('reports.failed-calls');
+        Route::get('reports/call-summary', [Reseller\ReportController::class, 'callSummary'])->name('reports.call-summary');
+        Route::get('reports/success-calls/export', [Reseller\ReportController::class, 'exportSuccessCalls'])->name('reports.success-calls.export');
+        Route::get('reports/failed-calls/export', [Reseller\ReportController::class, 'exportFailedCalls'])->name('reports.failed-calls.export');
+        Route::get('reports/call-summary/export', [Reseller\ReportController::class, 'exportCallSummary'])->name('reports.call-summary.export');
+
         Route::get('cdr', [Reseller\CdrController::class, 'index'])->name('cdr.index');
         Route::get('cdr/export', [Reseller\CdrController::class, 'export'])->name('cdr.export');
         Route::get('cdr/{uuid}', [Reseller\CdrController::class, 'show'])->name('cdr.show');
 
         // Financial
         Route::get('transactions', [Reseller\TransactionController::class, 'index'])->name('transactions.index');
+        Route::get('transactions/export', [Reseller\TransactionController::class, 'export'])->name('transactions.export');
+        Route::get('payments', [Reseller\PaymentController::class, 'index'])->name('payments.index');
 
         Route::get('balance/create', [Reseller\BalanceController::class, 'create'])->name('balance.create');
         Route::post('balance', [Reseller\BalanceController::class, 'store'])->name('balance.store');
+
+        Route::get('profile', [Reseller\ProfileController::class, 'index'])->name('profile');
+        Route::put('profile', [Reseller\ProfileController::class, 'update'])->name('profile.update');
+        Route::put('profile/password', [Reseller\ProfileController::class, 'updatePassword'])->name('profile.password');
     });
 });
 
@@ -212,7 +228,10 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
     Route::get('dashboard', Client\DashboardController::class)->name('dashboard');
 
     Route::middleware('kyc.approved')->group(function () {
+        Route::get('base-rate', [Client\RateController::class, 'index'])->name('base-rate');
+
         Route::get('sip-accounts', [Client\SipAccountController::class, 'index'])->name('sip-accounts.index');
+        Route::post('sip-accounts/registration-status', [Client\SipAccountController::class, 'registrationStatus'])->name('sip-accounts.registration-status');
         Route::get('sip-accounts/{sipAccount}', [Client\SipAccountController::class, 'show'])->name('sip-accounts.show');
         Route::get('sip-accounts/{sipAccount}/edit', [Client\SipAccountController::class, 'edit'])->name('sip-accounts.edit');
         Route::put('sip-accounts/{sipAccount}', [Client\SipAccountController::class, 'update'])->name('sip-accounts.update');
@@ -235,6 +254,9 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::post('payments/checkout', [Client\PaymentController::class, 'checkout'])->middleware('throttle:10,1')->name('payments.checkout');
         Route::get('payments/success', [Client\PaymentController::class, 'success'])->name('payments.success');
     });
+
+    Route::get('profile', [Client\ProfileController::class, 'index'])->name('profile');
+    Route::put('profile/password', [Client\ProfileController::class, 'updatePassword'])->name('profile.password');
 });
 
 // Two-factor authentication challenge (guest — user not yet authenticated)
