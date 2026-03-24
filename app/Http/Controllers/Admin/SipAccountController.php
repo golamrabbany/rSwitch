@@ -117,19 +117,32 @@ class SipAccountController extends Controller
 
         $contacts = [];
         try {
-            $output = shell_exec('sudo asterisk -rx "pjsip show contacts" 2>/dev/null');
-            if ($output) {
-                $lookup = array_flip($usernames);
-                foreach (explode("\n", $output) as $line) {
-                    if (preg_match('/Contact:\s+(\S+)\/sip:\S+@([\d.]+):\d+\S*\s+\S+\s+(Avail|Unavail)/', $line, $m)) {
-                        if (isset($lookup[$m[1]])) {
-                            $contacts[$m[1]] = ['ip' => $m[2], 'status' => $m[3]];
+            // Use Python billing service API (has real-time AMI connection)
+            $response = \Illuminate\Support\Facades\Http::timeout(3)
+                ->post('http://127.0.0.1:8001/api/contacts/status', [
+                    'usernames' => $usernames,
+                ]);
+
+            if ($response->successful()) {
+                $contacts = $response->json();
+            }
+        } catch (\Throwable $e) {
+            // Fallback to direct Asterisk CLI if Python API is unavailable
+            try {
+                $output = shell_exec('sudo asterisk -rx "pjsip show contacts" 2>/dev/null');
+                if ($output) {
+                    $lookup = array_flip($usernames);
+                    foreach (explode("\n", $output) as $line) {
+                        if (preg_match('/Contact:\s+(\S+)\/sip:\S+@([\d.]+):\d+\S*\s+\S+\s+(Avail|Unavail)/', $line, $m)) {
+                            if (isset($lookup[$m[1]])) {
+                                $contacts[$m[1]] = ['ip' => $m[2], 'status' => $m[3]];
+                            }
                         }
                     }
                 }
+            } catch (\Throwable $e2) {
+                // Silently fail
             }
-        } catch (\Throwable $e) {
-            // Silently fail
         }
 
         return response()->json($contacts);

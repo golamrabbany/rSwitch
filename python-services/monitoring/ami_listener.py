@@ -69,6 +69,7 @@ class AMIListener:
         self.settings = get_settings()
         self.manager: Optional[Manager] = None
         self._active_calls: dict[str, ActiveCall] = {}  # unique_id → ActiveCall
+        self._registered_contacts: dict[str, dict] = {}  # username → {ip, port, user_agent, registered_at}
         self._ws_clients: set = set()  # Connected WebSocket clients
         self._connected = False
         self._reconnect_task: Optional[asyncio.Task] = None
@@ -94,6 +95,7 @@ class AMIListener:
         self.manager.register_event("BridgeEnter", self._on_bridge)
         self.manager.register_event("Hangup", self._on_hangup)
         self.manager.register_event("Cdr", self._on_cdr)
+        self.manager.register_event("ContactStatus", self._on_contact_status)
 
         try:
             await self.manager.connect()
@@ -102,8 +104,9 @@ class AMIListener:
                 f"AMI connected to {self.settings.asterisk_ami_host}:"
                 f"{self.settings.asterisk_ami_port}"
             )
-            # Load current active channels on connect
+            # Load current state on connect
             await self._load_active_channels()
+            await self._load_registered_contacts()
         except Exception as e:
             self._connected = False
             logger.warning(f"AMI connection failed: {e}")
@@ -120,6 +123,7 @@ class AMIListener:
                     self._connected = True
                     logger.info("AMI reconnected")
                     await self._load_active_channels()
+                    await self._load_registered_contacts()
             except Exception as e:
                 logger.debug(f"AMI reconnect attempt failed: {e}")
 
@@ -140,13 +144,18 @@ class AMIListener:
             })
             # Parse response events for active channels
             for event in response:
-                if hasattr(event, 'Uniqueid') and hasattr(event, 'Channel'):
-                    uid = event.Uniqueid
-                    if uid not in self._active_calls:
-                        call = ActiveCall(uid, event.Channel)
-                        call.caller = getattr(event, 'CallerIDNum', '')
-                        call.callee = getattr(event, 'ConnectedLineNum', '') or getattr(event, 'Exten', '')
-                        call.state = "answered" if getattr(event, 'Duration', '0') != '0' else "ringing"
+                uid = getattr(event, 'Uniqueid', '') or ''
+                channel = getattr(event, 'Channel', '') or ''
+                # Skip empty/metadata entries
+                if not uid or not channel or uid == '0' or channel == '0':
+                    continue
+                if uid not in self._active_calls:
+                    call = ActiveCall(uid, channel)
+                    call.caller = getattr(event, 'CallerIDNum', '') or ''
+                    call.callee = getattr(event, 'ConnectedLineNum', '') or getattr(event, 'Exten', '') or ''
+                    call.state = "answered" if getattr(event, 'Duration', '0') != '0' else "ringing"
+                    # Only add if it looks like a real channel
+                    if call.caller or call.callee or 'PJSIP' in channel:
                         self._active_calls[uid] = call
 
             count = len(self._active_calls)
@@ -280,6 +289,109 @@ class AMIListener:
                     logger.info(f"Queued billing for CDR {row[0]} (uuid={uid})")
             except Exception as e:
                 logger.error(f"Error processing CDR event: {e}")
+
+    # ─────────────────────────────────────────────────────
+    # SIP Registration tracking
+    # ─────────────────────────────────────────────────────
+
+    async def _on_contact_status(self, manager, event):
+        """Track SIP registration status changes in real-time."""
+        uri = event.get("URI", "")
+        status = event.get("ContactStatus", "")
+        aor = event.get("AOR", "")
+
+        if not aor:
+            return
+
+        import re
+        # Extract IP from URI: sip:username@IP:port
+        ip_match = re.search(r"@([\d.]+)", uri)
+        ip = ip_match.group(1) if ip_match else ""
+
+        if status in ("Created", "Updated", "Reachable"):
+            self._registered_contacts[aor] = {
+                "ip": ip,
+                "uri": uri,
+                "user_agent": event.get("UserAgent", ""),
+                "registered_at": time.time(),
+                "status": "Avail",
+            }
+            logger.info(f"SIP registered: {aor} from {ip}")
+
+            # Broadcast to WebSocket clients
+            await self._broadcast({
+                "type": "sip_registered",
+                "username": aor,
+                "ip": ip,
+                "user_agent": event.get("UserAgent", ""),
+            })
+
+            # Update DB: last_registered_at
+            try:
+                from shared.database import get_sync_engine
+                from sqlalchemy import text
+                engine = get_sync_engine()
+                with engine.connect() as conn:
+                    conn.execute(
+                        text(
+                            "UPDATE sip_accounts SET last_registered_at = NOW(), "
+                            "last_registered_ip = :ip WHERE username = :username"
+                        ),
+                        {"ip": ip, "username": aor},
+                    )
+                    conn.commit()
+            except Exception as e:
+                logger.debug(f"Could not update registration in DB: {e}")
+
+        elif status in ("Removed", "Unreachable"):
+            self._registered_contacts.pop(aor, None)
+            logger.info(f"SIP unregistered: {aor}")
+
+            # Broadcast to WebSocket clients
+            await self._broadcast({
+                "type": "sip_unregistered",
+                "username": aor,
+            })
+
+    async def _load_registered_contacts(self):
+        """Load current registered contacts from ps_contacts table on startup."""
+        try:
+            import re
+            from shared.database import get_sync_engine
+            from sqlalchemy import text
+
+            engine = get_sync_engine()
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    text("SELECT id, uri, user_agent, endpoint FROM ps_contacts WHERE uri IS NOT NULL")
+                ).fetchall()
+
+            for row in rows:
+                # endpoint column has the clean username
+                aor = row.endpoint or row.id.split("^3B")[0].split(";")[0]
+                uri = (row.uri or "").replace("^3B", ";")
+
+                ip_match = re.search(r"@([\d.]+)", uri)
+                ip = ip_match.group(1) if ip_match else ""
+
+                if aor and uri:
+                    self._registered_contacts[aor] = {
+                        "ip": ip,
+                        "uri": uri,
+                        "user_agent": row.user_agent or "",
+                        "registered_at": time.time(),
+                        "status": "Avail",
+                    }
+
+            count = len(self._registered_contacts)
+            if count > 0:
+                logger.info(f"Loaded {count} registered contacts from database")
+        except Exception as e:
+            logger.debug(f"Could not load contacts: {e}")
+
+    def get_registered_contacts(self) -> dict:
+        """Return all registered contacts as {username: {ip, status, ...}}."""
+        return dict(self._registered_contacts)
 
     # ─────────────────────────────────────────────────────
     # WebSocket client management

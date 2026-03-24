@@ -222,6 +222,40 @@ async def get_active_calls():
     }
 
 
+@app.get("/api/contacts")
+async def get_contacts():
+    """Get all registered SIP contacts from Asterisk AMI (real-time)."""
+    ami = get_ami_listener()
+    return ami.get_registered_contacts()
+
+
+@app.post("/api/contacts/status")
+async def get_contacts_status(request: dict):
+    """
+    Check registration status for specific SIP usernames.
+    Replaces the PHP shell_exec('sudo asterisk -rx "pjsip show contacts"') approach.
+
+    Request: {"usernames": ["100090", "100001", ...]}
+    Response: {"100090": {"ip": "37.111.242.90", "status": "Avail"}, ...}
+    """
+    usernames = request.get("usernames", [])
+    if not usernames:
+        return {}
+
+    ami = get_ami_listener()
+    all_contacts = ami.get_registered_contacts()
+
+    result = {}
+    for username in usernames:
+        if username in all_contacts:
+            result[username] = {
+                "ip": all_contacts[username]["ip"],
+                "status": all_contacts[username].get("status", "Avail"),
+            }
+
+    return result
+
+
 @app.websocket("/ws/live-calls")
 async def websocket_live_calls(websocket: WebSocket):
     """

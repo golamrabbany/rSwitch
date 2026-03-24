@@ -116,39 +116,36 @@ class SipProvisioningService
     private function reloadPjsip(): void
     {
         try {
-            $asteriskHost = config('services.asterisk.host', 'asterisk');
+            $asteriskHost = config('services.asterisk.host', env('AMI_HOST', '127.0.0.1'));
+            $amiPort = config('services.asterisk.ami_port', env('AMI_PORT', 5038));
+            $amiUser = config('services.asterisk.ami_user', env('AMI_USER', 'rswitch'));
+            $amiSecret = config('services.asterisk.ami_secret', env('AMI_SECRET', ''));
 
             // Connect to Asterisk AMI and send reload command
-            $socket = @fsockopen($asteriskHost, 5038, $errno, $errstr, 3);
+            $socket = @fsockopen($asteriskHost, $amiPort, $errno, $errstr, 3);
 
             if (!$socket) {
                 Log::warning("SipProvisioning: AMI connect failed ({$errstr})");
                 return;
             }
 
+            stream_set_timeout($socket, 3);
+
             // Read banner
             fgets($socket);
 
             // Login
-            fwrite($socket, "Action: Login\r\n");
-            fwrite($socket, "Username: laravel\r\n");
-            fwrite($socket, "Secret: " . config('services.asterisk.ami_secret', 'rSwitch_AMI_s3cret_2024') . "\r\n");
-            fwrite($socket, "\r\n");
-
-            // Read login response
+            $loginCmd = "Action: Login\r\nUsername: {$amiUser}\r\nSecret: {$amiSecret}\r\n\r\n";
+            @fwrite($socket, $loginCmd);
             $this->readAmiResponse($socket);
 
             // Send PJSIP reload to flush sorcery cache
-            fwrite($socket, "Action: Command\r\n");
-            fwrite($socket, "Command: pjsip reload\r\n");
-            fwrite($socket, "\r\n");
-
+            @fwrite($socket, "Action: Command\r\nCommand: pjsip reload\r\n\r\n");
             $this->readAmiResponse($socket);
 
             // Logoff
-            fwrite($socket, "Action: Logoff\r\n\r\n");
-
-            fclose($socket);
+            @fwrite($socket, "Action: Logoff\r\n\r\n");
+            @fclose($socket);
         } catch (\Throwable $e) {
             Log::warning("SipProvisioning: PJSIP reload failed - {$e->getMessage()}");
         }

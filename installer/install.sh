@@ -720,9 +720,10 @@ configure_asterisk() {
 
 [global]
 type=global
-max_forwards=70
-user_agent=rSwitch PBX
-default_from_user=rswitch
+max_initial_qualify_time=4
+keep_alive_interval=30
+default_outbound_endpoint=
+disable_tcp_switch=yes
 
 [transport-udp]
 type=transport
@@ -731,19 +732,21 @@ bind=0.0.0.0:5060
 local_net=10.0.0.0/8
 local_net=172.16.0.0/12
 local_net=192.168.0.0/16
+cos=5
+tos=0xB8
 
 [transport-tcp]
 type=transport
 protocol=tcp
 bind=0.0.0.0:5060
 
-[transport-tls]
-type=transport
-protocol=tls
-bind=0.0.0.0:5061
-cert_file=/etc/asterisk/keys/asterisk.crt
-priv_key_file=/etc/asterisk/keys/asterisk.key
-method=tlsv1_2
+; [transport-tls]
+; type=transport
+; protocol=tls
+; bind=0.0.0.0:5061
+; cert_file=/etc/asterisk/keys/asterisk.crt
+; priv_key_file=/etc/asterisk/keys/asterisk.key
+; method=tlsv1_2
 
 #include pjsip_trunks.conf
 EOF
@@ -762,115 +765,228 @@ ps_contacts => odbc,rswitch,ps_contacts
 ps_endpoint_id_ips => odbc,rswitch,ps_endpoint_id_ips
 EOF
 
-    # Extensions configuration
-    cat > /etc/asterisk/extensions.conf << 'EOF'
+    # Sorcery configuration (PJSIP realtime mapping)
+    cat > /etc/asterisk/sorcery.conf << 'EOF'
+[res_pjsip]
+endpoint=realtime,ps_endpoints
+auth=realtime,ps_auths
+aor=realtime,ps_aors
+contact=realtime,ps_contacts
+
+[res_pjsip_endpoint_identifier_ip]
+identify=realtime,ps_endpoint_id_ips
+EOF
+
+    # RTP configuration (optimized for 1000+ calls)
+    cat > /etc/asterisk/rtp.conf << 'EOF'
+[general]
+rtpstart=10000
+rtpend=30000
+strictrtp=yes
+icesupport=no
+stunaddr=
+EOF
+
+    # Extensions configuration (Python FastAGI call control on port 4573)
+    if [[ -f "${INSTALL_DIR}/docker/asterisk/conf/extensions.conf" ]]; then
+        cp "${INSTALL_DIR}/docker/asterisk/conf/extensions.conf" /etc/asterisk/extensions.conf
+    else
+        cat > /etc/asterisk/extensions.conf << 'EOF'
 [general]
 static=yes
 writeprotect=yes
-autofallthrough=yes
-clearglobalvars=no
-priorityjumping=no
+clearglobalvars=yes
 
 [globals]
 AGI_HOST=127.0.0.1
 AGI_PORT=4573
 
 [from-internal]
-; Outbound calls from SIP accounts - handled by AGI
 exten => _X.,1,NoOp(Outbound call from ${CALLERID(all)} to ${EXTEN})
- same => n,AGI(agi://${AGI_HOST}:${AGI_PORT}/outbound)
+ same => n,Set(CHANNEL(language)=en)
+ same => n,Set(CHANNEL(hangup_handler_push)=hangup-handler,s,1)
+ same => n,AGI(agi://${AGI_HOST}:${AGI_PORT}/route_outbound)
+ same => n,GotoIf($["${AGISTATUS}" != "SUCCESS"]?error)
+ same => n,GotoIf($["${ROUTE_ACTION}" = "REJECT"]?reject)
+ same => n,GotoIf($["${ROUTE_ACTION}" = "DIAL_INTERNAL"]?internal)
+ same => n,Set(CALLERID(name)=${ROUTE_CLI_NAME})
+ same => n,Set(CALLERID(num)=${ROUTE_CLI_NUM})
+ same => n,ExecIf($["${RECORD_CALL}" = "1"]?MixMonitor(/var/spool/asterisk/recording/${CDR_UUID}.wav,b))
+ same => n,Dial(${ROUTE_DIAL_STRING},${ROUTE_DIAL_TIMEOUT},gT)
+ same => n,GotoIf($["${DIALSTATUS}" = "ANSWER"]?done)
+ same => n,GotoIf($["${ROUTE_FAILOVER}" = ""]?done)
+ same => n,Dial(${ROUTE_FAILOVER},${ROUTE_DIAL_TIMEOUT},gT)
+ same => n,Goto(done)
+ same => n(internal),Set(CALLERID(name)=${ROUTE_CLI_NAME})
+ same => n,Set(CALLERID(num)=${ROUTE_CLI_NUM})
+ same => n,Dial(${ROUTE_DIAL_STRING},${ROUTE_DIAL_TIMEOUT},gT)
+ same => n,Goto(done)
+ same => n(reject),Answer()
+ same => n,Playback(ss-noservice)
  same => n,Hangup()
-
-exten => h,1,AGI(agi://${AGI_HOST}:${AGI_PORT}/hangup)
+ same => n(error),Answer()
+ same => n,Playback(an-error-has-occurred)
+ same => n,Hangup()
+ same => n(done),Hangup()
 
 [from-trunk]
-; Inbound calls from trunks - handled by AGI
-exten => _X.,1,NoOp(Inbound call to ${EXTEN} from ${CALLERID(all)})
- same => n,AGI(agi://${AGI_HOST}:${AGI_PORT}/inbound)
+exten => _X.,1,NoOp(Inbound call from ${CALLERID(all)} to DID ${EXTEN})
+ same => n,Set(CHANNEL(language)=en)
+ same => n,Set(TRUNK_ENDPOINT=${CHANNEL(pjsip,endpoint)})
+ same => n,Set(CHANNEL(hangup_handler_push)=hangup-handler,s,1)
+ same => n,AGI(agi://${AGI_HOST}:${AGI_PORT}/route_inbound)
+ same => n,GotoIf($["${AGISTATUS}" != "SUCCESS"]?error)
+ same => n,GotoIf($["${ROUTE_ACTION}" = "REJECT"]?reject)
+ same => n,Dial(${ROUTE_DIAL_STRING},${ROUTE_DIAL_TIMEOUT},gT)
+ same => n,Goto(done)
+ same => n(reject),Answer()
+ same => n,Playback(ss-noservice)
  same => n,Hangup()
+ same => n(error),Answer()
+ same => n,Playback(an-error-has-occurred)
+ same => n,Hangup()
+ same => n(done),Hangup()
 
-exten => h,1,AGI(agi://${AGI_HOST}:${AGI_PORT}/hangup)
+[hangup-handler]
+exten => s,1,NoOp(Hangup handler — CDR UUID: ${CDR_UUID})
+ same => n,GotoIf($["${CDR_UUID}" = ""]?done)
+ same => n,Set(CALL_DURATION=${CDR(duration)})
+ same => n,Set(CALL_BILLSEC=${CDR(billsec)})
+ same => n,AGI(agi://${AGI_HOST}:${AGI_PORT}/call_end)
+ same => n(done),Return()
 
 [echo-test]
-; Simple echo test for testing
-exten => 600,1,NoOp(Echo Test)
- same => n,Answer()
- same => n,Wait(1)
+exten => 600,1,Answer()
  same => n,Playback(demo-echotest)
  same => n,Echo()
  same => n,Playback(demo-echodone)
  same => n,Hangup()
 EOF
+    fi
 
     # Modules configuration
     cat > /etc/asterisk/modules.conf << 'EOF'
 [modules]
-autoload=yes
+autoload = yes
 
-; Security - disable unused channel drivers
-noload => chan_alsa.so
-noload => chan_console.so
-noload => chan_skinny.so
-noload => chan_unistim.so
-noload => chan_phone.so
-noload => chan_mgcp.so
-noload => chan_oss.so
+; Preload ODBC modules (required for PJSIP realtime to work)
+preload = res_odbc.so
+preload = res_config_odbc.so
 
-; Disable old SIP channel driver (use PJSIP)
-noload => chan_sip.so
+; Disable unused channel drivers
+noload = chan_alsa.so
+noload = chan_console.so
+noload = chan_skinny.so
+noload = chan_unistim.so
+noload = chan_phone.so
+noload = chan_mgcp.so
+noload = chan_oss.so
+noload = chan_sip.so
+noload = chan_iax2.so
+noload = chan_dahdi.so
 
-; Disable IAX2 if not needed
-noload => chan_iax2.so
+; Disable unused backends
+noload = res_pjsip_phoneprov.so
+noload = res_config_pgsql.so
+noload = res_config_ldap.so
+noload = res_corosync.so
+noload = res_snmp.so
+noload = res_xmpp.so
+noload = res_smdi.so
 
-; Disable unused apps
-noload => app_festival.so
-noload => app_amd.so
-noload => app_followme.so
-noload => app_page.so
-noload => app_minivm.so
-noload => app_zapateller.so
-
-; Load PJSIP
-load => res_pjproject.so
-load => res_pjsip.so
-load => res_pjsip_session.so
-load => res_pjsip_authenticator_digest.so
-load => res_pjsip_endpoint_identifier_ip.so
-load => res_pjsip_endpoint_identifier_user.so
-load => res_pjsip_outbound_authenticator_digest.so
-load => res_pjsip_registrar.so
-load => res_pjsip_transport_websocket.so
-load => chan_pjsip.so
-
-; ODBC/Realtime
-load => res_odbc.so
-load => res_config_odbc.so
-load => func_odbc.so
-load => cdr_odbc.so
-load => cdr_custom.so
-load => res_realtime.so
+; Performance: disable unused features
+noload = cdr_adaptive_odbc.so
+noload = res_pjsip_history.so
+noload = res_hep.so
+noload = res_hep_pjsip.so
+noload = res_hep_rtcp.so
+noload = res_calendar.so
+noload = res_fax.so
+noload = res_fax_spandsp.so
+noload = app_festival.so
+noload = app_amd.so
+noload = app_followme.so
+noload = app_page.so
+noload = app_minivm.so
+noload = app_zapateller.so
 EOF
 
     # Manager configuration (AMI)
+    AMI_SECRET=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)
     cat > /etc/asterisk/manager.conf << EOF
 [general]
 enabled = yes
 port = 5038
 bindaddr = 127.0.0.1
-displayconnects = yes
+webenabled = no
 
 [rswitch]
-secret = ${DB_PASS}
+secret = ${AMI_SECRET}
 deny = 0.0.0.0/0.0.0.0
 permit = 127.0.0.1/255.255.255.255
-read = all
-write = all
-writetimeout = 5000
-eventfilter = !Event: RTCP*
-eventfilter = !Event: VarSet
-eventfilter = !Event: Cdr
-eventfilter = !Event: NewExten
+read = command,system,call,cdr
+write = command,system,call
 EOF
+
+    # Logger configuration (with security log for Fail2Ban)
+    cat > /etc/asterisk/logger.conf << 'EOF'
+[general]
+dateformat=%F %T.%3q
+
+[logfiles]
+console => notice,warning,error
+messages => notice,warning,error
+full => notice,warning,error,debug,verbose
+security => security
+EOF
+
+    # Asterisk core configuration
+    # Detect module path for this OS
+    if [[ -d "/usr/lib/x86_64-linux-gnu/asterisk/modules" ]]; then
+        AST_MOD_DIR="/usr/lib/x86_64-linux-gnu/asterisk/modules"
+    elif [[ -d "/usr/lib64/asterisk/modules" ]]; then
+        AST_MOD_DIR="/usr/lib64/asterisk/modules"
+    else
+        AST_MOD_DIR="/usr/lib/asterisk/modules"
+    fi
+
+    cat > /etc/asterisk/asterisk.conf << EOF
+[directories]
+astetcdir => /etc/asterisk
+astmoddir => ${AST_MOD_DIR}
+astvarlibdir => /var/lib/asterisk
+astdbdir => /var/lib/asterisk
+astkeydir => /var/lib/asterisk
+astdatadir => /usr/share/asterisk
+astagidir => /usr/share/asterisk/agi-bin
+astspooldir => /var/spool/asterisk
+astrundir => /var/run/asterisk
+astlogdir => /var/log/asterisk
+
+[options]
+runuser = asterisk
+rungroup = asterisk
+verbose = 1
+debug = 0
+highpriority = yes
+maxcalls = 1200
+maxload = 0.9
+transmit_silence = yes
+hideconnect = yes
+EOF
+
+    # File descriptor limits for high call volume
+    cat > /etc/security/limits.d/asterisk.conf << 'LIMEOF'
+asterisk soft nofile 65536
+asterisk hard nofile 65536
+LIMEOF
+
+    mkdir -p /etc/systemd/system/asterisk.service.d
+    cat > /etc/systemd/system/asterisk.service.d/limits.conf << 'LIMEOF'
+[Service]
+LimitNOFILE=65536
+LIMEOF
+    systemctl daemon-reload
 
     # Create SSL directory
     mkdir -p /etc/asterisk/keys
@@ -948,9 +1064,12 @@ install_application() {
     chown ${WEB_USER}:${WEB_USER} .env
 
     # Add AGI and AMI configuration
+    # Read AMI secret from manager.conf (generated during configure_asterisk)
+    AMI_SECRET_FOR_ENV=$(grep '^secret' /etc/asterisk/manager.conf 2>/dev/null | head -1 | awk -F'= ' '{print $2}' | tr -d ' ')
+
     cat >> .env << EOF
 
-# Asterisk AGI Server
+# Asterisk AGI Server (Python FastAGI)
 AGI_HOST=127.0.0.1
 AGI_PORT=4573
 
@@ -958,7 +1077,7 @@ AGI_PORT=4573
 AMI_HOST=127.0.0.1
 AMI_PORT=5038
 AMI_USER=rswitch
-AMI_SECRET=${DB_PASS}
+AMI_SECRET=${AMI_SECRET_FOR_ENV}
 EOF
 
     # Generate application key
@@ -967,6 +1086,25 @@ EOF
     # Run migrations
     log_info "Running database migrations..."
     sudo -u ${WEB_USER} php artisan migrate --force
+
+    # Fix ps_contacts table for Asterisk 20+ compatibility
+    log_info "Updating ps_contacts table for Asterisk compatibility..."
+    mysql -u${DB_USER} -p"${DB_PASS}" ${DB_NAME} -e "
+        ALTER TABLE ps_contacts
+            ADD COLUMN IF NOT EXISTS via_addr VARCHAR(40) DEFAULT NULL,
+            ADD COLUMN IF NOT EXISTS via_port INT DEFAULT NULL,
+            ADD COLUMN IF NOT EXISTS call_id VARCHAR(255) DEFAULT NULL,
+            ADD COLUMN IF NOT EXISTS endpoint VARCHAR(40) DEFAULT NULL,
+            ADD COLUMN IF NOT EXISTS prune_on_boot VARCHAR(5) DEFAULT 'no',
+            ADD COLUMN IF NOT EXISTS authenticate_qualify VARCHAR(5) DEFAULT 'no',
+            ADD COLUMN IF NOT EXISTS qualify_timeout FLOAT DEFAULT 3.0;
+    " 2>/dev/null || {
+        # MySQL < 8.0.16 doesn't support IF NOT EXISTS for ADD COLUMN
+        for col in "via_addr VARCHAR(40)" "via_port INT" "call_id VARCHAR(255)" "endpoint VARCHAR(40)" "prune_on_boot VARCHAR(5) DEFAULT 'no'" "authenticate_qualify VARCHAR(5) DEFAULT 'no'" "qualify_timeout FLOAT DEFAULT 3.0"; do
+            COL_NAME=$(echo "$col" | awk '{print $1}')
+            mysql -u${DB_USER} -p"${DB_PASS}" ${DB_NAME} -e "ALTER TABLE ps_contacts ADD COLUMN $col;" 2>/dev/null || true
+        done
+    }
 
     # Seed database
     log_info "Seeding database..."

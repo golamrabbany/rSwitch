@@ -310,39 +310,121 @@
         </div>
     @endif
 
-    {{-- Lazy-load registration status via AJAX --}}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const cells = document.querySelectorAll('.reg-status');
-            if (!cells.length) return;
+@push('scripts')
+<script>
+(function() {
+    const WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws/live-calls';
+    const cells = document.querySelectorAll('.reg-status');
+    if (!cells.length) return;
 
-            const usernames = Array.from(cells).map(el => el.dataset.username);
+    // Build username → cell map for fast updates
+    const cellMap = {};
+    const usernames = [];
+    cells.forEach(cell => {
+        const u = cell.dataset.username;
+        cellMap[u] = cell;
+        usernames.push(u);
+    });
 
-            fetch('{{ route('admin.sip-accounts.registration-status') }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({ usernames: usernames })
-            })
-            .then(r => r.json())
-            .then(contacts => {
-                cells.forEach(cell => {
-                    const username = cell.dataset.username;
-                    if (contacts[username]) {
-                        cell.innerHTML = '<span class="text-emerald-600">Registered (' + contacts[username].ip + ')</span>';
-                    } else {
-                        cell.innerHTML = '<span class="text-gray-400">Unregistered</span>';
-                    }
-                });
-            })
-            .catch(() => {
-                cells.forEach(cell => {
-                    cell.innerHTML = '<span class="text-gray-400">Unregistered</span>';
-                });
-            });
+    // 1. Load initial status via REST (faster than waiting for WS snapshot)
+    fetch('{{ route('admin.sip-accounts.registration-status') }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ usernames: usernames })
+    })
+    .then(r => r.json())
+    .then(contacts => applyStatus(contacts))
+    .catch(() => {});
+
+    // 2. Connect WebSocket for real-time updates
+    let ws = null;
+    let reconnectAttempts = 0;
+
+    function connect() {
+        ws = new WebSocket(WS_URL);
+
+        ws.onopen = function() {
+            reconnectAttempts = 0;
+        };
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'sip_registered') {
+                const cell = cellMap[data.username];
+                if (cell) {
+                    setRegistered(cell, data.ip);
+                    flashCell(cell, 'bg-emerald-50');
+                }
+            }
+
+            if (data.type === 'sip_unregistered') {
+                const cell = cellMap[data.username];
+                if (cell) {
+                    setUnregistered(cell);
+                    flashCell(cell, 'bg-red-50');
+                }
+            }
+        };
+
+        ws.onclose = function() {
+            if (reconnectAttempts < 10) {
+                reconnectAttempts++;
+                setTimeout(connect, Math.min(1000 * reconnectAttempts, 10000));
+            }
+        };
+    }
+
+    function applyStatus(contacts) {
+        cells.forEach(cell => {
+            const username = cell.dataset.username;
+            if (contacts[username]) {
+                setRegistered(cell, contacts[username].ip);
+            } else {
+                setUnregistered(cell);
+            }
         });
-    </script>
+    }
+
+    function setRegistered(cell, ip) {
+        cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-emerald-600">' +
+            '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>' +
+            'Registered (' + escapeHtml(ip) + ')' +
+            '</span>';
+    }
+
+    function setUnregistered(cell) {
+        cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-gray-400">' +
+            '<span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>' +
+            'Unregistered' +
+            '</span>';
+    }
+
+    function flashCell(cell, colorClass) {
+        const row = cell.closest('tr');
+        if (row) {
+            row.classList.add(colorClass);
+            setTimeout(() => row.classList.remove(colorClass), 2000);
+        }
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // Keep alive
+    setInterval(function() {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send('ping');
+    }, 25000);
+
+    connect();
+})();
+</script>
+@endpush
 </x-admin-layout>
