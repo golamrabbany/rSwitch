@@ -356,7 +356,7 @@
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-indigo-800">Auto Provisioning</p>
-                                <p class="text-xs text-indigo-600">Trunk will be provisioned to Asterisk automatically</p>
+                                <p class="text-xs text-indigo-600">Trunk will be provisioned to rSwitch automatically</p>
                             </div>
                         </div>
 

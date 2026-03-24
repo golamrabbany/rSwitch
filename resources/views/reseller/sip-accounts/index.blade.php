@@ -412,8 +412,8 @@ function sipPage() {
     const usernames = [];
     cells.forEach(cell => { const u = cell.dataset.username; cellMap[u] = cell; usernames.push(u); });
 
-    function setReg(cell, ip) { cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-emerald-600 text-sm"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Registered (' + ip + ')</span>'; }
-    function setUnreg(cell) { cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-gray-400 text-sm"><span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>Unregistered</span>'; }
+    function setReg(cell, ip) { cell.innerHTML = '<div><span class="inline-flex items-center gap-1.5 text-emerald-600 text-xs font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Registered</span>' + (ip ? '<div class="text-xs text-gray-400 font-mono mt-0.5">' + ip + '</div>' : '') + '</div>'; }
+    function setUnreg(cell) { cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-gray-400 text-xs"><span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>Unregistered</span>'; }
 
     fetch('{{ route("reseller.sip-accounts.registration-status") }}', {
         method: 'POST',

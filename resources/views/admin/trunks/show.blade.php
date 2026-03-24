@@ -50,7 +50,7 @@
                 </svg>
                 Edit
             </a>
-            <form method="POST" action="{{ route('admin.trunks.destroy', $trunk) }}" class="inline" onsubmit="return confirm('Delete this trunk? This will also remove it from Asterisk.')">
+            <form method="POST" action="{{ route('admin.trunks.destroy', $trunk) }}" class="inline" onsubmit="return confirm('Delete this trunk? This will also remove it from rSwitch.')">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="btn-danger">
@@ -286,7 +286,7 @@
             {{-- Provisioning Status --}}
             <div class="detail-card">
                 <div class="detail-card-header">
-                    <h3 class="detail-card-title">Asterisk Status</h3>
+                    <h3 class="detail-card-title">rSwitch Status</h3>
                 </div>
                 <div class="detail-card-body">
                     @if($provisioned)

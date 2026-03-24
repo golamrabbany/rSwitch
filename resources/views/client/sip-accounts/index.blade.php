@@ -153,8 +153,8 @@
                 var username = cell.dataset.username;
                 var info = data[username];
                 if (info && info.registered) {
-                    cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Registered</span>' +
-                        '<div class="text-xs text-gray-400 mt-0.5">' + (info.contact || '') + '</div>';
+                    var ip = info.ip || info.contact || '';
+                    cell.innerHTML = '<div><span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Registered</span>' + (ip ? '<div class="text-xs text-gray-400 font-mono mt-0.5">' + ip + '</div>' : '') + '</div>';
                 } else {
                     cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-xs text-gray-400"><span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>Unregistered</span>';
                 }

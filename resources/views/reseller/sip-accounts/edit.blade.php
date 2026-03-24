@@ -63,7 +63,7 @@
                         <option value="suspended" {{ old('status', $sipAccount->status) === 'suspended' ? 'selected' : '' }}>Suspended</option>
                         <option value="disabled" {{ old('status', $sipAccount->status) === 'disabled' ? 'selected' : '' }}>Disabled</option>
                     </select>
-                    <p class="mt-1 text-xs text-gray-500">Suspended/disabled accounts are deprovisioned from Asterisk.</p>
+                    <p class="mt-1 text-xs text-gray-500">Suspended/disabled accounts are deprovisioned from rSwitch.</p>
                     <x-input-error :messages="$errors->get('status')" class="mt-2" />
                 </div>
 

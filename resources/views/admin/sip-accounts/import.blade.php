@@ -433,7 +433,7 @@
                                 <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
                                     <span class="text-xs font-bold text-indigo-600">4</span>
                                 </div>
-                                <p class="text-sm text-gray-600">Active accounts are automatically provisioned to Asterisk</p>
+                                <p class="text-sm text-gray-600">Active accounts are automatically provisioned to rSwitch</p>
                             </div>
                         </div>
                     </div>

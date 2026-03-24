@@ -43,7 +43,7 @@
                 </svg>
                 Edit
             </a>
-            <form method="POST" action="{{ route('admin.sip-accounts.destroy', $sipAccount) }}" class="inline" onsubmit="return confirm('Delete this SIP account? This will also remove it from Asterisk.')">
+            <form method="POST" action="{{ route('admin.sip-accounts.destroy', $sipAccount) }}" class="inline" onsubmit="return confirm('Delete this SIP account? This will also remove it from rSwitch.')">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="btn-danger">
@@ -206,7 +206,7 @@
             {{-- Provisioning Status --}}
             <div class="detail-card">
                 <div class="detail-card-header">
-                    <h3 class="detail-card-title">Asterisk Status</h3>
+                    <h3 class="detail-card-title">rSwitch Status</h3>
                 </div>
                 <div class="detail-card-body">
                     @if($provisioned)
@@ -218,7 +218,7 @@
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-emerald-800">Provisioned</p>
-                                <p class="text-xs text-emerald-600">Active in Asterisk realtime</p>
+                                <p class="text-xs text-emerald-600">Active in rSwitch</p>
                             </div>
                         </div>
                     @else
@@ -230,7 +230,7 @@
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-red-800">Not Provisioned</p>
-                                <p class="text-xs text-red-600">Not in Asterisk realtime</p>
+                                <p class="text-xs text-red-600">Not provisioned</p>
                             </div>
                         </div>
                     @endif

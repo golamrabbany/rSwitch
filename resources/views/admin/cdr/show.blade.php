@@ -172,10 +172,10 @@
                 </div>
             </div>
 
-            {{-- Asterisk Technical Details --}}
+            {{-- Technical Details --}}
             <div class="detail-card">
                 <div class="detail-card-header">
-                    <h3 class="detail-card-title">Asterisk Technical Details</h3>
+                    <h3 class="detail-card-title">Technical Details</h3>
                 </div>
                 <div class="detail-card-body">
                     <div class="space-y-3">

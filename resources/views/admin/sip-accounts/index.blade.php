@@ -406,17 +406,17 @@
     }
 
     function setRegistered(cell, ip) {
-        cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-emerald-600">' +
+        cell.innerHTML = '<div><span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">' +
             '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>' +
-            'Registered (' + escapeHtml(ip) + ')' +
-            '</span>';
+            'Registered</span>' +
+            (ip ? '<div class="text-xs text-gray-400 font-mono mt-0.5">' + escapeHtml(ip) + '</div>' : '') +
+            '</div>';
     }
 
     function setUnregistered(cell) {
-        cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-gray-400">' +
+        cell.innerHTML = '<span class="inline-flex items-center gap-1.5 text-xs text-gray-400">' +
             '<span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>' +
-            'Unregistered' +
-            '</span>';
+            'Unregistered</span>';
     }
 
     function flashCell(cell, colorClass) {
