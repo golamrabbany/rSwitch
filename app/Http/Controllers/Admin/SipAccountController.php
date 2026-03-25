@@ -170,9 +170,21 @@ class SipAccountController extends Controller
         }
         $clientIds = $clientQuery->pluck('id')->toArray();
 
+        // SIP PIN settings
+        $pinPrefix = \App\Models\SystemSetting::get('sip_pin_prefix', '');
+        $pinMinLen = \App\Models\SystemSetting::get('sip_pin_min_length', 4);
+        $pinMaxLen = \App\Models\SystemSetting::get('sip_pin_max_length', 10);
+
+        $usernameRules = ['required', 'string', 'unique:sip_accounts,username', 'regex:/^\d+$/'];
+        $usernameRules[] = "min:{$pinMinLen}";
+        $usernameRules[] = "max:{$pinMaxLen}";
+        if ($pinPrefix) {
+            $usernameRules[] = "starts_with:{$pinPrefix}";
+        }
+
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id', Rule::in($clientIds)],
-            'username' => ['required', 'string', 'max:40', 'unique:sip_accounts,username', 'alpha_dash'],
+            'username' => $usernameRules,
             'password' => ['required', 'string', 'min:6', 'max:80'],
             'auth_type' => ['required', Rule::in(['password', 'ip', 'both'])],
             'allowed_ips' => ['nullable', 'required_if:auth_type,ip', 'required_if:auth_type,both', 'string', 'max:500'],
@@ -182,6 +194,12 @@ class SipAccountController extends Controller
             'codec_allow' => ['required', 'string', 'max:100'],
             'allow_p2p' => ['boolean'],
             'allow_recording' => ['boolean'],
+        ], [
+            'username.regex' => 'PIN must contain only numeric digits.',
+            'username.min' => "PIN must be at least {$pinMinLen} digits.",
+            'username.max' => "PIN must not exceed {$pinMaxLen} digits.",
+            'username.starts_with' => "PIN must start with prefix '{$pinPrefix}'.",
+            'username.unique' => 'This PIN is already in use.',
         ]);
 
         // Handle checkbox boolean conversion (unchecked checkboxes send nothing)
@@ -570,9 +588,23 @@ class SipAccountController extends Controller
                         continue;
                     }
 
-                    // Validate username format
-                    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $username)) {
-                        $results['errors'][] = "Row {$rowNum}: Username '{$username}' contains invalid characters (alphanumeric, dashes, underscores only)";
+                    // Validate username format against PIN settings
+                    $importPinPrefix = \App\Models\SystemSetting::get('sip_pin_prefix', '');
+                    $importPinMinLen = \App\Models\SystemSetting::get('sip_pin_min_length', 4);
+                    $importPinMaxLen = \App\Models\SystemSetting::get('sip_pin_max_length', 10);
+
+                    if (!preg_match('/^\d+$/', $username)) {
+                        $results['errors'][] = "Row {$rowNum}: Username '{$username}' must be numeric digits only";
+                        $results['skipped']++;
+                        continue;
+                    }
+                    if (strlen($username) < $importPinMinLen || strlen($username) > $importPinMaxLen) {
+                        $results['errors'][] = "Row {$rowNum}: Username '{$username}' must be {$importPinMinLen}-{$importPinMaxLen} digits";
+                        $results['skipped']++;
+                        continue;
+                    }
+                    if ($importPinPrefix && !str_starts_with($username, $importPinPrefix)) {
+                        $results['errors'][] = "Row {$rowNum}: Username '{$username}' must start with prefix '{$importPinPrefix}'";
                         $results['skipped']++;
                         continue;
                     }
