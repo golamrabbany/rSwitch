@@ -166,6 +166,7 @@ update_application() {
     mkdir -p "$INSTALL_DIR/storage/app/private/voice-files"
     chown asterisk:asterisk /var/spool/asterisk/recording
     chown asterisk:asterisk /var/spool/asterisk/voicebroadcast
+    chmod 775 /var/spool/asterisk/voicebroadcast
     chown asterisk:asterisk /var/spool/asterisk/outgoing
     chmod 775 /var/spool/asterisk/outgoing
     usermod -aG asterisk www-data 2>/dev/null || true

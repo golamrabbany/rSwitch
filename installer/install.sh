@@ -986,6 +986,7 @@ EOF
     mkdir -p /var/spool/asterisk/outgoing
     mkdir -p /var/spool/asterisk/recording
     chown asterisk:asterisk /var/spool/asterisk/voicebroadcast
+    chmod 775 /var/spool/asterisk/voicebroadcast
     chown asterisk:asterisk /var/spool/asterisk/recording
     # outgoing: www-data writes .call files, asterisk reads them
     chown asterisk:asterisk /var/spool/asterisk/outgoing

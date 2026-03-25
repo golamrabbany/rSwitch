@@ -8,8 +8,8 @@ import time
 import logging
 import redis
 from sqlalchemy import text
-from celery_app import celery_app
-from database import get_session
+from celery_app import app as celery_app
+from shared.database import get_session
 
 logger = logging.getLogger(__name__)
 
