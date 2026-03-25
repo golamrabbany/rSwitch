@@ -53,7 +53,7 @@
                           return;
                       }
                       this.clientLoading = true;
-                      fetch('{{ route('admin.broadcasts.search-clients') }}?q=' + encodeURIComponent(this.clientSearch), {
+                      fetch('{{ route('admin.sip-accounts.search-clients') }}?q=' + encodeURIComponent(this.clientSearch), {
                           headers: { 'X-Requested-With': 'XMLHttpRequest' }
                       })
                       .then(r => r.json())

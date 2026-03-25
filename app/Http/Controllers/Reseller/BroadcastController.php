@@ -35,7 +35,11 @@ class BroadcastController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
-        return view('reseller.broadcasts.create', compact('clients'));
+        $clientsJson = $clients->map(function ($c) {
+            return ['id' => $c->id, 'name' => $c->name, 'email' => $c->email];
+        })->values()->toArray();
+
+        return view('reseller.broadcasts.create', compact('clients', 'clientsJson'));
     }
 
     public function store(Request $request, BroadcastService $service)

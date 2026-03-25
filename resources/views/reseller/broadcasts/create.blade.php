@@ -24,6 +24,8 @@
         </div>
     </div>
 
+    <script>var _allClients = @json($clientsJson);</script>
+
     <form method="POST" action="{{ route('reseller.broadcasts.store') }}" enctype="multipart/form-data"
           x-data="{
               type: '{{ old('type', 'simple') }}',
@@ -46,20 +48,14 @@
                   }
               },
               searchClients() {
-                  clearTimeout(this.clientDebounce);
-                  this.clientDebounce = setTimeout(() => {
-                      if (!this.clientSearch || this.clientSearch.length < 2) {
-                          this.clientResults = [];
-                          return;
-                      }
-                      this.clientLoading = true;
-                      fetch('{{ route('reseller.broadcasts.search-clients') }}?q=' + encodeURIComponent(this.clientSearch), {
-                          headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                      })
-                      .then(r => r.json())
-                      .then(data => { this.clientResults = data; this.clientLoading = false; })
-                      .catch(() => { this.clientLoading = false; });
-                  }, 300);
+                  if (!this.clientSearch || this.clientSearch.length < 1) {
+                      this.clientResults = _allClients.slice(0, 5);
+                      return;
+                  }
+                  var q = this.clientSearch.toLowerCase();
+                  this.clientResults = _allClients.filter(function(c) {
+                      return c.name.toLowerCase().indexOf(q) > -1 || c.email.toLowerCase().indexOf(q) > -1;
+                  }).slice(0, 5);
               },
               selectClient(user) {
                   this.clientSearch = user.name;
