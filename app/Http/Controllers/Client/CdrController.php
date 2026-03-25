@@ -60,7 +60,9 @@ class CdrController extends Controller
 
         $record->load('sipAccount:id,username,status');
 
-        return view('client.cdr.show', compact('record'));
+        $hasRecording = file_exists(config('filesystems.disks.recordings.root') . '/' . $record->uuid . '.wav');
+
+        return view('client.cdr.show', compact('record', 'hasRecording'));
     }
 
     public function export(Request $request)

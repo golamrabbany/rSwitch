@@ -66,7 +66,9 @@ class CdrController extends Controller
             'did:id,number',
         ]);
 
-        return view('admin.cdr.show', compact('record'));
+        $hasRecording = file_exists(config('filesystems.disks.recordings.root') . '/' . $record->uuid . '.wav');
+
+        return view('admin.cdr.show', compact('record', 'hasRecording'));
     }
 
     public function export(Request $request)

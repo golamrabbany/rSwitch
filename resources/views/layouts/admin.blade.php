@@ -109,7 +109,7 @@
                 @php
                     $telecomActive = request()->routeIs('admin.sip-accounts.*', 'admin.dids.*', 'admin.ring-groups.*');
                     if ($isSuperAdmin) {
-                        $telecomActive = $telecomActive || request()->routeIs('admin.trunks.*', 'admin.trunk-routes.*', 'admin.rate-groups.*');
+                        $telecomActive = $telecomActive || request()->routeIs('admin.trunks.*', 'admin.trunk-routes.*', 'admin.trunk-monitor.*', 'admin.rate-groups.*');
                     }
                 @endphp
                 <div x-data="{ open: {{ $telecomActive ? 'true' : 'false' }} }" class="mb-1">
@@ -129,6 +129,7 @@
                         @if($isSuperAdmin)
                             <a href="{{ route('admin.trunks.index') }}" class="nav-child {{ request()->routeIs('admin.trunks.*') ? 'active' : 'text-gray-500' }}">Trunks</a>
                             <a href="{{ route('admin.trunk-routes.index') }}" class="nav-child {{ request()->routeIs('admin.trunk-routes.*') ? 'active' : 'text-gray-500' }}">Routing Rules</a>
+                            <a href="{{ route('admin.trunk-monitor.index') }}" class="nav-child {{ request()->routeIs('admin.trunk-monitor.*') ? 'active' : 'text-gray-500' }}">Trunk Monitor</a>
                         @endif
                         <a href="{{ route('admin.dids.index') }}" class="nav-child {{ request()->routeIs('admin.dids.*') ? 'active' : 'text-gray-500' }}">DIDs</a>
                         <a href="{{ route('admin.ring-groups.index') }}" class="nav-child {{ request()->routeIs('admin.ring-groups.*') ? 'active' : 'text-gray-500' }}">Ring Groups</a>
@@ -170,6 +171,7 @@
                         <a href="{{ route('admin.operational-reports.daily') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.daily') ? 'active' : 'text-gray-500' }}">Daily Summary</a>
                         <a href="{{ route('admin.operational-reports.monthly') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.monthly') ? 'active' : 'text-gray-500' }}">Monthly Summary</a>
                         <a href="{{ route('admin.operational-reports.hourly') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.hourly') ? 'active' : 'text-gray-500' }}">Hourly Summary</a>
+                        <a href="{{ route('admin.operational-reports.profit-loss') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.profit-loss*') ? 'active' : 'text-gray-500' }}">Profit & Loss</a>
                     </div>
                 </div>
 

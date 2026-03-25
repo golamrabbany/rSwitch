@@ -1338,6 +1338,207 @@ class OperationalReportController extends Controller
     }
 
     /**
+     * Profit & Loss Report — grouped by reseller.
+     */
+    public function profitLoss(Request $request)
+    {
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfDay()
+            : Carbon::now()->subDays(30)->startOfDay();
+
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfDay()
+            : Carbon::now()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfDay();
+        }
+
+        // Cap at 365 days
+        if ($dateFrom->diffInDays($dateTo) > 365) {
+            $dateTo = $dateFrom->copy()->addDays(365)->endOfDay();
+        }
+
+        $data = CallRecord::query()
+            ->whereBetween('call_start', [$dateFrom, $dateTo])
+            ->whereNotNull('reseller_id')
+            ->join('users', 'users.id', '=', 'call_records.reseller_id')
+            ->groupBy('call_records.reseller_id', 'users.name')
+            ->selectRaw('
+                call_records.reseller_id,
+                users.name as reseller_name,
+                COUNT(*) as total_calls,
+                SUM(call_records.disposition = "ANSWERED") as answered_calls,
+                COALESCE(SUM(CASE WHEN call_records.disposition = "ANSWERED" THEN call_records.billable_duration ELSE 0 END), 0) as total_billable,
+                COALESCE(SUM(call_records.total_cost), 0) as client_revenue,
+                COALESCE(SUM(call_records.reseller_cost), 0) as reseller_cost
+            ')
+            ->orderByDesc('client_revenue')
+            ->get();
+
+        // Compute per-row derived fields
+        $data->transform(function ($row) {
+            $row->minutes = round($row->total_billable / 60, 2);
+            $row->profit = $row->client_revenue - $row->reseller_cost;
+            $row->margin_pct = $row->client_revenue > 0
+                ? round(($row->profit / $row->client_revenue) * 100, 1)
+                : 0;
+            $row->asr = $row->total_calls > 0
+                ? round(($row->answered_calls / $row->total_calls) * 100, 1)
+                : 0;
+            return $row;
+        });
+
+        // Totals
+        $totalRevenue = $data->sum('client_revenue');
+        $totalResellerCost = $data->sum('reseller_cost');
+        $totalProfit = $totalRevenue - $totalResellerCost;
+        $avgMargin = $totalRevenue > 0 ? round(($totalProfit / $totalRevenue) * 100, 1) : 0;
+        $totalCalls = $data->sum('total_calls');
+        $totalAnswered = $data->sum('answered_calls');
+        $totalMinutes = $data->sum('minutes');
+
+        // Chart data: top 10 resellers by profit
+        $chartItems = $data->sortByDesc('profit')->take(10);
+        $chartLabels = $chartItems->pluck('reseller_name')->values();
+        $chartData = $chartItems->pluck('profit')->values();
+
+        return view('admin.operational-reports.profit-loss', compact(
+            'data',
+            'dateFrom',
+            'dateTo',
+            'totalRevenue',
+            'totalResellerCost',
+            'totalProfit',
+            'avgMargin',
+            'totalCalls',
+            'totalAnswered',
+            'totalMinutes',
+            'chartLabels',
+            'chartData'
+        ));
+    }
+
+    /**
+     * Export Profit & Loss as XLSX.
+     */
+    public function exportProfitLoss(Request $request)
+    {
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfDay()
+            : Carbon::now()->subDays(30)->startOfDay();
+
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfDay()
+            : Carbon::now()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfDay();
+        }
+
+        if ($dateFrom->diffInDays($dateTo) > 365) {
+            $dateTo = $dateFrom->copy()->addDays(365)->endOfDay();
+        }
+
+        $data = CallRecord::query()
+            ->whereBetween('call_start', [$dateFrom, $dateTo])
+            ->whereNotNull('reseller_id')
+            ->join('users', 'users.id', '=', 'call_records.reseller_id')
+            ->groupBy('call_records.reseller_id', 'users.name')
+            ->selectRaw('
+                call_records.reseller_id,
+                users.name as reseller_name,
+                COUNT(*) as total_calls,
+                SUM(call_records.disposition = "ANSWERED") as answered_calls,
+                COALESCE(SUM(CASE WHEN call_records.disposition = "ANSWERED" THEN call_records.billable_duration ELSE 0 END), 0) as total_billable,
+                COALESCE(SUM(call_records.total_cost), 0) as client_revenue,
+                COALESCE(SUM(call_records.reseller_cost), 0) as reseller_cost
+            ')
+            ->orderByDesc('client_revenue')
+            ->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Profit & Loss');
+
+        $headers = ['#', 'Reseller', 'Total Calls', 'Answered', 'ASR%', 'Minutes', 'Client Revenue', 'Reseller Cost', 'Profit', 'Margin %'];
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue(chr(65 + $col) . '1', $header);
+        }
+        $lastCol = chr(64 + count($headers));
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4338CA']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['bottom' => ['borderStyle' => Border::BORDER_THIN]],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        $row = 2;
+        $totalRevenue = 0;
+        $totalResellerCost = 0;
+        $totalCalls = 0;
+        $totalAnswered = 0;
+        $totalMinutes = 0;
+
+        foreach ($data as $i => $r) {
+            $minutes = round($r->total_billable / 60, 2);
+            $profit = $r->client_revenue - $r->reseller_cost;
+            $margin = $r->client_revenue > 0 ? round(($profit / $r->client_revenue) * 100, 1) : 0;
+            $asr = $r->total_calls > 0 ? round(($r->answered_calls / $r->total_calls) * 100, 1) : 0;
+
+            $sheet->setCellValue("A{$row}", $i + 1);
+            $sheet->setCellValue("B{$row}", $r->reseller_name);
+            $sheet->setCellValue("C{$row}", $r->total_calls);
+            $sheet->setCellValue("D{$row}", $r->answered_calls);
+            $sheet->setCellValue("E{$row}", $asr . '%');
+            $sheet->setCellValue("F{$row}", number_format($minutes, 2));
+            $sheet->setCellValue("G{$row}", number_format((float) $r->client_revenue, 4));
+            $sheet->setCellValue("H{$row}", number_format((float) $r->reseller_cost, 4));
+            $sheet->setCellValue("I{$row}", number_format($profit, 4));
+            $sheet->setCellValue("J{$row}", $margin . '%');
+
+            if ($row % 2 === 0) {
+                $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('EEF2FF');
+            }
+
+            $totalRevenue += $r->client_revenue;
+            $totalResellerCost += $r->reseller_cost;
+            $totalCalls += $r->total_calls;
+            $totalAnswered += $r->answered_calls;
+            $totalMinutes += $minutes;
+            $row++;
+        }
+
+        // Totals row
+        $totalProfit = $totalRevenue - $totalResellerCost;
+        $totalMargin = $totalRevenue > 0 ? round(($totalProfit / $totalRevenue) * 100, 1) : 0;
+        $sheet->setCellValue("A{$row}", '');
+        $sheet->setCellValue("B{$row}", 'TOTAL');
+        $sheet->setCellValue("C{$row}", $totalCalls);
+        $sheet->setCellValue("D{$row}", $totalAnswered);
+        $sheet->setCellValue("E{$row}", '');
+        $sheet->setCellValue("F{$row}", number_format($totalMinutes, 2));
+        $sheet->setCellValue("G{$row}", number_format($totalRevenue, 4));
+        $sheet->setCellValue("H{$row}", number_format($totalResellerCost, 4));
+        $sheet->setCellValue("I{$row}", number_format($totalProfit, 4));
+        $sheet->setCellValue("J{$row}", $totalMargin . '%');
+        $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getFont()->setBold(true);
+
+        foreach (range('A', $lastCol) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'profit-loss-' . $dateFrom->format('Y-m-d') . '-to-' . $dateTo->format('Y-m-d') . '.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    /**
      * Get reseller and trunk lists for filter dropdowns.
      */
     private function getFilterOptions(User $authUser): array

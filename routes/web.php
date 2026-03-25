@@ -56,6 +56,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:super_admin'])
     Route::post('trunk-routes/test', [Admin\TrunkRouteController::class, 'testRoute'])->name('trunk-routes.test');
     Route::resource('trunk-routes', Admin\TrunkRouteController::class)->except(['show']);
 
+    Route::get('trunk-monitor', [Admin\TrunkMonitorController::class, 'index'])->name('trunk-monitor.index');
+    Route::post('trunk-monitor/refresh', [Admin\TrunkMonitorController::class, 'refresh'])->name('trunk-monitor.refresh');
+
     // Rate Groups & Rates (global system)
     Route::resource('rate-groups', Admin\RateGroupController::class);
     Route::get('rate-groups/{rate_group}/export', [Admin\RateGroupController::class, 'exportCsv'])->name('rate-groups.export');
@@ -124,6 +127,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('cdr', [Admin\CdrController::class, 'index'])->name('cdr.index');
     Route::get('cdr/export', [Admin\CdrController::class, 'export'])->name('cdr.export');
     Route::get('cdr/{uuid}', [Admin\CdrController::class, 'show'])->name('cdr.show');
+    Route::get('cdr/{uuid}/recording', [Admin\RecordingController::class, 'play'])->name('cdr.recording');
 
     // Operational Reports
     Route::get('operational-reports', [Admin\OperationalReportController::class, 'index'])->name('operational-reports.index');
@@ -140,6 +144,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('operational-reports/monthly/export', [Admin\OperationalReportController::class, 'exportMonthlySummary'])->name('operational-reports.monthly.export');
     Route::get('operational-reports/hourly', [Admin\OperationalReportController::class, 'hourlySummary'])->name('operational-reports.hourly');
     Route::get('operational-reports/hourly/export', [Admin\OperationalReportController::class, 'exportHourlySummary'])->name('operational-reports.hourly.export');
+    Route::get('operational-reports/profit-loss', [Admin\OperationalReportController::class, 'profitLoss'])->name('operational-reports.profit-loss');
+    Route::get('operational-reports/profit-loss/export', [Admin\OperationalReportController::class, 'exportProfitLoss'])->name('operational-reports.profit-loss.export');
 
     // Financial management (scoped)
     Route::get('transactions', [Admin\TransactionController::class, 'index'])->name('transactions.index');
@@ -250,6 +256,7 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::get('cdr', [Client\CdrController::class, 'index'])->name('cdr.index');
         Route::get('cdr/export', [Client\CdrController::class, 'export'])->name('cdr.export');
         Route::get('cdr/{uuid}', [Client\CdrController::class, 'show'])->name('cdr.show');
+        Route::get('cdr/{uuid}/recording', [Admin\RecordingController::class, 'play'])->name('cdr.recording');
 
         Route::get('transactions', [Client\TransactionController::class, 'index'])->name('transactions.index');
 

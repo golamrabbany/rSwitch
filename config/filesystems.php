@@ -47,6 +47,11 @@ return [
             'report' => false,
         ],
 
+        'recordings' => [
+            'driver' => 'local',
+            'root' => env('RECORDING_PATH', '/var/spool/asterisk/recording'),
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
