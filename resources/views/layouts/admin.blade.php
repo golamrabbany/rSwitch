@@ -171,6 +171,24 @@
                         <a href="{{ route('admin.operational-reports.daily') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.daily') ? 'active' : 'text-gray-500' }}">Daily Summary</a>
                         <a href="{{ route('admin.operational-reports.monthly') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.monthly') ? 'active' : 'text-gray-500' }}">Monthly Summary</a>
                         <a href="{{ route('admin.operational-reports.hourly') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.hourly') ? 'active' : 'text-gray-500' }}">Hourly Summary</a>
+                    </div>
+                </div>
+
+                <!-- Financial Reports -->
+                @php $financialReportActive = request()->routeIs('admin.operational-reports.profit-loss*'); @endphp
+                <div x-data="{ open: {{ $financialReportActive ? 'true' : 'false' }} }" class="mb-1">
+                    <button @click="open = !open" class="nav-parent {{ $financialReportActive ? 'has-active' : 'text-gray-600' }}">
+                        <div class="flex items-center">
+                            <svg class="nav-icon {{ $financialReportActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                            </svg>
+                            <span class="nav-text">Financial Reports</span>
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-collapse class="nav-children">
                         <a href="{{ route('admin.operational-reports.profit-loss') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.profit-loss*') ? 'active' : 'text-gray-500' }}">Profit & Loss</a>
                     </div>
                 </div>

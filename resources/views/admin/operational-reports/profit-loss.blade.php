@@ -21,12 +21,6 @@
                 </svg>
                 Export
             </a>
-            <a href="{{ route('admin.operational-reports.index') }}" class="btn-action-secondary">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                </svg>
-                Back
-            </a>
         </div>
     </div>
 
@@ -108,50 +102,6 @@
             </div>
         </form>
     </div>
-
-    {{-- Chart --}}
-    @if($data->count() > 0)
-        <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-            <h3 class="text-sm font-semibold text-gray-700 mb-4">Top 10 Resellers by Profit</h3>
-            <div style="height: 300px;">
-                <canvas id="profitChart"></canvas>
-            </div>
-        </div>
-    @endif
-
-    @push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var canvas = document.getElementById('profitChart');
-        if (!canvas) return;
-
-        var chartLabels = @json($chartLabels);
-        var chartData = @json($chartData);
-
-        new Chart(canvas, {
-            type: 'bar',
-            data: {
-                labels: chartLabels,
-                datasets: [{
-                    label: 'Profit',
-                    data: chartData,
-                    backgroundColor: chartData.map(function(v) { return v >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)'; }),
-                    borderColor: chartData.map(function(v) { return v >= 0 ? '#10b981' : '#ef4444'; }),
-                    borderWidth: 1,
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: { x: { beginAtZero: true } }
-            }
-        });
-    });
-    </script>
-    @endpush
 
     {{-- Data Table --}}
     @if($data->count() > 0)
