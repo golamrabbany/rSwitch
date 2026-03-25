@@ -18,7 +18,7 @@
     </div>
 
     {{-- Section 2: Filter Card --}}
-    <div class="filter-card">
+    <div class="filter-card mb-3">
         <form method="GET" class="filter-row">
             <div class="filter-search-box">
                 <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -48,41 +48,44 @@
     </div>
 
     {{-- Section 3: Table --}}
-    <div class="data-table-container">
-        <table class="data-table">
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        @if($admins->total() > 0)
+            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                    Regular Admins Total : {{ number_format($admins->total()) }} &middot; Showing {{ $admins->firstItem() }} to {{ $admins->lastItem() }}
+                </span>
+            </div>
+        @endif
+        <table class="w-full text-sm">
             <thead>
-                <tr>
-                    <th>Account</th>
-                    <th>Status</th>
-                    <th>Assigned Resellers</th>
-                    <th>Created</th>
-                    <th class="text-center">Actions</th>
+                <tr class="border-b border-gray-200">
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SL</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Account</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned Resellers</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($admins as $admin)
-                    <tr>
-                        <td>
-                            <div class="user-cell">
-                                <div class="avatar avatar-indigo">
-                                    {{ strtoupper(substr($admin->name, 0, 1)) }}
-                                </div>
-                                <div>
-                                    <div class="user-name">{{ $admin->name }}</div>
-                                    <div class="user-email">{{ $admin->email }}</div>
-                                </div>
-                            </div>
+                    <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
+                        <td class="px-3 py-2 text-gray-500">{{ $admins->firstItem() + $loop->index }}</td>
+                        <td class="px-3 py-2">
+                            <div class="font-medium text-gray-900">{{ $admin->name }}</div>
+                            <div class="text-xs text-gray-500">{{ $admin->email }}</div>
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             @if($admin->status === 'active')
-                                <span class="badge badge-success">Active</span>
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active</span>
                             @elseif($admin->status === 'suspended')
-                                <span class="badge badge-warning">Suspended</span>
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Suspended</span>
                             @else
-                                <span class="badge badge-danger">Disabled</span>
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Disabled</span>
                             @endif
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             @if($admin->assigned_resellers_count > 0)
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <span class="badge badge-blue">
@@ -100,38 +103,40 @@
                                 <span class="text-gray-400 text-sm">No resellers assigned</span>
                             @endif
                         </td>
-                        <td class="text-sm text-gray-500">
+                        <td class="px-3 py-2 text-gray-500">
                             {{ $admin->created_at->format('M d, Y') }}
                         </td>
-                        <td class="text-center whitespace-nowrap">
-                            <a href="{{ route('admin.admins.show', $admin) }}" class="action-icon" title="View">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                            </a>
-                            <a href="{{ route('admin.admins.edit', $admin) }}" class="action-icon" title="Edit">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                </svg>
-                            </a>
-                            @if($admin->id !== auth()->id())
-                                <form action="{{ route('admin.admins.destroy', $admin) }}" method="POST" class="inline"
-                                      onsubmit="return confirm('Are you sure you want to delete this admin?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="action-icon action-icon-danger" title="Delete">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                        </svg>
-                                    </button>
-                                </form>
-                            @endif
+                        <td class="px-3 py-2">
+                            <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <a href="{{ route('admin.admins.show', $admin) }}" class="p-1 rounded text-blue-500 hover:text-blue-700 hover:bg-blue-50" title="View">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </a>
+                                <a href="{{ route('admin.admins.edit', $admin) }}" class="p-1 rounded text-amber-500 hover:text-amber-700 hover:bg-amber-50" title="Edit">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </a>
+                                @if($admin->id !== auth()->id())
+                                    <form action="{{ route('admin.admins.destroy', $admin) }}" method="POST" class="inline"
+                                          onsubmit="return confirm('Are you sure you want to delete this admin?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50" title="Delete">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="text-center py-12">
+                        <td colspan="6" class="text-center py-12">
                             <div class="empty-state">
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>

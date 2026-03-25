@@ -75,7 +75,7 @@
     </div>
 
     {{-- Filter Card --}}
-    <div class="filter-card" x-data="{
+    <div class="filter-card mb-3" x-data="{
         userSearch: '{{ $users->firstWhere('id', request('user_id'))?->name ?? '' }}',
         userId: '{{ request('user_id') }}',
         userOpen: false,
@@ -177,29 +177,39 @@
     </div>
 
     {{-- Data Table --}}
-    <div class="data-table-container">
-        <table class="data-table">
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {{-- Summary Bar --}}
+        @if ($records->hasPages())
+            <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                <span class="text-sm text-gray-600">
+                    Showing <span class="font-semibold">{{ $records->firstItem() }}-{{ $records->lastItem() }}</span> of <span class="font-semibold">{{ number_format($records->total()) }}</span> records
+                </span>
+            </div>
+        @endif
+        <table class="w-full text-sm">
             <thead>
-                <tr>
-                    <th>Date / Time</th>
-                    <th>Caller</th>
-                    <th>Callee</th>
-                    <th class="text-center">Duration</th>
-                    <th class="text-center">Billsec</th>
-                    <th>Disposition</th>
-                    <th class="text-center">Actions</th>
+                <tr class="border-b border-gray-200">
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date / Time</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Callee</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Billsec</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Disposition</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($records as $record)
-                    <tr>
-                        <td>
+                    <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
+                        <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $records->firstItem() + $loop->index }}</td>
+                        <td class="px-3 py-2">
                             <div class="cdr-date">
                                 <span class="cdr-date-main">{{ $record->call_start?->format('M d, Y') }}</span>
                                 <span class="cdr-date-time">{{ $record->call_start?->format('H:i:s') }}</span>
                             </div>
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             <div class="cdr-party">
                                 <span class="cdr-party-number">{{ $record->caller }}</span>
                                 @if ($record->user)
@@ -207,51 +217,53 @@
                                 @endif
                             </div>
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             <span class="cdr-party-number">{{ $record->callee }}</span>
                         </td>
-                        <td class="text-center font-mono tabular-nums whitespace-nowrap">
+                        <td class="px-3 py-2 text-center font-mono tabular-nums whitespace-nowrap">
                             {{ sprintf('%02d:%02d', intdiv($record->duration, 60), $record->duration % 60) }}
                         </td>
-                        <td class="text-center font-mono tabular-nums whitespace-nowrap">
+                        <td class="px-3 py-2 text-center font-mono tabular-nums whitespace-nowrap">
                             {{ sprintf('%02d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }}
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             @switch($record->disposition)
                                 @case('ANSWERED')
-                                    <span class="badge badge-success">ANSWERED</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>
                                     @break
                                 @case('NO ANSWER')
-                                    <span class="badge badge-warning">NO ANSWER</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>No Answer</span>
                                     @break
                                 @case('BUSY')
-                                    <span class="badge badge-warning">BUSY</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Busy</span>
                                     @break
                                 @case('FAILED')
-                                    <span class="badge badge-danger">FAILED</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span>
                                     @if($record->hangup_cause)
                                         <div class="text-xs text-red-400 mt-0.5">{{ str_replace('_', ' ', $record->hangup_cause) }}</div>
                                     @endif
                                     @break
                                 @case('CANCEL')
-                                    <span class="badge badge-gray">CANCEL</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Cancel</span>
                                     @break
                                 @default
                                     <span class="text-gray-400">—</span>
                             @endswitch
                         </td>
-                        <td class="text-center whitespace-nowrap">
-                            <a href="{{ route('admin.cdr.show', ['uuid' => $record->uuid, 'date' => $record->call_start?->format('Y-m-d')]) }}" class="action-icon" title="View Details">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                            </a>
+                        <td class="px-3 py-2 text-center whitespace-nowrap">
+                            <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <a href="{{ route('admin.cdr.show', ['uuid' => $record->uuid, 'date' => $record->call_start?->format('Y-m-d')]) }}" class="p-1 rounded text-blue-500 hover:text-blue-700 hover:bg-blue-50" title="View Details">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center py-12">
+                        <td colspan="8" class="text-center py-12">
                             <div class="empty-state">
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>

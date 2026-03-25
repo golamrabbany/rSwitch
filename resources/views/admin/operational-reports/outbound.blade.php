@@ -95,7 +95,7 @@
     </div>
 
     {{-- Filter Bar --}}
-    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-3">
         <form method="GET" class="space-y-3">
             {{-- Row 1: Destination + Dates + Disposition + Trunk --}}
             <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto auto; gap: 0.75rem; align-items: center;">
@@ -226,27 +226,27 @@
             {{-- Table --}}
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SL</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SIP Account</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller ID</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Destination</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Call Time</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">CDR Dur.</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Bill Dur.</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SIP Account</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller ID</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Destination</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Call Time</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">CDR Dur.</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Bill Dur.</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody>
                         @foreach ($calls as $call)
-                            <tr class="hover:bg-gray-50 transition-colors">
+                            <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
                                 {{-- SL --}}
-                                <td class="px-4 py-3 text-gray-500 text-xs">{{ $calls->firstItem() + $loop->index }}</td>
+                                <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $calls->firstItem() + $loop->index }}</td>
 
                                 {{-- SIP Account + User --}}
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     @if($call->sipAccount)
                                         <a href="{{ route('admin.sip-accounts.show', $call->sipAccount) }}" class="text-indigo-600 hover:text-indigo-500 font-mono font-medium">
                                             {{ $call->sipAccount->username }}
@@ -260,7 +260,7 @@
                                 </td>
 
                                 {{-- Caller ID + Source IP --}}
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     <span class="font-mono text-gray-900">{{ $call->caller_id ?: $call->caller }}</span>
                                     @if($call->sipAccount?->last_registered_ip)
                                         <div class="text-xs text-gray-400 font-mono">{{ $call->sipAccount->last_registered_ip }}</div>
@@ -268,18 +268,18 @@
                                 </td>
 
                                 {{-- Destination --}}
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     <span class="font-mono text-gray-900">{{ $call->callee }}</span>
                                 </td>
 
                                 {{-- Call Time --}}
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     <div class="text-gray-900 text-xs font-mono">{{ $call->call_start->format('Y-m-d H:i:s') }}</div>
                                     <div class="text-xs text-gray-400 font-mono">{{ $call->call_end?->format('Y-m-d H:i:s') ?? '-' }}</div>
                                 </td>
 
                                 {{-- CDR Duration --}}
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     @if($call->duration > 0)
                                         <span class="font-medium text-gray-900">{{ gmdate('H:i:s', $call->duration) }}</span>
                                     @else
@@ -288,7 +288,7 @@
                                 </td>
 
                                 {{-- Bill Duration --}}
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     @if($call->billable_duration > 0)
                                         <span class="font-medium text-gray-900">{{ gmdate('H:i:s', $call->billable_duration) }}</span>
                                     @else
@@ -297,7 +297,7 @@
                                 </td>
 
                                 {{-- Trunk --}}
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     @if($call->outgoingTrunk)
                                         <a href="{{ route('admin.trunks.show', $call->outgoingTrunk) }}" class="text-indigo-600 hover:text-indigo-500 font-medium">
                                             {{ Str::limit($call->outgoingTrunk->name, 20) }}
@@ -309,38 +309,23 @@
                                 </td>
 
                                 {{-- Status --}}
-                                <td class="px-4 py-3">
+                                <td class="px-3 py-2">
                                     @switch($call->disposition)
                                         @case('ANSWERED')
-                                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                                Answered
-                                            </span>
+                                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>
                                             @break
                                         @case('NO ANSWER')
-                                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                                No Answer
-                                            </span>
+                                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>No Answer</span>
                                             @break
                                         @case('BUSY')
-                                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                                Busy
-                                            </span>
+                                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>Busy</span>
                                             @break
                                         @case('FAILED')
                                         @case('CONGESTION')
-                                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                                Failed
-                                            </span>
+                                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span>
                                             @break
                                         @default
-                                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                                                {{ $call->disposition ?? 'Unknown' }}
-                                            </span>
+                                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>{{ $call->disposition ?? 'Unknown' }}</span>
                                     @endswitch
                                 </td>
                             </tr>

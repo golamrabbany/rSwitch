@@ -25,7 +25,7 @@
     </div>
 
     {{-- Filter Card --}}
-    <div class="filter-card">
+    <div class="filter-card mb-3">
         <form method="GET" class="filter-row flex-wrap">
             <div class="filter-search-box">
                 <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -54,23 +54,33 @@
     </div>
 
     {{-- Data Table --}}
-    <div class="data-table-container">
-        <table class="data-table">
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        @if($endpoints->total() > 0)
+            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                    Webhooks Total : {{ number_format($endpoints->total()) }} &middot; Showing {{ $endpoints->firstItem() }} to {{ $endpoints->lastItem() }}
+                </span>
+            </div>
+        @endif
+        <table class="w-full text-sm">
             <thead>
-                <tr>
-                    <th>URL</th>
-                    <th>User</th>
-                    <th>Events</th>
-                    <th>Status</th>
-                    <th>Failures</th>
-                    <th>Last Triggered</th>
-                    <th class="text-center">Actions</th>
+                <tr class="border-b border-gray-200">
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SL</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">URL</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Events</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Failures</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Triggered</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($endpoints as $ep)
-                    <tr>
-                        <td>
+                    <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
+                        <td class="px-3 py-2 text-gray-500">{{ $loop->iteration + ($endpoints->currentPage() - 1) * $endpoints->perPage() }}</td>
+                        <td class="px-3 py-2">
                             <div class="max-w-xs">
                                 <a href="{{ route('admin.webhooks.show', $ep) }}" class="text-indigo-600 hover:text-indigo-700 font-medium truncate block">
                                     {{ Str::limit($ep->url, 40) }}
@@ -80,7 +90,7 @@
                                 @endif
                             </div>
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             <div class="user-cell">
                                 <div class="avatar avatar-indigo">
                                     {{ strtoupper(substr($ep->user->name, 0, 1)) }}
@@ -91,41 +101,49 @@
                                 </div>
                             </div>
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             <span class="badge badge-info">{{ count($ep->events) }} events</span>
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             @if ($ep->active)
-                                <span class="badge badge-success">Active</span>
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    <span class="text-sm font-medium text-emerald-700">Active</span>
+                                </span>
                             @else
-                                <span class="badge badge-danger">Inactive</span>
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                                    <span class="text-sm font-medium text-red-700">Inactive</span>
+                                </span>
                             @endif
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             <span class="{{ $ep->failure_count > 0 ? 'text-red-600 font-semibold' : 'text-gray-500' }}">
                                 {{ $ep->failure_count }}
                             </span>
                         </td>
-                        <td class="text-gray-600">
+                        <td class="px-3 py-2 text-gray-600">
                             {{ $ep->last_triggered_at?->diffForHumans() ?? 'Never' }}
                         </td>
-                        <td class="text-center whitespace-nowrap">
-                            <a href="{{ route('admin.webhooks.show', $ep) }}" class="action-icon" title="View">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                            </a>
-                            <a href="{{ route('admin.webhooks.edit', $ep) }}" class="action-icon" title="Edit">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                </svg>
-                            </a>
+                        <td class="px-3 py-2 text-center whitespace-nowrap">
+                            <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <a href="{{ route('admin.webhooks.show', $ep) }}" class="text-blue-600 hover:text-blue-700" title="View">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </a>
+                                <a href="{{ route('admin.webhooks.edit', $ep) }}" class="text-amber-600 hover:text-amber-700" title="Edit">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center py-12">
+                        <td colspan="8" class="text-center py-12">
                             <div class="empty-state">
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>

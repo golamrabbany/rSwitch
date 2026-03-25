@@ -87,7 +87,7 @@
     </div>
 
     {{-- Filter Card --}}
-    <div class="filter-card">
+    <div class="filter-card mb-3">
         <form method="GET" action="{{ route('admin.cdr.index') }}">
             <div class="cdr-filter-grid">
                 <div class="cdr-filter-item">
@@ -175,32 +175,42 @@
     </div>
 
     {{-- Data Table --}}
-    <div class="data-table-container">
-        <table class="data-table">
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {{-- Summary Bar --}}
+        @if ($records->hasPages())
+            <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                <span class="text-sm text-gray-600">
+                    Showing <span class="font-semibold">{{ $records->firstItem() }}-{{ $records->lastItem() }}</span> of <span class="font-semibold">{{ number_format($records->total()) }}</span> records
+                </span>
+            </div>
+        @endif
+        <table class="w-full text-sm">
             <thead>
-                <tr>
-                    <th>Date / Time</th>
-                    <th>Caller</th>
-                    <th>Callee</th>
-                    <th class="text-right">Duration</th>
-                    <th class="text-right">Billsec</th>
-                    <th class="text-right">Cost</th>
-                    <th>Disposition</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th class="text-center">Actions</th>
+                <tr class="border-b border-gray-200">
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date / Time</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Callee</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Billsec</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Cost</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Disposition</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($records as $record)
-                    <tr>
-                        <td>
+                    <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
+                        <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $records->firstItem() + $loop->index }}</td>
+                        <td class="px-3 py-2">
                             <div class="cdr-date">
                                 <span class="cdr-date-main">{{ $record->call_start?->format('M d, Y') }}</span>
                                 <span class="cdr-date-time">{{ $record->call_start?->format('H:i:s') }}</span>
                             </div>
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             <div class="cdr-party">
                                 <span class="cdr-party-number">{{ $record->caller }}</span>
                                 @if ($record->user)
@@ -208,74 +218,76 @@
                                 @endif
                             </div>
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             <span class="cdr-party-number">{{ $record->callee }}</span>
                         </td>
-                        <td class="text-right tabular-nums">
+                        <td class="px-3 py-2 text-right tabular-nums">
                             {{ sprintf('%d:%02d', intdiv($record->duration, 60), $record->duration % 60) }}
                         </td>
-                        <td class="text-right tabular-nums">
+                        <td class="px-3 py-2 text-right tabular-nums">
                             {{ sprintf('%d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }}
                         </td>
-                        <td class="text-right tabular-nums font-medium">
+                        <td class="px-3 py-2 text-right tabular-nums font-medium">
                             {{ format_currency($record->total_cost, 4) }}
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             @switch($record->disposition)
                                 @case('ANSWERED')
-                                    <span class="badge badge-success">ANSWERED</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>
                                     @break
                                 @case('NO ANSWER')
-                                    <span class="badge badge-warning">NO ANSWER</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>No Answer</span>
                                     @break
                                 @case('BUSY')
-                                    <span class="badge badge-warning">BUSY</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Busy</span>
                                     @break
                                 @case('FAILED')
-                                    <span class="badge badge-danger">FAILED</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span>
                                     @break
                                 @case('CANCEL')
-                                    <span class="badge badge-gray">CANCEL</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Cancel</span>
                                     @break
                                 @default
                                     <span class="text-gray-400">—</span>
                             @endswitch
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             @if($record->call_type === 'broadcast')
-                                <span class="badge badge-info">Broadcast</span>
+                                <span class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>Broadcast</span>
                             @else
-                                <span class="badge badge-gray">Regular</span>
+                                <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Regular</span>
                             @endif
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             @switch($record->status)
                                 @case('rated')
-                                    <span class="badge badge-success">Rated</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Rated</span>
                                     @break
                                 @case('in_progress')
-                                    <span class="badge badge-warning">In Progress</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>In Progress</span>
                                     @break
                                 @case('failed')
-                                    <span class="badge badge-danger">Failed</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span>
                                     @break
                                 @case('unbillable')
-                                    <span class="badge badge-gray">Unbillable</span>
+                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Unbillable</span>
                                     @break
                             @endswitch
                         </td>
-                        <td class="text-center whitespace-nowrap">
-                            <a href="{{ route('admin.cdr.show', ['uuid' => $record->uuid, 'date' => $record->call_start?->format('Y-m-d')]) }}" class="action-icon" title="View Details">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                            </a>
+                        <td class="px-3 py-2 text-center whitespace-nowrap">
+                            <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <a href="{{ route('admin.cdr.show', ['uuid' => $record->uuid, 'date' => $record->call_start?->format('Y-m-d')]) }}" class="p-1 rounded text-blue-500 hover:text-blue-700 hover:bg-blue-50" title="View Details">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="text-center py-12">
+                        <td colspan="11" class="text-center py-12">
                             <div class="empty-state">
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>

@@ -31,7 +31,7 @@
     </div>
 
     {{-- Filter Bar --}}
-    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-3">
         <form method="GET" class="space-y-3">
             <div style="display: grid; grid-template-columns: 1fr 1fr auto auto auto; gap: 0.75rem; align-items: center;">
                 <input type="date" name="date_from" value="{{ request('date_from', $dateFrom->format('Y-m-d')) }}" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
@@ -183,34 +183,34 @@
                 </span>
             </div>
             <div class="overflow-x-auto">
-                <table class="data-table">
+                <table class="w-full text-sm">
                     <thead>
-                        <tr>
-                            <th class="w-12">#</th>
-                            <th>Month</th>
-                            <th style="text-align: right">Total Calls</th>
-                            <th style="text-align: right">Answered</th>
-                            <th style="text-align: right">Failed</th>
-                            <th style="text-align: right">ASR%</th>
-                            <th style="text-align: right">ACD</th>
-                            <th style="text-align: right">Minutes</th>
-                            <th style="text-align: right">Change</th>
+                        <tr class="border-b border-gray-200">
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Month</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Calls</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Answered</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Failed</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ASR%</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ACD</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Minutes</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Change</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($rows as $index => $row)
-                            <tr>
-                                <td class="text-gray-400">{{ $index + 1 }}</td>
-                                <td class="font-medium text-gray-900">{{ $row->month_label }}</td>
-                                <td style="text-align: right" class="font-medium">{{ number_format($row->total_calls) }}</td>
-                                <td style="text-align: right" class="text-emerald-600">{{ number_format($row->answered_calls) }}</td>
-                                <td style="text-align: right" class="text-red-500">{{ number_format($row->failed_calls) }}</td>
-                                <td style="text-align: right">
+                            <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
+                                <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $index + 1 }}</td>
+                                <td class="px-3 py-2 font-medium text-gray-900">{{ $row->month_label }}</td>
+                                <td class="px-3 py-2 text-right font-medium tabular-nums">{{ number_format($row->total_calls) }}</td>
+                                <td class="px-3 py-2 text-right text-emerald-600 tabular-nums">{{ number_format($row->answered_calls) }}</td>
+                                <td class="px-3 py-2 text-right text-red-500 tabular-nums">{{ number_format($row->failed_calls) }}</td>
+                                <td class="px-3 py-2 text-right">
                                     <span class="{{ $row->asr >= 50 ? 'text-emerald-600' : 'text-amber-600' }} font-medium">{{ $row->asr }}%</span>
                                 </td>
-                                <td style="text-align: right" class="text-gray-600">{{ $row->acd > 0 ? sprintf('%dm %ds', intdiv($row->acd, 60), $row->acd % 60) : '-' }}</td>
-                                <td style="text-align: right">{{ number_format($row->minutes, 0) }}</td>
-                                <td style="text-align: right">
+                                <td class="px-3 py-2 text-right text-gray-600">{{ $row->acd > 0 ? sprintf('%dm %ds', intdiv($row->acd, 60), $row->acd % 60) : '-' }}</td>
+                                <td class="px-3 py-2 text-right tabular-nums">{{ number_format($row->minutes, 0) }}</td>
+                                <td class="px-3 py-2 text-right">
                                     @if($row->change === null)
                                         <span class="text-gray-400">&mdash;</span>
                                     @elseif($row->change >= 0)
@@ -229,19 +229,19 @@
                         @endforeach
                     </tbody>
                     <tfoot>
-                        <tr class="bg-gray-50 font-bold">
-                            <td></td>
-                            <td>Totals</td>
-                            <td style="text-align: right">{{ number_format($totals['total_calls']) }}</td>
-                            <td style="text-align: right" class="text-emerald-600">{{ number_format($totals['answered_calls']) }}</td>
-                            <td style="text-align: right" class="text-red-500">{{ number_format($totals['failed_calls']) }}</td>
-                            <td style="text-align: right">
+                        <tr class="bg-gray-50 font-bold border-t border-gray-200">
+                            <td class="px-3 py-2"></td>
+                            <td class="px-3 py-2">Totals</td>
+                            <td class="px-3 py-2 text-right tabular-nums">{{ number_format($totals['total_calls']) }}</td>
+                            <td class="px-3 py-2 text-right text-emerald-600 tabular-nums">{{ number_format($totals['answered_calls']) }}</td>
+                            <td class="px-3 py-2 text-right text-red-500 tabular-nums">{{ number_format($totals['failed_calls']) }}</td>
+                            <td class="px-3 py-2 text-right">
                                 <span class="{{ $totals['asr'] >= 50 ? 'text-emerald-600' : 'text-amber-600' }}">{{ $totals['asr'] }}%</span>
                             </td>
                             @php $totalAcd = $totals['answered_calls'] > 0 ? round($rows->sum('total_billsec') / $totals['answered_calls']) : 0; @endphp
-                            <td style="text-align: right" class="text-gray-600">{{ $totalAcd > 0 ? sprintf('%dm %ds', intdiv($totalAcd, 60), $totalAcd % 60) : '-' }}</td>
-                            <td style="text-align: right">{{ number_format($totals['minutes'], 0) }}</td>
-                            <td></td>
+                            <td class="px-3 py-2 text-right text-gray-600">{{ $totalAcd > 0 ? sprintf('%dm %ds', intdiv($totalAcd, 60), $totalAcd % 60) : '-' }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums">{{ number_format($totals['minutes'], 0) }}</td>
+                            <td class="px-3 py-2"></td>
                         </tr>
                     </tfoot>
                 </table>

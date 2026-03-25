@@ -142,7 +142,7 @@
                             @endif
                         </td>
                         <td class="px-3 py-2 text-center">
-                            <div class="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                            <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                                 <a href="{{ route('admin.dids.show', $did) }}" class="p-1 rounded text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors" title="View">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>

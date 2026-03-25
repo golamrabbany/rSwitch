@@ -111,7 +111,7 @@
                                             <td class="px-3 py-2 text-sm">{{ $dnc->addedBy?->name ?? '—' }}</td>
                                             <td class="px-3 py-2 text-sm text-gray-500">{{ $dnc->created_at?->format('M d, Y H:i') ?? '—' }}</td>
                                             <td class="px-3 py-2 text-center">
-                                                <div class="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                                                     <form method="POST" action="{{ route('admin.dnc.destroy', $dnc) }}" onsubmit="return confirm('Remove this number from DNC list?')">
                                                         @csrf
                                                         @method('DELETE')
