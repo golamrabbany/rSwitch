@@ -4,7 +4,7 @@
     {{-- ═══════════════════════════════════════════════════════════
          SECTION A: NOC Live Operations Strip (dark, always on top)
          ═══════════════════════════════════════════════════════════ --}}
-    <div class="rounded-xl mb-6" style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); margin-left:-1.5rem; margin-right:-1.5rem; padding:1.25rem 0;">
+    <div class="rounded-xl mb-6" style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding:0.625rem 0;">
         <div style="display:grid; grid-template-columns: repeat(5, 1fr);">
             {{-- Live Calls --}}
             <div style="padding:0 1.5rem; border-right:1px solid rgba(255,255,255,0.08);">
@@ -67,7 +67,7 @@
     </div>
 
     {{-- ═══════════════════════════════════════════════════
-         SECTION B: Weekly KPI Cards (4-col)
+         SECTION B: KPI + Financial (horizontal stat-cards)
          ═══════════════════════════════════════════════════ --}}
     @php
         $revenueChange = ($prevWeekStats['total_cost'] ?? 0) > 0
@@ -78,163 +78,57 @@
         $acdSecs = $weekStats['acd'] % 60;
         $totalHours = intdiv($weekStats['total_duration'], 3600);
         $totalMins = intdiv($weekStats['total_duration'] % 3600, 60);
+        $revChange = $financialSummary['revenue_change'] ?? 0;
+        $outstanding = $financialSummary['outstanding_balance'] ?? 0;
     @endphp
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {{-- Revenue --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <span class="text-xs font-medium text-gray-400">7 Days</span>
+    <div class="mb-6" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:1rem;">
+        <div class="stat-card">
+            <div class="stat-icon bg-indigo-100">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
-            <p class="text-2xl font-bold text-gray-900">{{ format_currency($weekStats['total_cost']) }}</p>
-            <p class="text-sm text-gray-500 mb-2">Revenue</p>
-            <div class="flex items-center text-xs">
-                @if($revenueChange >= 0)
-                    <span class="inline-flex items-center text-emerald-600"><svg class="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>{{ abs($revenueChange) }}%</span>
-                @else
-                    <span class="inline-flex items-center text-red-600"><svg class="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>{{ abs($revenueChange) }}%</span>
-                @endif
-                <span class="text-gray-400 ml-1">vs last week</span>
+            <div class="stat-content">
+                <p class="stat-value">{{ format_currency($weekStats['total_cost']) }}</p>
+                <p class="stat-label">Revenue (7d) @if($revenueChange != 0)<span class="{{ $revenueChange >= 0 ? 'text-emerald-600' : 'text-red-600' }}">{{ $revenueChange >= 0 ? '+' : '' }}{{ $revenueChange }}%</span>@endif</p>
             </div>
         </div>
-
-        {{-- Total Calls --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                </div>
-                <span class="text-xs font-medium text-gray-400">7 Days</span>
+        <div class="stat-card">
+            <div class="stat-icon bg-emerald-100">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             </div>
-            <p class="text-2xl font-bold text-gray-900">{{ number_format($weekStats['total_calls']) }}</p>
-            <p class="text-sm text-gray-500 mb-2">Total Calls</p>
-            <div class="flex items-center text-xs">
-                @if($callsChange >= 0)
-                    <span class="inline-flex items-center text-emerald-600"><svg class="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>{{ abs($callsChange) }}%</span>
-                @else
-                    <span class="inline-flex items-center text-red-600"><svg class="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>{{ abs($callsChange) }}%</span>
-                @endif
-                <span class="text-gray-400 ml-1">vs last week</span>
+            <div class="stat-content">
+                <p class="stat-value">{{ number_format($weekStats['total_calls']) }}</p>
+                <p class="stat-label">Calls (7d) @if($callsChange != 0)<span class="{{ $callsChange >= 0 ? 'text-emerald-600' : 'text-red-600' }}">{{ $callsChange >= 0 ? '+' : '' }}{{ $callsChange }}%</span>@endif</p>
             </div>
         </div>
-
-        {{-- ASR --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <span class="text-xs font-medium px-2 py-0.5 rounded-full {{ $weekStats['asr'] >= 50 ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600' }}">ASR</span>
+        <div class="stat-card">
+            <div class="stat-icon bg-indigo-100">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
             </div>
-            <p class="text-2xl font-bold text-gray-900">{{ $weekStats['asr'] }}%</p>
-            <p class="text-sm text-gray-500 mb-2">Answer Rate</p>
-            <div class="flex items-center text-xs gap-3">
-                <span class="text-emerald-600">{{ number_format($weekStats['answered_calls']) }} answered</span>
-                <span class="text-gray-300">|</span>
-                <span class="text-red-500">{{ number_format($weekStats['failed_calls']) }} failed</span>
+            <div class="stat-content">
+                <p class="stat-value">{{ format_currency($financialSummary['this_month_revenue'] ?? 0) }}</p>
+                <p class="stat-label">Monthly @if($revChange != 0)<span class="{{ $revChange >= 0 ? 'text-emerald-600' : 'text-red-600' }}">{{ $revChange >= 0 ? '+' : '' }}{{ $revChange }}%</span>@endif</p>
             </div>
         </div>
-
-        {{-- ACD --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <span class="text-xs font-medium text-gray-400">ACD</span>
+        <div class="stat-card">
+            <div class="stat-icon {{ $outstanding > 0 ? 'bg-red-100' : 'bg-emerald-100' }}">
+                <svg class="w-6 h-6 {{ $outstanding > 0 ? 'text-red-600' : 'text-emerald-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             </div>
-            <p class="text-2xl font-bold text-gray-900 tabular-nums">{{ $acdMins }}:{{ sprintf('%02d', $acdSecs) }}</p>
-            <p class="text-sm text-gray-500 mb-2">Avg Call Duration</p>
-            <div class="flex items-center text-xs text-gray-500">Total: {{ $totalHours }}h {{ $totalMins }}m talk time</div>
+            <div class="stat-content">
+                <p class="stat-value {{ $outstanding > 0 ? 'text-red-600' : 'text-emerald-600' }}">{{ format_currency($outstanding) }}</p>
+                <p class="stat-label">Outstanding</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-emerald-100">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </div>
+            <div class="stat-content">
+                <p class="stat-value">{{ format_currency($financialSummary['total_user_balance'] ?? 0) }}</p>
+                <p class="stat-label">Balance Pool</p>
+            </div>
         </div>
     </div>
 
-    {{-- ═══════════════════════════════════════════════════
-         SECTION C: Financial Pulse (3-col)
-         ═══════════════════════════════════════════════════ --}}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {{-- This Month Revenue --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                    </div>
-                    <span class="text-sm font-medium text-gray-700">Monthly Revenue</span>
-                </div>
-                @php $revChange = $financialSummary['revenue_change'] ?? 0; @endphp
-                @if($revChange != 0)
-                    <span class="text-xs font-medium px-2 py-0.5 rounded-full {{ $revChange >= 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600' }}">
-                        {{ $revChange >= 0 ? '+' : '' }}{{ $revChange }}%
-                    </span>
-                @endif
-            </div>
-            <p class="text-2xl font-bold text-gray-900">{{ format_currency($financialSummary['this_month_revenue'] ?? 0) }}</p>
-            <p class="text-xs text-gray-400 mt-1">Last month: {{ format_currency($financialSummary['last_month_revenue'] ?? 0) }}</p>
-        </div>
-
-        {{-- Outstanding Balance --}}
-        @php $outstanding = $financialSummary['outstanding_balance'] ?? 0; @endphp
-        <a href="{{ route('admin.invoices.index') }}" class="bg-white rounded-xl border {{ $outstanding > 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-200' }} p-5 shadow-sm hover:shadow-md transition-shadow">
-            <div class="flex items-center gap-2 mb-3">
-                <div class="w-8 h-8 rounded-lg {{ $outstanding > 0 ? 'bg-red-100' : 'bg-emerald-100' }} flex items-center justify-center">
-                    <svg class="w-4 h-4 {{ $outstanding > 0 ? 'text-red-600' : 'text-emerald-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                </div>
-                <span class="text-sm font-medium text-gray-700">Outstanding</span>
-            </div>
-            <p class="text-2xl font-bold {{ $outstanding > 0 ? 'text-red-600' : 'text-emerald-600' }}">{{ format_currency($outstanding) }}</p>
-            <p class="text-xs text-gray-400 mt-1">unpaid issued invoices</p>
-        </a>
-
-        {{-- Total User Balance --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <div class="flex items-center gap-2 mb-3">
-                <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                </div>
-                <span class="text-sm font-medium text-gray-700">Platform Balance</span>
-            </div>
-            <p class="text-2xl font-bold text-gray-900">{{ format_currency($financialSummary['total_user_balance'] ?? 0) }}</p>
-            <p class="text-xs text-gray-400 mt-1">total prepaid balance across all users</p>
-        </div>
-    </div>
-
-    {{-- ═══════════════════════════════════════════════════
-         SECTION D: Platform Inventory Bar (6-col compact)
-         ═══════════════════════════════════════════════════ --}}
-    <div class="mb-6" style="display:grid; grid-template-columns: repeat(6, 1fr); gap:0.75rem;">
-        <a href="{{ route('admin.users.index', ['role' => 'reseller']) }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #10b981;">
-            <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['resellers']) }}</p>
-            <p class="text-xs text-gray-500">Resellers</p>
-        </a>
-        <a href="{{ route('admin.users.index', ['role' => 'client']) }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #0ea5e9;">
-            <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['clients']) }}</p>
-            <p class="text-xs text-gray-500">Clients</p>
-        </a>
-        <a href="{{ route('admin.sip-accounts.index') }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #6366f1;">
-            <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['sip_accounts']) }}</p>
-            <p class="text-xs text-gray-500">SIP Accounts</p>
-        </a>
-        @if(auth()->user()->isSuperAdmin())
-        <a href="{{ route('admin.trunks.index') }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #a855f7;">
-            <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['active_trunks']) }}</p>
-            <p class="text-xs text-gray-500">Active Trunks</p>
-        </a>
-        @endif
-        <a href="{{ route('admin.dids.index') }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #3b82f6;">
-            <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['active_dids']) }}</p>
-            <p class="text-xs text-gray-500">Active DIDs</p>
-        </a>
-        @if(auth()->user()->isSuperAdmin())
-        <a href="{{ route('admin.trunk-routes.index') }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #f43f5e;">
-            @php $routeCount = \App\Models\TrunkRoute::where('status', 'active')->count(); @endphp
-            <p class="text-xl font-bold text-gray-900">{{ number_format($routeCount) }}</p>
-            <p class="text-xs text-gray-500">Routes</p>
-        </a>
-        @endif
-    </div>
 
     {{-- ═══════════════════════════════════════════════════
          SECTION E: Chart + System Health (8+4 grid)
@@ -242,16 +136,16 @@
     <div class="grid grid-cols-12 gap-6 mb-6">
         {{-- Call Volume & Revenue Chart --}}
         <div class="col-span-12 lg:col-span-8">
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm" x-data="{ chartTab: 'daily' }">
-                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm h-full flex flex-col" x-data="{ chartTab: 'daily' }">
+                <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
                     <h3 class="font-semibold text-gray-900">Call Volume & Revenue</h3>
                     <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
                         <button @click="chartTab = 'daily'; $nextTick(() => initDailyChart())" :class="chartTab === 'daily' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'" class="px-3 py-1.5 text-xs font-medium">7 Days</button>
                         <button @click="chartTab = 'hourly'; $nextTick(() => initHourlyChart())" :class="chartTab === 'hourly' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'" class="px-3 py-1.5 text-xs font-medium border-l">Today Hourly</button>
                     </div>
                 </div>
-                <div class="p-5">
-                    <div class="h-56">
+                <div class="p-5 flex-1 flex items-center">
+                    <div class="w-full" style="height:100%; min-height:280px;">
                         <canvas x-show="chartTab === 'daily'" id="dailyChart" style="display:block;"></canvas>
                         <canvas x-show="chartTab === 'hourly'" id="hourlyChart" style="display:none;"></canvas>
                     </div>
@@ -345,12 +239,12 @@
     </div>
 
     {{-- ═══════════════════════════════════════════════════
-         SECTION F: Recent Calls + Top Destinations + Quick Actions
+         SECTION F: Recent Calls + Quick Actions
          ═══════════════════════════════════════════════════ --}}
     <div class="grid grid-cols-12 gap-6">
         {{-- Recent Calls --}}
-        <div class="col-span-12 lg:col-span-5">
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div class="col-span-12 lg:col-span-8">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm h-full">
                 <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <h3 class="font-semibold text-gray-900">Recent Calls</h3>
                     <a href="{{ route('admin.cdr.index') }}" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">View CDR</a>
@@ -415,47 +309,8 @@
             </div>
         </div>
 
-        {{-- Top Destinations --}}
-        <div class="col-span-12 lg:col-span-4">
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm h-full">
-                <div class="px-5 py-4 border-b border-gray-100">
-                    <h3 class="font-semibold text-gray-900">Top Destinations</h3>
-                </div>
-                <div class="p-5">
-                    @if($topDestinations->isNotEmpty())
-                        <div class="space-y-3">
-                            @foreach($topDestinations as $index => $dest)
-                                <div class="flex items-center gap-3">
-                                    <span class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">{{ $index + 1 }}</span>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-sm font-mono font-medium text-gray-900 truncate">{{ $dest->destination_prefix }}</span>
-                                            <span class="text-sm font-bold text-gray-900">{{ number_format($dest->calls) }}</span>
-                                        </div>
-                                        <div class="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                            @php $maxCalls = $topDestinations->first()->calls; $pct = $maxCalls > 0 ? ($dest->calls / $maxCalls) * 100 : 0; @endphp
-                                            <div class="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full" style="width: {{ $pct }}%"></div>
-                                        </div>
-                                        <div class="flex items-center justify-between mt-1 text-xs text-gray-500">
-                                            <span>{{ number_format($dest->answered) }} answered</span>
-                                            <span>{{ format_currency($dest->revenue) }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="text-center py-8 text-gray-400">
-                            <svg class="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                            <p class="text-sm">No destination data</p>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        </div>
-
         {{-- Quick Actions --}}
-        <div class="col-span-12 lg:col-span-3">
+        <div class="col-span-12 lg:col-span-4">
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm h-full">
                 <div class="px-5 py-4 border-b border-gray-100">
                     <h3 class="font-semibold text-gray-900">Quick Actions</h3>
@@ -627,19 +482,97 @@
                 data: {
                     labels: data.map(d => d.label),
                     datasets: [
-                        { label: 'Total Calls', data: data.map(d => d.calls), backgroundColor: 'rgba(99,102,241,0.7)', borderRadius: 4, yAxisID: 'y', order: 2 },
-                        { label: 'Answered', data: data.map(d => d.answered), backgroundColor: 'rgba(16,185,129,0.7)', borderRadius: 4, yAxisID: 'y', order: 3 },
-                        { label: 'Revenue', data: data.map(d => d.revenue), type: 'line', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointHoverRadius: 6, yAxisID: 'y1', order: 1 },
+                        {
+                            label: 'Total Calls',
+                            data: data.map(d => d.calls),
+                            backgroundColor: '#818cf8',
+                            hoverBackgroundColor: '#6366f1',
+                            borderRadius: { topLeft: 4, topRight: 4 },
+                            yAxisID: 'y',
+                            order: 2,
+                            barPercentage: 0.7,
+                            categoryPercentage: 0.65,
+                        },
+                        {
+                            label: 'Answered',
+                            data: data.map(d => d.answered),
+                            backgroundColor: '#6ee7b7',
+                            hoverBackgroundColor: '#34d399',
+                            borderRadius: { topLeft: 4, topRight: 4 },
+                            yAxisID: 'y',
+                            order: 3,
+                            barPercentage: 0.7,
+                            categoryPercentage: 0.65,
+                        },
+                        {
+                            label: 'Revenue',
+                            data: data.map(d => d.revenue),
+                            type: 'line',
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'transparent',
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#f59e0b',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            borderWidth: 2.5,
+                            yAxisID: 'y1',
+                            order: 1,
+                        },
                     ]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
+                    responsive: true,
+                    maintainAspectRatio: false,
                     interaction: { intersect: false, mode: 'index' },
-                    plugins: { legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 6, boxHeight: 6, padding: 15, font: { size: 11 } } }, tooltip: { backgroundColor: 'white', titleColor: '#1f2937', bodyColor: '#4b5563', borderColor: '#e5e7eb', borderWidth: 1, padding: 12 } },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            align: 'end',
+                            labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6, boxHeight: 6, padding: 20, font: { size: 11, weight: '500' }, color: '#6b7280' }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1f2937',
+                            titleColor: '#f9fafb',
+                            bodyColor: '#d1d5db',
+                            borderColor: '#374151',
+                            borderWidth: 1,
+                            padding: { top: 10, bottom: 10, left: 14, right: 14 },
+                            cornerRadius: 8,
+                            displayColors: true,
+                            usePointStyle: true,
+                            boxPadding: 4,
+                            titleFont: { size: 12, weight: '600' },
+                            bodyFont: { size: 11 },
+                            callbacks: {
+                                label: function(ctx) {
+                                    if (ctx.dataset.label === 'Revenue') return ' Revenue: $' + ctx.parsed.y.toFixed(2);
+                                    return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
                     scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#9ca3af' } },
-                        y: { beginAtZero: true, position: 'left', grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 }, color: '#9ca3af' } },
-                        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { font: { size: 11 }, color: '#f59e0b', callback: function(v) { return '$' + v.toFixed(0); } } }
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 11, weight: '500' }, color: '#9ca3af', padding: 8 },
+                            border: { display: false }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            position: 'left',
+                            grid: { color: 'rgba(0,0,0,0.04)', drawBorder: false },
+                            ticks: { font: { size: 11 }, color: '#9ca3af', padding: 8 },
+                            border: { display: false }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { font: { size: 11 }, color: '#f59e0b', padding: 8, callback: function(v) { return '$' + v.toFixed(0); } },
+                            border: { display: false }
+                        }
                     }
                 }
             });
@@ -656,16 +589,48 @@
                 data: {
                     labels: data.map(d => d.label),
                     datasets: [
-                        { label: 'Total Calls', data: data.map(d => d.calls), backgroundColor: data.map((d, i) => i >= 8 && i <= 20 ? 'rgba(99,102,241,0.7)' : 'rgba(148,163,184,0.4)'), borderRadius: 3 },
-                        { label: 'Answered', data: data.map(d => d.answered), backgroundColor: 'rgba(16,185,129,0.6)', borderRadius: 3 },
+                        {
+                            label: 'Total Calls',
+                            data: data.map(d => d.calls),
+                            backgroundColor: data.map((d, i) => i >= 8 && i <= 20 ? '#818cf8' : '#cbd5e1'),
+                            hoverBackgroundColor: data.map((d, i) => i >= 8 && i <= 20 ? '#6366f1' : '#94a3b8'),
+                            borderRadius: { topLeft: 3, topRight: 3 },
+                            barPercentage: 0.8,
+                        },
+                        {
+                            label: 'Answered',
+                            data: data.map(d => d.answered),
+                            backgroundColor: '#6ee7b7',
+                            hoverBackgroundColor: '#34d399',
+                            borderRadius: { topLeft: 3, topRight: 3 },
+                            barPercentage: 0.8,
+                        },
                     ]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 6, boxHeight: 6, padding: 15, font: { size: 11 } } } },
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            align: 'end',
+                            labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 6, boxHeight: 6, padding: 20, font: { size: 11, weight: '500' }, color: '#6b7280' }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1f2937',
+                            titleColor: '#f9fafb',
+                            bodyColor: '#d1d5db',
+                            borderColor: '#374151',
+                            borderWidth: 1,
+                            padding: { top: 10, bottom: 10, left: 14, right: 14 },
+                            cornerRadius: 8,
+                            usePointStyle: true,
+                            boxPadding: 4,
+                        }
+                    },
                     scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9ca3af', maxRotation: 0 } },
-                        y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 }, color: '#9ca3af' } }
+                        x: { grid: { display: false }, ticks: { font: { size: 10, weight: '500' }, color: '#9ca3af', maxRotation: 0, padding: 8 }, border: { display: false } },
+                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)', drawBorder: false }, ticks: { font: { size: 11 }, color: '#9ca3af', padding: 8 }, border: { display: false } }
                     }
                 }
             });
