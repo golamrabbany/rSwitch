@@ -468,6 +468,41 @@
                 </div>
             </div>
 
+            {{-- SIP Account Ranges (Reseller only) --}}
+            @if($user->role === 'reseller')
+            <div class="detail-card">
+                <div class="detail-card-header flex items-center justify-between">
+                    <h3 class="detail-card-title">SIP Account Ranges</h3>
+                    <a href="{{ route('admin.users.edit', $user) }}" class="text-xs text-indigo-600 hover:text-indigo-500 font-medium">Edit</a>
+                </div>
+                <div class="detail-card-body">
+                    @if(!empty($user->sip_ranges))
+                        <div class="space-y-2">
+                            @foreach($user->sip_ranges as $range)
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-mono font-medium text-gray-900">{{ $range['start'] }} — {{ $range['end'] }}</p>
+                                            @php $rangeSize = (int)$range['end'] - (int)$range['start'] + 1; @endphp
+                                            <p class="text-xs text-gray-400">{{ number_format($rangeSize) }} numbers</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-center py-4">
+                            <p class="text-sm text-gray-500">No range restriction</p>
+                            <p class="text-xs text-gray-400 mt-1">This reseller can create any SIP account number</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
             {{-- SIP Accounts --}}
             <div class="detail-card">
                 <div class="detail-card-header flex items-center justify-between">
