@@ -239,6 +239,8 @@
                                         @foreach(auth()->user()->sip_ranges as $range)
                                             <p class="text-xs text-indigo-500 mt-0.5 font-medium">Range: {{ $range['start'] }} — {{ $range['end'] }}</p>
                                         @endforeach
+                                    @else
+                                        <p class="text-xs text-emerald-500 mt-0.5">Any number allowed (no range restriction)</p>
                                     @endif
                                 </div>
                                 <div>

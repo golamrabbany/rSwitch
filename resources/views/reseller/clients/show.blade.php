@@ -414,6 +414,13 @@
                                         <input type="text" name="username" required placeholder="{{ $sipPrefix ? str_repeat('0', $sipMinLen) : 'e.g. 200001' }}" class="form-input font-mono" style="{{ $sipPrefix ? 'padding-left: ' . (strlen($sipPrefix) * 0.6 + 1) . 'rem;' : '' }}">
                                     </div>
                                     <p class="text-xs text-gray-400 mt-1">{{ $sipPrefix ? "Prefix '{$sipPrefix}' + {$sipMinLen}-{$sipMaxLen} digits" : "Numeric, {$sipMinLen}-{$sipMaxLen} digits" }}</p>
+                                    @if(!empty(auth()->user()->sip_ranges))
+                                        @foreach(auth()->user()->sip_ranges as $range)
+                                            <p class="text-xs text-indigo-500 mt-0.5 font-medium">Range: {{ $range['start'] }} — {{ $range['end'] }}</p>
+                                        @endforeach
+                                    @else
+                                        <p class="text-xs text-emerald-500 mt-0.5">Any number allowed (no range restriction)</p>
+                                    @endif
                                 </div>
                                 <div>
                                     <label class="form-label">Password</label>
