@@ -161,6 +161,7 @@
                                 <x-input-error :messages="$errors->get('user_id')" class="mt-2" />
                             </div>
 
+                            <div :style="kycError ? 'opacity: 0.4; pointer-events: none;' : ''">
                             <div class="form-group">
                                 <label for="username" class="form-label">Username (SIP PIN)</label>
                                 @php
@@ -184,10 +185,12 @@
                                 <p class="form-hint">Concurrent call limit (1-100)</p>
                                 <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                             </div>
+                            </div>{{-- /kycError disable wrapper --}}
                         </div>
                     </div>
                 </div>
 
+                <div :style="kycError ? 'opacity: 0.4; pointer-events: none;' : ''">
                 {{-- Authentication --}}
                 <div class="form-card" x-data="{ authType: '{{ old('auth_type', 'password') }}' }">
                     <div class="form-card-header">
@@ -356,10 +359,12 @@
                     </div>
                 </div>
 
+                </div>{{-- /kycError disable wrapper for cards --}}
+
                 {{-- Form Actions --}}
                 <div class="flex items-center justify-end gap-3">
                     <a href="{{ route('admin.sip-accounts.index') }}" class="btn-secondary">Cancel</a>
-                    <button type="submit" class="btn-primary">
+                    <button type="submit" class="btn-primary" :disabled="kycError !== ''" :class="kycError !== '' ? 'opacity-50 cursor-not-allowed' : ''">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                         </svg>
