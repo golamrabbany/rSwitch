@@ -88,15 +88,28 @@ update_application() {
     cd $INSTALL_DIR
 
     # Pull latest code from git
+    GIT_REPO="https://github.com/golamrabbany/rSwitch.git"
     if [[ -d "$INSTALL_DIR/.git" ]]; then
         log_info "Pulling latest code from git..."
-        git stash --quiet 2>/dev/null || true
-        git pull origin master --no-edit
-        git stash pop --quiet 2>/dev/null || true
-        log_success "Code updated from git"
+        git fetch origin master 2>&1
+        git reset --hard origin/master 2>&1
+        log_success "Code updated from git ($(git rev-parse --short HEAD))"
     else
-        log_warning "Not a git repository — skipping git pull"
-        log_info "To enable git updates, run: cd $INSTALL_DIR && git init && git remote add origin https://github.com/golamrabbany/rSwitch.git"
+        log_info "Initializing git repository..."
+        git init
+        git config --global --add safe.directory "$INSTALL_DIR"
+        # Check if token is provided or prompt for it
+        if [[ -f /root/.rswitch-git-token ]]; then
+            GIT_TOKEN=$(cat /root/.rswitch-git-token)
+            GIT_REPO="https://golamrabbany:${GIT_TOKEN}@github.com/golamrabbany/rSwitch.git"
+        else
+            log_warning "No git token found. Create /root/.rswitch-git-token with your GitHub PAT"
+            log_info "Or run: echo 'ghp_YOUR_TOKEN' > /root/.rswitch-git-token"
+        fi
+        git remote add origin "$GIT_REPO"
+        git fetch origin master 2>&1
+        git reset --hard origin/master 2>&1
+        log_success "Git repository initialized and code pulled"
     fi
 
     # Clear caches
