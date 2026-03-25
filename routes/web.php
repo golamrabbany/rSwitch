@@ -162,6 +162,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::get('payments', [Admin\PaymentController::class, 'index'])->name('payments.index');
     Route::get('payments/{payment}', [Admin\PaymentController::class, 'show'])->name('payments.show');
+
+    // Voice Broadcast — Voice Files
+    Route::get('voice-files', [Admin\VoiceFileController::class, 'index'])->name('voice-files.index');
+    Route::get('voice-files/{voiceFile}', [Admin\VoiceFileController::class, 'show'])->name('voice-files.show');
+    Route::get('voice-files/{voiceFile}/play', [Admin\VoiceFileController::class, 'play'])->name('voice-files.play');
+    Route::get('voice-files/{voiceFile}/download', [Admin\VoiceFileController::class, 'download'])->name('voice-files.download');
+    Route::post('voice-files/{voiceFile}/approve', [Admin\VoiceFileController::class, 'approve'])->name('voice-files.approve');
+    Route::post('voice-files/{voiceFile}/reject', [Admin\VoiceFileController::class, 'reject'])->name('voice-files.reject');
 });
 
 // Recharge Admin routes (view-only access + balance operations)
@@ -226,6 +234,11 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::get('cdr/export', [Reseller\CdrController::class, 'export'])->name('cdr.export');
         Route::get('cdr/{uuid}', [Reseller\CdrController::class, 'show'])->name('cdr.show');
 
+        // Voice Broadcast — Voice Files
+        Route::get('voice-files', [Reseller\VoiceFileController::class, 'index'])->name('voice-files.index');
+        Route::get('voice-files/{voiceFile}', [Reseller\VoiceFileController::class, 'show'])->name('voice-files.show');
+        Route::get('voice-files/{voiceFile}/play', [Reseller\VoiceFileController::class, 'play'])->name('voice-files.play');
+
         // Financial
         Route::get('transactions', [Reseller\TransactionController::class, 'index'])->name('transactions.index');
         Route::get('transactions/export', [Reseller\TransactionController::class, 'export'])->name('transactions.export');
@@ -260,6 +273,14 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::get('cdr/export', [Client\CdrController::class, 'export'])->name('cdr.export');
         Route::get('cdr/{uuid}', [Client\CdrController::class, 'show'])->name('cdr.show');
         Route::get('cdr/{uuid}/recording', [Admin\RecordingController::class, 'play'])->name('cdr.recording');
+
+        // Voice Broadcast — Voice Files
+        Route::get('voice-files', [Client\VoiceFileController::class, 'index'])->name('voice-files.index');
+        Route::get('voice-files/create', [Client\VoiceFileController::class, 'create'])->name('voice-files.create');
+        Route::post('voice-files', [Client\VoiceFileController::class, 'store'])->name('voice-files.store');
+        Route::get('voice-files/{voiceFile}', [Client\VoiceFileController::class, 'show'])->name('voice-files.show');
+        Route::get('voice-files/{voiceFile}/play', [Client\VoiceFileController::class, 'play'])->name('voice-files.play');
+        Route::delete('voice-files/{voiceFile}', [Client\VoiceFileController::class, 'destroy'])->name('voice-files.destroy');
 
         Route::get('transactions', [Client\TransactionController::class, 'index'])->name('transactions.index');
 

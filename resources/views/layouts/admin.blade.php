@@ -194,6 +194,25 @@
                     </div>
                 </div>
 
+                <!-- Voice Broadcast -->
+                @php $broadcastActive = request()->routeIs('admin.voice-files.*', 'admin.broadcasts.*'); @endphp
+                <div x-data="{ open: {{ $broadcastActive ? 'true' : 'false' }} }" class="mb-1">
+                    <button @click="open = !open" class="nav-parent {{ $broadcastActive ? 'has-active' : 'text-gray-600' }}">
+                        <div class="flex items-center">
+                            <svg class="nav-icon {{ $broadcastActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                            </svg>
+                            <span class="nav-text">Voice Broadcast</span>
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-collapse class="nav-children">
+                        <a href="{{ route('admin.voice-files.index') }}" class="nav-child {{ request()->routeIs('admin.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Files</a>
+                    </div>
+                </div>
+
                 <div class="my-3 border-t border-gray-100"></div>
 
                 <!-- Finance Menu -->

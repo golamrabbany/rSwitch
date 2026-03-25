@@ -41,7 +41,7 @@
                 <div class="my-3 border-t border-gray-100"></div>
 
                 <!-- Telecom Menu -->
-                @php $telecomActive = request()->routeIs('client.base-rate', 'client.sip-accounts.*', 'client.dids.*', 'client.cdr.*'); @endphp
+                @php $telecomActive = request()->routeIs('client.base-rate', 'client.sip-accounts.*', 'client.dids.*', 'client.cdr.*', 'client.voice-files.*', 'client.broadcasts.*'); @endphp
                 <div x-data="{ open: {{ $telecomActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $telecomActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
@@ -59,6 +59,7 @@
                         <a href="{{ route('client.sip-accounts.index') }}" class="nav-child {{ request()->routeIs('client.sip-accounts.*') ? 'active' : 'text-gray-500' }}">SIP Accounts</a>
                         <a href="{{ route('client.dids.index') }}" class="nav-child {{ request()->routeIs('client.dids.*') ? 'active' : 'text-gray-500' }}">DIDs</a>
                         <a href="{{ route('client.cdr.index') }}" class="nav-child {{ request()->routeIs('client.cdr.*') ? 'active' : 'text-gray-500' }}">CDR / Reports</a>
+                        <a href="{{ route('client.voice-files.index') }}" class="nav-child {{ request()->routeIs('client.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Files</a>
                     </div>
                 </div>
 
