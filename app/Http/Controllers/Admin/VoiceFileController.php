@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\VoiceFile;
 use App\Services\VoiceFileService;
 use Illuminate\Http\Request;
@@ -34,6 +35,39 @@ class VoiceFileController extends Controller
         ];
 
         return view('admin.voice-files.index', compact('voiceFiles', 'stats'));
+    }
+
+    public function create()
+    {
+        $clients = User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email']);
+
+        return view('admin.voice-files.create', compact('clients'));
+    }
+
+    public function store(Request $request, VoiceFileService $service)
+    {
+        $request->validate([
+            'user_id' => ['required', 'exists:users,id'],
+            'name' => ['required', 'string', 'max:100'],
+            'voice_file' => ['required', 'file', 'mimes:wav,mp3', 'max:10240'],
+        ]);
+
+        $client = User::findOrFail($request->user_id);
+        abort_unless(auth()->user()->canManage($client), 403);
+
+        $voiceFile = $service->upload(
+            $request->file('voice_file'),
+            $client,
+            $request->name
+        );
+
+        // Super Admin upload = auto-approved
+        if (auth()->user()->isSuperAdmin()) {
+            $service->approve($voiceFile, auth()->user());
+        }
+
+        return redirect()->route('admin.voice-files.show', $voiceFile)
+            ->with('success', 'Voice file uploaded' . (auth()->user()->isSuperAdmin() ? ' and auto-approved.' : '. Pending approval.'));
     }
 
     public function show(VoiceFile $voiceFile)

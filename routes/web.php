@@ -165,6 +165,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     // Voice Broadcast — Voice Files
     Route::get('voice-files', [Admin\VoiceFileController::class, 'index'])->name('voice-files.index');
+    Route::get('voice-files/create', [Admin\VoiceFileController::class, 'create'])->name('voice-files.create');
+    Route::post('voice-files', [Admin\VoiceFileController::class, 'store'])->name('voice-files.store');
     Route::get('voice-files/{voiceFile}', [Admin\VoiceFileController::class, 'show'])->name('voice-files.show');
     Route::get('voice-files/{voiceFile}/play', [Admin\VoiceFileController::class, 'play'])->name('voice-files.play');
     Route::get('voice-files/{voiceFile}/download', [Admin\VoiceFileController::class, 'download'])->name('voice-files.download');
