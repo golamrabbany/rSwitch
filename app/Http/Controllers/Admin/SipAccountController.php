@@ -175,9 +175,13 @@ class SipAccountController extends Controller
         $pinMinLen = \App\Models\SystemSetting::get('sip_pin_min_length', 4);
         $pinMaxLen = \App\Models\SystemSetting::get('sip_pin_max_length', 10);
 
+        $prefixLen = strlen($pinPrefix);
+        $totalMinLen = $prefixLen + $pinMinLen;
+        $totalMaxLen = $prefixLen + $pinMaxLen;
+
         $usernameRules = ['required', 'string', 'unique:sip_accounts,username', 'regex:/^\d+$/'];
-        $usernameRules[] = "min:{$pinMinLen}";
-        $usernameRules[] = "max:{$pinMaxLen}";
+        $usernameRules[] = "min:{$totalMinLen}";
+        $usernameRules[] = "max:{$totalMaxLen}";
         if ($pinPrefix) {
             $usernameRules[] = "starts_with:{$pinPrefix}";
         }
@@ -196,8 +200,8 @@ class SipAccountController extends Controller
             'allow_recording' => ['boolean'],
         ], [
             'username.regex' => 'PIN must contain only numeric digits.',
-            'username.min' => "PIN must be at least {$pinMinLen} digits.",
-            'username.max' => "PIN must not exceed {$pinMaxLen} digits.",
+            'username.min' => "PIN must be at least {$pinMinLen} digits after prefix '{$pinPrefix}' (total {$totalMinLen}).",
+            'username.max' => "PIN must not exceed {$pinMaxLen} digits after prefix '{$pinPrefix}' (total {$totalMaxLen}).",
             'username.starts_with' => "PIN must start with prefix '{$pinPrefix}'.",
             'username.unique' => 'This PIN is already in use.',
         ]);
@@ -592,14 +596,17 @@ class SipAccountController extends Controller
                     $importPinPrefix = \App\Models\SystemSetting::get('sip_pin_prefix', '');
                     $importPinMinLen = \App\Models\SystemSetting::get('sip_pin_min_length', 4);
                     $importPinMaxLen = \App\Models\SystemSetting::get('sip_pin_max_length', 10);
+                    $importPrefixLen = strlen($importPinPrefix);
+                    $importTotalMin = $importPrefixLen + $importPinMinLen;
+                    $importTotalMax = $importPrefixLen + $importPinMaxLen;
 
                     if (!preg_match('/^\d+$/', $username)) {
                         $results['errors'][] = "Row {$rowNum}: Username '{$username}' must be numeric digits only";
                         $results['skipped']++;
                         continue;
                     }
-                    if (strlen($username) < $importPinMinLen || strlen($username) > $importPinMaxLen) {
-                        $results['errors'][] = "Row {$rowNum}: Username '{$username}' must be {$importPinMinLen}-{$importPinMaxLen} digits";
+                    if (strlen($username) < $importTotalMin || strlen($username) > $importTotalMax) {
+                        $results['errors'][] = "Row {$rowNum}: Username '{$username}' must be {$importTotalMin}-{$importTotalMax} digits (prefix '{$importPinPrefix}' + {$importPinMinLen}-{$importPinMaxLen} digits)";
                         $results['skipped']++;
                         continue;
                     }

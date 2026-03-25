@@ -71,9 +71,13 @@ class SipAccountController extends Controller
         $pinMinLen = \App\Models\SystemSetting::get('sip_pin_min_length', 4);
         $pinMaxLen = \App\Models\SystemSetting::get('sip_pin_max_length', 10);
 
+        $prefixLen = strlen($pinPrefix);
+        $totalMinLen = $prefixLen + $pinMinLen;
+        $totalMaxLen = $prefixLen + $pinMaxLen;
+
         $usernameRules = ['required', 'string', 'unique:sip_accounts,username', 'regex:/^\d+$/'];
-        $usernameRules[] = "min:{$pinMinLen}";
-        $usernameRules[] = "max:{$pinMaxLen}";
+        $usernameRules[] = "min:{$totalMinLen}";
+        $usernameRules[] = "max:{$totalMaxLen}";
         if ($pinPrefix) {
             $usernameRules[] = "starts_with:{$pinPrefix}";
         }
@@ -90,8 +94,8 @@ class SipAccountController extends Controller
             'codec_allow' => ['required', 'string', 'max:100'],
         ], [
             'username.regex' => 'PIN must contain only numeric digits.',
-            'username.min' => "PIN must be at least {$pinMinLen} digits.",
-            'username.max' => "PIN must not exceed {$pinMaxLen} digits.",
+            'username.min' => "PIN must be at least {$pinMinLen} digits after prefix '{$pinPrefix}' (total {$totalMinLen}).",
+            'username.max' => "PIN must not exceed {$pinMaxLen} digits after prefix '{$pinPrefix}' (total {$totalMaxLen}).",
             'username.starts_with' => "PIN must start with prefix '{$pinPrefix}'.",
             'username.unique' => 'This PIN is already in use.',
         ]);
