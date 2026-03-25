@@ -206,6 +206,12 @@ class SipAccountController extends Controller
             'username.unique' => 'This PIN is already in use.',
         ]);
 
+        // KYC check — cannot create SIP account for non-approved client
+        $client = \App\Models\User::find($validated['user_id']);
+        if ($client && $client->kyc_status !== 'approved') {
+            return back()->withInput()->with('warning', "Cannot create SIP account: {$client->name}'s KYC is not approved ({$client->kyc_status}).");
+        }
+
         // Handle checkbox boolean conversion (unchecked checkboxes send nothing)
         $validated['allow_p2p'] = $request->boolean('allow_p2p');
         $validated['allow_recording'] = $request->boolean('allow_recording');
@@ -485,6 +491,12 @@ class SipAccountController extends Controller
             'allow_p2p' => ['boolean'],
             'allow_recording' => ['boolean'],
         ]);
+
+        // KYC check for import
+        $importClient = User::find($validated['user_id']);
+        if ($importClient && $importClient->kyc_status !== 'approved') {
+            return back()->withInput()->with('warning', "Cannot import SIP accounts: {$importClient->name}'s KYC is not approved ({$importClient->kyc_status}).");
+        }
 
         $mode = $validated['mode'];
         $allowP2p = $request->boolean('allow_p2p');

@@ -100,6 +100,12 @@ class SipAccountController extends Controller
             'username.unique' => 'This PIN is already in use.',
         ]);
 
+        // KYC check
+        $client = \App\Models\User::find($validated['user_id']);
+        if ($client && $client->kyc_status !== 'approved') {
+            return back()->withInput()->with('warning', "Cannot create SIP account: {$client->name}'s KYC is not approved.");
+        }
+
         $sip = SipAccount::create($validated);
 
         $this->provisioning->provision($sip);
