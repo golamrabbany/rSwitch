@@ -101,7 +101,7 @@ class SipAccountController extends Controller
         }
 
         return response()->json(
-            $query->limit(20)->get(['id', 'name', 'email', 'parent_id'])
+            $query->limit(20)->get(['id', 'name', 'email', 'parent_id', 'balance', 'kyc_status'])
         );
     }
 
