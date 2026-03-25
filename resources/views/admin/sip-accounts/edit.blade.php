@@ -118,7 +118,10 @@
                                                         <p class="text-xs text-gray-500" x-text="user.email"></p>
                                                     </div>
                                                 </div>
-                                                <span class="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">Client</span>
+                                                <div class="text-right">
+                                                    <p class="text-sm font-mono font-semibold" :class="parseFloat(user.balance) > 0 ? 'text-emerald-600' : 'text-red-500'" x-text="'{{ currency_symbol() }}' + parseFloat(user.balance || 0).toFixed(2)"></p>
+                                                    <p class="text-xs" :class="user.kyc_status === 'approved' ? 'text-emerald-500' : 'text-amber-500'" x-text="user.kyc_status === 'approved' ? 'KYC Approved' : 'KYC: ' + (user.kyc_status || 'none')"></p>
+                                                </div>
                                             </div>
                                         </template>
                                     </div>
