@@ -25,7 +25,7 @@ class User extends Authenticatable
         'kyc_status', 'kyc_verified_at', 'kyc_rejected_reason',
         'billing_type', 'credit_limit', 'balance', 'currency', 'rate_group_id',
         'min_balance_for_calls', 'low_balance_threshold',
-        'max_channels', 'sip_range_start', 'sip_range_end', 'daily_spend_limit', 'daily_call_limit',
+        'max_channels', 'sip_ranges', 'daily_spend_limit', 'daily_call_limit',
         'destination_whitelist_enabled',
         'two_fa_enabled', 'two_fa_secret', 'two_fa_recovery_codes', 'two_fa_confirmed_at',
         'otp_code', 'otp_expires_at',
@@ -46,6 +46,7 @@ class User extends Authenticatable
             'balance' => 'decimal:4',
             'credit_limit' => 'decimal:4',
             'destination_whitelist_enabled' => 'boolean',
+            'sip_ranges' => 'array',
             'two_fa_enabled' => 'boolean',
             'otp_expires_at' => 'datetime',
         ];

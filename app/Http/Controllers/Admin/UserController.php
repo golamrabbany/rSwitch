@@ -128,8 +128,7 @@ class UserController extends Controller
             'balance' => $validated['balance'] ?? 0,
             'credit_limit' => $validated['credit_limit'] ?? 0,
             'max_channels' => $validated['max_channels'] ?? 10,
-            'sip_range_start' => $request->input('sip_range_start'),
-            'sip_range_end' => $request->input('sip_range_end'),
+            'sip_ranges' => $this->parseSipRanges($request->input('sip_ranges')),
             'status' => 'active',
         ]);
 
@@ -286,8 +285,7 @@ class UserController extends Controller
             'rate_group_id' => $validated['rate_group_id'],
             'credit_limit' => $validated['credit_limit'] ?? 0,
             'max_channels' => $validated['max_channels'] ?? 10,
-            'sip_range_start' => $request->input('sip_range_start'),
-            'sip_range_end' => $request->input('sip_range_end'),
+            'sip_ranges' => $this->parseSipRanges($request->input('sip_ranges')),
             'daily_spend_limit' => $validated['daily_spend_limit'],
             'daily_call_limit' => $validated['daily_call_limit'],
         ]);
@@ -319,5 +317,26 @@ class UserController extends Controller
         AuditService::logUpdated($user, $original, 'user.status_toggled');
 
         return back()->with('success', "User {$user->status}.");
+    }
+
+    /**
+     * Parse SIP ranges from form input, filter empty and validate.
+     */
+    private function parseSipRanges(?array $ranges): ?array
+    {
+        if (!$ranges) return null;
+
+        $valid = [];
+        foreach ($ranges as $range) {
+            $start = trim($range['start'] ?? '');
+            $end = trim($range['end'] ?? '');
+            if ($start !== '' && $end !== '' && ctype_digit($start) && ctype_digit($end)) {
+                if (strcmp($start, $end) <= 0) {
+                    $valid[] = ['start' => $start, 'end' => $end];
+                }
+            }
+        }
+
+        return !empty($valid) ? $valid : null;
     }
 }

@@ -169,29 +169,51 @@
                     </div>
                 </div>
 
-                {{-- SIP Range (Reseller only) --}}
+                {{-- SIP Ranges (Reseller only) --}}
                 @if($user->role === 'reseller')
-                <div class="form-card">
+                @php
+                    $sipPrefix = \App\Models\SystemSetting::get('sip_pin_prefix', '');
+                    $existingRanges = $user->sip_ranges ?: [['start' => '', 'end' => '']];
+                @endphp
+                <div class="form-card" x-data="{ ranges: {{ json_encode($existingRanges) }} }">
                     <div class="form-card-header">
-                        <h3 class="form-card-title">SIP Account Range</h3>
-                        <p class="form-card-subtitle">Allowed number range for this reseller's SIP accounts</p>
-                    </div>
-                    <div class="form-card-body">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="form-group">
-                                <label class="form-label">Range Start</label>
-                                <input type="text" name="sip_range_start" value="{{ old('sip_range_start', $user->sip_range_start) }}" class="form-input font-mono" placeholder="e.g. 09603100000">
-                                <p class="form-hint">First allowed SIP account number</p>
-                                <x-input-error :messages="$errors->get('sip_range_start')" class="mt-2" />
+                        <div class="flex items-center justify-between w-full">
+                            <div>
+                                <h3 class="form-card-title">SIP Account Ranges</h3>
+                                <p class="form-card-subtitle">Allowed number ranges for this reseller's SIP accounts</p>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Range End</label>
-                                <input type="text" name="sip_range_end" value="{{ old('sip_range_end', $user->sip_range_end) }}" class="form-input font-mono" placeholder="e.g. 09603100050">
-                                <p class="form-hint">Last allowed SIP account number</p>
-                                <x-input-error :messages="$errors->get('sip_range_end')" class="mt-2" />
-                            </div>
+                            <button type="button" @click="ranges.push({ start: '', end: '' })" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Add Range
+                            </button>
                         </div>
-                        <p class="text-xs text-gray-400 mt-2">Leave empty to allow any PIN. Reseller can only create SIP accounts within this range.</p>
+                    </div>
+                    <div class="form-card-body space-y-3">
+                        <template x-for="(range, index) in ranges" :key="index">
+                            <div class="flex items-center gap-3">
+                                <div class="flex-1">
+                                    <div class="relative">
+                                        @if($sipPrefix)
+                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-sm">{{ $sipPrefix }}</span>
+                                        @endif
+                                        <input type="text" :name="'sip_ranges[' + index + '][start]'" x-model="range.start" class="form-input font-mono" style="{{ $sipPrefix ? 'padding-left: ' . (strlen($sipPrefix) * 0.6 + 1) . 'rem;' : '' }}" placeholder="Start">
+                                    </div>
+                                </div>
+                                <span class="text-gray-400 text-sm">to</span>
+                                <div class="flex-1">
+                                    <div class="relative">
+                                        @if($sipPrefix)
+                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-sm">{{ $sipPrefix }}</span>
+                                        @endif
+                                        <input type="text" :name="'sip_ranges[' + index + '][end]'" x-model="range.end" class="form-input font-mono" style="{{ $sipPrefix ? 'padding-left: ' . (strlen($sipPrefix) * 0.6 + 1) . 'rem;' : '' }}" placeholder="End">
+                                    </div>
+                                </div>
+                                <button type="button" @click="ranges.length > 1 ? ranges.splice(index, 1) : (ranges[0] = { start: '', end: '' })" class="p-2 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                            </div>
+                        </template>
+                        <p class="text-xs text-gray-400">Leave empty to allow any PIN. Start and end must be valid numbers.</p>
                     </div>
                 </div>
                 @endif
