@@ -1,5 +1,6 @@
 ; rSwitch PJSIP Configuration Template
 ; Endpoints are loaded from realtime database
+; Optimized for high call volume
 
 [global]
 type=global
@@ -8,6 +9,12 @@ user_agent=rSwitch PBX
 default_from_user=rswitch
 endpoint_identifier_order=ip,username
 max_initial_qualify_time=4
+keep_alive_interval=30
+; Performance: disable unnecessary processing
+disable_tcp_switch=yes
+; Threadpool: increase for high concurrency
+taskprocessor_overload_trigger=global
+taskprocessor_overload_trigger_count=500
 
 ; UDP Transport — with QoS for voice traffic prioritization
 [transport-udp]
@@ -19,6 +26,7 @@ local_net=172.16.0.0/12
 local_net=192.168.0.0/16
 cos=5
 tos=0xB8
+; Set to your server's public IP (installer will replace):
 ; external_media_address=YOUR_PUBLIC_IP
 ; external_signaling_address=YOUR_PUBLIC_IP
 

@@ -138,18 +138,54 @@ update_application() {
     sudo -u www-data php artisan route:cache
     sudo -u www-data php artisan view:cache
 
-    # Update Asterisk dialplan
-    log_info "Updating Asterisk dialplan..."
-    if [[ -f "$INSTALL_DIR/installer/templates/asterisk/extensions.conf.template" ]]; then
-        cp "$INSTALL_DIR/installer/templates/asterisk/extensions.conf.template" /etc/asterisk/extensions.conf
-        chown asterisk:asterisk /etc/asterisk/extensions.conf
+    # Update Asterisk configs from templates
+    log_info "Updating Asterisk configuration..."
+    if [[ -d "$INSTALL_DIR/installer/templates/asterisk" ]]; then
+        for tpl in extensions.conf pjsip.conf rtp.conf modules.conf manager.conf; do
+            if [[ -f "$INSTALL_DIR/installer/templates/asterisk/${tpl}.template" ]]; then
+                cp "$INSTALL_DIR/installer/templates/asterisk/${tpl}.template" "/etc/asterisk/${tpl}"
+                chown asterisk:asterisk "/etc/asterisk/${tpl}"
+            fi
+        done
+        # Restore AMI secret (template has placeholder)
+        if [[ -n "$AMI_SECRET" ]]; then
+            sed -i "s/{{AMI_SECRET}}/${AMI_SECRET}/" /etc/asterisk/manager.conf
+        elif grep -q 'AMI_SECRET' "$INSTALL_DIR/.env" 2>/dev/null; then
+            AMI_SECRET=$(grep 'AMI_SECRET' "$INSTALL_DIR/.env" | cut -d= -f2)
+            sed -i "s/{{AMI_SECRET}}/${AMI_SECRET}/" /etc/asterisk/manager.conf
+        fi
         asterisk -rx "dialplan reload" 2>/dev/null || true
-        log_success "Asterisk dialplan updated"
+        asterisk -rx "module reload" 2>/dev/null || true
+        log_success "Asterisk configs updated from templates"
     fi
 
-    # Create recording directory if it doesn't exist
+    # Create required directories
     mkdir -p /var/spool/asterisk/recording
+    mkdir -p /var/spool/asterisk/voicebroadcast
     chown asterisk:asterisk /var/spool/asterisk/recording
+    chown asterisk:asterisk /var/spool/asterisk/voicebroadcast
+
+    # Apply kernel tuning if not already present
+    if [[ ! -f /etc/sysctl.d/99-rswitch-asterisk.conf ]]; then
+        log_info "Applying kernel tuning..."
+        cat > /etc/sysctl.d/99-rswitch-asterisk.conf << 'SYSEOF'
+net.core.rmem_max = 26214400
+net.core.wmem_max = 26214400
+net.core.rmem_default = 1048576
+net.core.wmem_default = 1048576
+net.core.somaxconn = 4096
+net.core.netdev_max_backlog = 5000
+net.ipv4.tcp_max_syn_backlog = 4096
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.udp_mem = 65536 131072 262144
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
+fs.file-max = 262144
+SYSEOF
+        sysctl -p /etc/sysctl.d/99-rswitch-asterisk.conf 2>/dev/null || true
+        log_success "Kernel tuning applied"
+    fi
 
     # Update IVR sound files
     if [[ -d "$INSTALL_DIR/IVR" ]]; then

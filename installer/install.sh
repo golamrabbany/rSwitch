@@ -703,8 +703,9 @@ username => ${DB_USER}
 password => ${DB_PASS}
 pre-connect => yes
 sanitysql => select 1
-max_connections => 5
+max_connections => 100
 connect_timeout => 10
+logging => no
 EOF
 
     log_success "ODBC configured"
@@ -969,24 +970,65 @@ rungroup = asterisk
 verbose = 1
 debug = 0
 highpriority = yes
-maxcalls = 1200
+maxcalls = 3000
 maxload = 0.9
+cache_record_files = yes
 transmit_silence = yes
 hideconnect = yes
+live_dangerously = no
+timestamp = yes
 EOF
 
-    # File descriptor limits for high call volume
+    # Create voicebroadcast directory
+    mkdir -p /var/spool/asterisk/voicebroadcast
+    chown asterisk:asterisk /var/spool/asterisk/voicebroadcast
+
+    # File descriptor limits — high for 3000+ concurrent calls
     cat > /etc/security/limits.d/asterisk.conf << 'LIMEOF'
-asterisk soft nofile 65536
-asterisk hard nofile 65536
+asterisk soft nofile 131072
+asterisk hard nofile 131072
 LIMEOF
 
     mkdir -p /etc/systemd/system/asterisk.service.d
     cat > /etc/systemd/system/asterisk.service.d/limits.conf << 'LIMEOF'
 [Service]
-LimitNOFILE=65536
+LimitNOFILE=131072
+LimitCORE=infinity
+Nice=-10
 LIMEOF
     systemctl daemon-reload
+
+    # Kernel tuning for high-volume SIP/RTP
+    cat > /etc/sysctl.d/99-rswitch-asterisk.conf << 'SYSEOF'
+# rSwitch Asterisk Performance Tuning
+# Network buffers for SIP/RTP traffic
+net.core.rmem_max = 26214400
+net.core.wmem_max = 26214400
+net.core.rmem_default = 1048576
+net.core.wmem_default = 1048576
+net.core.somaxconn = 4096
+net.core.netdev_max_backlog = 5000
+
+# TCP tuning
+net.ipv4.tcp_max_syn_backlog = 4096
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+
+# UDP buffer
+net.ipv4.udp_mem = 65536 131072 262144
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
+
+# Connection tracking (for NAT/firewall)
+net.netfilter.nf_conntrack_max = 262144
+net.netfilter.nf_conntrack_udp_timeout = 30
+net.netfilter.nf_conntrack_udp_timeout_stream = 60
+
+# File handles
+fs.file-max = 262144
+SYSEOF
+    sysctl -p /etc/sysctl.d/99-rswitch-asterisk.conf 2>/dev/null || true
+    log_success "Kernel tuning applied"
 
     # Create SSL directory
     mkdir -p /etc/asterisk/keys

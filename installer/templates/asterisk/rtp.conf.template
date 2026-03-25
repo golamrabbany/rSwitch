@@ -1,10 +1,10 @@
 ; rSwitch RTP Configuration
-; Optimized for high call volume (1000+ concurrent calls)
+; Optimized for high call volume (3000+ concurrent calls)
 
 [general]
-; Wide port range: 20,000 ports = supports 10,000 concurrent RTP streams
+; Port range: 10,000 ports = 5,000 concurrent calls (2 ports per call)
 rtpstart=10000
-rtpend=30000
+rtpend=20000
 
 ; Security: enforce symmetric RTP
 strictrtp=yes
@@ -12,3 +12,6 @@ strictrtp=yes
 ; Performance: disable ICE/STUN (not needed for server-to-server)
 icesupport=no
 stunaddr=
+
+; Performance: reduce DTMF detection overhead
+dtmftimeout=3000
