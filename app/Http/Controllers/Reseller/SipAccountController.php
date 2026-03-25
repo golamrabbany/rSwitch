@@ -93,8 +93,8 @@ class SipAccountController extends Controller
             'auth_type' => ['required', Rule::in(['password', 'ip', 'both'])],
             'allowed_ips' => ['nullable', 'required_if:auth_type,ip', 'required_if:auth_type,both', 'string', 'max:500'],
             'caller_id_name' => ['required', 'string', 'max:80'],
-            'caller_id_number' => ['required', 'string', 'max:20'],
-            'max_channels' => ['required', 'integer', 'min:1', 'max:100'],
+            'caller_id_number' => ['nullable', 'string', 'max:20'],
+            'max_channels' => ['nullable', 'integer', 'min:1', 'max:100'],
             'codec_allow' => ['required', 'string', 'max:100'],
         ], [
             'username.regex' => 'PIN must contain only numeric digits.',
@@ -128,6 +128,10 @@ class SipAccountController extends Controller
                 return back()->withInput()->with('warning', 'PIN must be within your assigned range(s): ' . implode(', ', $rangeText) . '.');
             }
         }
+
+        // Auto-set caller_id_number to username, max_channels to 1
+        $validated['caller_id_number'] = $validated['caller_id_number'] ?: $validated['username'];
+        $validated['max_channels'] = $validated['max_channels'] ?: 1;
 
         $sip = SipAccount::create($validated);
 

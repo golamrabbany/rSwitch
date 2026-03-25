@@ -274,27 +274,18 @@
                                 </div>
                             </div>
 
-                            {{-- Caller ID --}}
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="form-label">Caller ID Name</label>
-                                    <input type="text" name="caller_id_name" x-model="form.caller_id_name" required class="form-input">
-                                    <p class="text-xs text-gray-400 mt-1">Display name for outgoing calls</p>
-                                </div>
-                                <div>
-                                    <label class="form-label">Caller ID Number</label>
-                                    <input type="text" name="caller_id_number" x-model="form.caller_id_number" required placeholder="e.g. 01XXXXXXXXX" class="form-input">
-                                    <p class="text-xs text-gray-400 mt-1">Phone number shown to callee</p>
-                                </div>
+                            {{-- Caller ID Name only --}}
+                            <div>
+                                <label class="form-label">Caller ID Name</label>
+                                <input type="text" name="caller_id_name" x-model="form.caller_id_name" required class="form-input">
+                                <p class="text-xs text-gray-400 mt-1">Display name for outgoing calls</p>
                             </div>
+                            {{-- Hidden: Caller ID Number = username, Max Channels = 1 --}}
+                            <input type="hidden" name="caller_id_number" :value="form.caller_id_number">
+                            <input type="hidden" name="max_channels" value="1">
 
-                            {{-- Channels + Codec --}}
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="form-label">Max Channels</label>
-                                    <input type="number" name="max_channels" x-model="form.max_channels" required min="1" max="100" class="form-input">
-                                    <p class="text-xs text-gray-400 mt-1">Max concurrent calls (1–100)</p>
-                                </div>
+                            {{-- Codec --}}
+                            <div>
                                 <div x-data="{
                                     codecs: ['ulaw', 'alaw', 'g729'],
                                     get selected() { return (form.codec_allow || 'ulaw').split(',').map(s => s.trim()).filter(Boolean); },
