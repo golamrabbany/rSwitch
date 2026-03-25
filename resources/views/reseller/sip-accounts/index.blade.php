@@ -274,18 +274,17 @@
                                 </div>
                             </div>
 
-                            {{-- Caller ID Name only --}}
-                            <div>
-                                <label class="form-label">Caller ID Name</label>
-                                <input type="text" name="caller_id_name" x-model="form.caller_id_name" required class="form-input">
-                                <p class="text-xs text-gray-400 mt-1">Display name for outgoing calls</p>
-                            </div>
                             {{-- Hidden: Caller ID Number = username, Max Channels = 1 --}}
                             <input type="hidden" name="caller_id_number" :value="form.caller_id_number">
                             <input type="hidden" name="max_channels" value="1">
 
-                            {{-- Codec --}}
-                            <div>
+                            {{-- Caller ID Name + Codec --}}
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="form-label">Caller ID Name</label>
+                                    <input type="text" name="caller_id_name" x-model="form.caller_id_name" required class="form-input">
+                                    <p class="text-xs text-gray-400 mt-1">Display name for outgoing calls</p>
+                                </div>
                                 <div x-data="{
                                     codecs: ['ulaw', 'alaw', 'g729'],
                                     get selected() { return (form.codec_allow || 'ulaw').split(',').map(s => s.trim()).filter(Boolean); },
@@ -317,7 +316,7 @@
                                     </div>
                                     <p class="text-xs text-gray-400 mt-1">Audio codecs for this endpoint</p>
                                 </div>
-                            </div>
+                            </div>{{-- /grid-cols-2 Caller ID + Codec --}}
 
                             </div>{{-- /kycError disable wrapper --}}
 
