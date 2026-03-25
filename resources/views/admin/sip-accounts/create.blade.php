@@ -148,9 +148,19 @@
                             </div>
 
                             <div class="form-group">
-                                <label for="username" class="form-label">Username (SIP ID)</label>
-                                <input type="text" id="username" name="username" x-model="username" @input="updateUsername($event.target.value)" required class="form-input font-mono" placeholder="e.g. 100001">
-                                <p class="form-hint">Alphanumeric, dashes, underscores only</p>
+                                <label for="username" class="form-label">Username (SIP PIN)</label>
+                                @php
+                                    $sipPrefix = \App\Models\SystemSetting::get('sip_pin_prefix', '');
+                                    $sipMinLen = \App\Models\SystemSetting::get('sip_pin_min_length', 4);
+                                    $sipMaxLen = \App\Models\SystemSetting::get('sip_pin_max_length', 10);
+                                @endphp
+                                <div class="relative">
+                                    @if($sipPrefix)
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono font-medium">{{ $sipPrefix }}</span>
+                                    @endif
+                                    <input type="text" id="username" name="username" x-model="username" @input="updateUsername($event.target.value)" required class="form-input font-mono" style="{{ $sipPrefix ? 'padding-left: ' . (strlen($sipPrefix) * 0.6 + 1) . 'rem;' : '' }}" placeholder="{{ $sipPrefix ? str_repeat('0', $sipMinLen) : 'e.g. 100001' }}">
+                                </div>
+                                <p class="form-hint">{{ $sipPrefix ? "Prefix '{$sipPrefix}' + {$sipMinLen}-{$sipMaxLen} digits" : "Numeric digits, {$sipMinLen}-{$sipMaxLen} characters" }}</p>
                                 <x-input-error :messages="$errors->get('username')" class="mt-2" />
                             </div>
 

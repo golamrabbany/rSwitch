@@ -215,16 +215,26 @@
                             </div>
 
                             {{-- Username + Password --}}
+                            @php
+                                $sipPrefix = \App\Models\SystemSetting::get('sip_pin_prefix', '');
+                                $sipMinLen = \App\Models\SystemSetting::get('sip_pin_min_length', 4);
+                                $sipMaxLen = \App\Models\SystemSetting::get('sip_pin_max_length', 10);
+                            @endphp
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label class="form-label">Username</label>
+                                    <label class="form-label">Username (PIN)</label>
                                     <template x-if="mode === 'add'">
-                                        <input type="text" name="username" required placeholder="e.g. 200001" class="form-input font-mono">
+                                        <div class="relative">
+                                            @if($sipPrefix)
+                                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono font-medium">{{ $sipPrefix }}</span>
+                                            @endif
+                                            <input type="text" name="username" required placeholder="{{ $sipPrefix ? str_repeat('0', $sipMinLen) : 'e.g. 200001' }}" class="form-input font-mono" style="{{ $sipPrefix ? 'padding-left: ' . (strlen($sipPrefix) * 0.6 + 1) . 'rem;' : '' }}">
+                                        </div>
                                     </template>
                                     <template x-if="mode === 'edit'">
                                         <input type="text" disabled :value="editUsername" class="form-input font-mono bg-gray-50 text-gray-500">
                                     </template>
-                                    <p class="text-xs text-gray-400 mt-1">Unique SIP login username</p>
+                                    <p class="text-xs text-gray-400 mt-1">{{ $sipPrefix ? "Prefix '{$sipPrefix}' + {$sipMinLen}-{$sipMaxLen} digits" : "Numeric, {$sipMinLen}-{$sipMaxLen} digits" }}</p>
                                 </div>
                                 <div>
                                     <label class="form-label" x-text="mode === 'add' ? 'Password' : 'New Password'"></label>
