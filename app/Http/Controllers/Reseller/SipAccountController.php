@@ -46,7 +46,11 @@ class SipAccountController extends Controller
         // Only show clients in filter dropdown
         $users = User::whereIn('id', $clientIds)->orderBy('name')->get();
 
-        return view('reseller.sip-accounts.index', compact('sipAccounts', 'users'));
+        $clientsJson = $users->map(function ($u) {
+            return ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'kyc_status' => $u->kyc_status, 'balance' => $u->balance];
+        })->values()->toArray();
+
+        return view('reseller.sip-accounts.index', compact('sipAccounts', 'users', 'clientsJson'));
     }
 
     public function create(Request $request)

@@ -350,7 +350,7 @@
 
 @push('scripts')
 <script>
-const _clients = @json($users->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'kyc_status' => $u->kyc_status, 'balance' => $u->balance]));
+const _clients = @json($clientsJson);
 
 function clientSearch() {
     return {
