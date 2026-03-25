@@ -208,18 +208,23 @@
                                     <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                     <span class="text-xs text-red-700" x-text="kycError"></span>
                                 </div>
-                                <div x-show="open && mode === 'add' && filteredClients.length > 0" @click.away="open = false" class="absolute z-50 mt-1 w-full bg-white rounded-lg border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
+                                <div x-show="open && mode === 'add' && filteredClients.length > 0" @click.away="open = false" class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
                                     <template x-for="c in filteredClients" :key="c.id">
-                                        <button type="button" @click="selectClient(c)" class="w-full px-3 py-2 text-left text-sm hover:bg-emerald-50 flex items-center justify-between">
-                                            <div>
-                                                <span class="font-medium text-gray-900" x-text="c.name"></span>
-                                                <span class="text-xs text-gray-400 ml-1" x-text="c.email"></span>
+                                        <div @click="selectClient(c)" class="px-4 py-2 cursor-pointer hover:bg-emerald-50 flex items-center justify-between" :class="{ 'bg-emerald-50': form.user_id == c.id }">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                                                    <span class="text-xs font-medium text-emerald-600" x-text="c.name.substring(0, 2).toUpperCase()"></span>
+                                                </div>
+                                                <div>
+                                                    <p class="text-sm font-medium text-gray-900" x-text="c.name"></p>
+                                                    <p class="text-xs text-gray-500" x-text="c.email"></p>
+                                                </div>
                                             </div>
                                             <div class="text-right">
-                                                <span class="text-xs font-mono" :class="parseFloat(c.balance) > 0 ? 'text-emerald-600' : 'text-red-500'" x-text="'{{ currency_symbol() }}' + parseFloat(c.balance || 0).toFixed(2)"></span>
-                                                <span class="block text-xs" :class="c.kyc_status === 'approved' ? 'text-emerald-500' : 'text-amber-500'" x-text="c.kyc_status === 'approved' ? 'Approved' : (c.kyc_status || 'No KYC')"></span>
+                                                <p class="text-sm font-mono font-semibold" :class="parseFloat(c.balance) > 0 ? 'text-emerald-600' : 'text-red-500'" x-text="'{{ currency_symbol() }}' + parseFloat(c.balance || 0).toFixed(2)"></p>
+                                                <p class="text-xs" :class="c.kyc_status === 'approved' ? 'text-emerald-500' : 'text-amber-500'" x-text="c.kyc_status === 'approved' ? 'KYC Approved' : 'KYC: ' + (c.kyc_status || 'none')"></p>
                                             </div>
-                                        </button>
+                                        </div>
                                     </template>
                                 </div>
                             </div>
