@@ -4,57 +4,64 @@
     {{-- ═══════════════════════════════════════════════════════════
          SECTION A: NOC Live Operations Strip (dark, always on top)
          ═══════════════════════════════════════════════════════════ --}}
-    <div class="rounded-xl mb-6" style="background:#0f172a; margin-left:-1.5rem; margin-right:-1.5rem; padding:1rem 1.5rem;">
+    <div class="rounded-xl mb-6" style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); margin-left:-1.5rem; margin-right:-1.5rem; padding:1.25rem 0;">
         <div style="display:grid; grid-template-columns: repeat(5, 1fr);">
             {{-- Live Calls --}}
-            <div style="padding:0.25rem 1.25rem; border-right:1px solid #334155;">
-                <div class="flex items-center gap-2 mb-1">
-                    <p class="text-xs font-medium uppercase tracking-wide" style="color:#94a3b8;">Live Calls</p>
-                    <span id="ws-status" class="w-2 h-2 rounded-full bg-gray-500" title="WebSocket: connecting..."></span>
+            <div style="padding:0 1.5rem; border-right:1px solid rgba(255,255,255,0.08);">
+                <div class="flex items-center gap-2 mb-2">
+                    <span style="width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 8px #4ade80;" id="ws-status" title="WebSocket: connecting..."></span>
+                    <p class="text-xs font-semibold uppercase tracking-wider" style="color:#cbd5e1; letter-spacing:0.1em;">Live Calls</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <p class="text-2xl font-bold text-white tabular-nums" id="live-concurrent">0</p>
+                    <p class="font-bold text-white tabular-nums" style="font-size:1.75rem; line-height:1;" id="live-concurrent">0</p>
                     <span id="live-pulse" class="relative flex h-3 w-3 hidden">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                     </span>
                 </div>
-                <p class="text-xs" style="color:#64748b;">concurrent channels</p>
+                <p class="text-xs mt-1" style="color:#64748b;">concurrent channels</p>
             </div>
 
             {{-- CPS --}}
-            <div style="padding:0.25rem 1.25rem; border-right:1px solid #334155;">
-                <p class="text-xs font-medium uppercase tracking-wide mb-1" style="color:#94a3b8;">CPS</p>
-                <p class="text-2xl font-bold text-white tabular-nums" id="live-cps">0.0</p>
-                <p class="text-xs" style="color:#64748b;">calls per second</p>
+            <div style="padding:0 1.5rem; border-right:1px solid rgba(255,255,255,0.08);">
+                <p class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:#cbd5e1; letter-spacing:0.1em;">CPS</p>
+                <p class="font-bold text-white tabular-nums" style="font-size:1.75rem; line-height:1;" id="live-cps">0.0</p>
+                <p class="text-xs mt-1" style="color:#64748b;">calls per second</p>
             </div>
 
             {{-- Live ASR --}}
-            <div style="padding:0.25rem 1.25rem; border-right:1px solid #334155;">
-                <div class="flex items-center gap-2 mb-1">
-                    <p class="text-xs font-medium uppercase tracking-wide" style="color:#94a3b8;">Live ASR</p>
-                    <span id="live-asr-badge" class="text-xs font-medium px-1.5 py-0.5 rounded-full" style="background:#334155; color:#94a3b8;">--</span>
+            <div style="padding:0 1.5rem; border-right:1px solid rgba(255,255,255,0.08);">
+                <div class="flex items-center gap-2 mb-2">
+                    <p class="text-xs font-semibold uppercase tracking-wider" style="color:#cbd5e1; letter-spacing:0.1em;">Live ASR</p>
+                    <span id="live-asr-badge" class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:rgba(255,255,255,0.08); color:#94a3b8; font-size:10px;">--</span>
                 </div>
-                <p class="text-2xl font-bold tabular-nums text-white" id="live-asr">0.0<span class="text-lg">%</span></p>
-                <p class="text-xs" style="color:#64748b;">answer seizure ratio</p>
+                <p class="font-bold tabular-nums text-white" style="font-size:1.75rem; line-height:1;" id="live-asr">0.0<span style="font-size:1rem;">%</span></p>
+                <p class="text-xs mt-1" style="color:#64748b;">answer seizure ratio</p>
             </div>
 
             {{-- Today's Activity --}}
-            <div style="padding:0.25rem 1.25rem; border-right:1px solid #334155;">
-                <p class="text-xs font-medium uppercase tracking-wide mb-1" style="color:#94a3b8;">Today</p>
-                <p class="text-2xl font-bold text-white tabular-nums" id="live-today-calls">0</p>
-                <div class="flex items-center gap-2 text-xs">
-                    <span class="text-emerald-400"><span id="live-today-answered">0</span> ans</span>
-                    <span style="color:#475569;">|</span>
-                    <span class="text-red-400"><span id="live-today-failed">0</span> fail</span>
+            <div style="padding:0 1.5rem; border-right:1px solid rgba(255,255,255,0.08);">
+                <p class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:#cbd5e1; letter-spacing:0.1em;">Today</p>
+                <p class="font-bold text-white tabular-nums" style="font-size:1.75rem; line-height:1;" id="live-today-calls">0</p>
+                <div class="flex items-center gap-2 text-xs mt-1">
+                    <span style="color:#4ade80;"><span id="live-today-answered">0</span> ans</span>
+                    <span style="color:#334155;">|</span>
+                    <span style="color:#f87171;"><span id="live-today-failed">0</span> fail</span>
                 </div>
             </div>
 
-            {{-- Date & Time --}}
-            <div style="padding:0.25rem 1.25rem; text-align:right;">
-                <p class="text-xs font-medium uppercase tracking-wide mb-1" style="color:#94a3b8;">System Time</p>
-                <p class="text-lg font-bold text-white">{{ now()->format('g:i A') }}</p>
-                <p class="text-xs" style="color:#64748b;">{{ now()->format('D, M j, Y') }}</p>
+            {{-- ACD (Avg Call Duration) --}}
+            <div style="padding:0 1.5rem;">
+                <p class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:#cbd5e1; letter-spacing:0.1em;">ACD</p>
+                @php
+                    $todayAcd = ($todayStats['today_answered'] ?? 0) > 0
+                        ? round(($todayStats['today_duration'] ?? 0) / $todayStats['today_answered'])
+                        : 0;
+                    $todayAcdMin = intdiv($todayAcd, 60);
+                    $todayAcdSec = $todayAcd % 60;
+                @endphp
+                <p class="font-bold text-white tabular-nums" style="font-size:1.75rem; line-height:1;">{{ $todayAcdMin }}:{{ sprintf('%02d', $todayAcdSec) }}</p>
+                <p class="text-xs mt-1" style="color:#64748b;">avg call duration</p>
             </div>
         </div>
     </div>
@@ -544,25 +551,28 @@
             elAsr.innerHTML = asr.toFixed(1) + '<span class="text-lg">%</span>';
 
             if (todayCalls === 0) {
-                elAsr.className = 'text-2xl font-bold tabular-nums text-white';
-                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full';
-                elAsrBadge.style.cssText = 'background:#334155; color:#94a3b8;';
+                elAsr.className = 'font-bold tabular-nums text-white';
+                elAsr.style.cssText = 'font-size:1.75rem; line-height:1;';
+                elAsrBadge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full';
+                elAsrBadge.style.cssText = 'background:rgba(255,255,255,0.08); color:#94a3b8; font-size:10px;';
                 elAsrBadge.textContent = '--';
             } else if (asr >= 60) {
-                elAsr.className = 'text-2xl font-bold tabular-nums text-emerald-400';
-                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full';
-                elAsrBadge.style.cssText = 'background:#064e3b; color:#6ee7b7;';
+                elAsr.className = 'font-bold tabular-nums';
+                elAsr.style.cssText = 'font-size:1.75rem; line-height:1; color:#4ade80;';
+                elAsrBadge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full';
+                elAsrBadge.style.cssText = 'background:rgba(74,222,128,0.15); color:#4ade80; font-size:10px;';
                 elAsrBadge.textContent = 'Good';
             } else if (asr >= 40) {
-                elAsr.className = 'text-2xl font-bold tabular-nums';
-                elAsr.style.color = '#fbbf24';
-                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full';
-                elAsrBadge.style.cssText = 'background:#78350f; color:#fbbf24;';
+                elAsr.className = 'font-bold tabular-nums';
+                elAsr.style.cssText = 'font-size:1.75rem; line-height:1; color:#fbbf24;';
+                elAsrBadge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full';
+                elAsrBadge.style.cssText = 'background:rgba(251,191,36,0.15); color:#fbbf24; font-size:10px;';
                 elAsrBadge.textContent = 'Fair';
             } else {
-                elAsr.className = 'text-2xl font-bold tabular-nums text-red-400';
-                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full';
-                elAsrBadge.style.cssText = 'background:#7f1d1d; color:#fca5a5;';
+                elAsr.className = 'font-bold tabular-nums';
+                elAsr.style.cssText = 'font-size:1.75rem; line-height:1; color:#f87171;';
+                elAsrBadge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full';
+                elAsrBadge.style.cssText = 'background:rgba(248,113,113,0.15); color:#f87171; font-size:10px;';
                 elAsrBadge.textContent = 'Low';
             }
 
