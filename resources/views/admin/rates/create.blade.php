@@ -97,7 +97,16 @@
                         <p class="form-card-subtitle">Set when this rate becomes active</p>
                     </div>
                     <div class="form-card-body">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="form-group">
+                                <label for="rate_type" class="form-label">Rate Type</label>
+                                <select id="rate_type" name="rate_type" class="form-input">
+                                    <option value="regular" {{ old('rate_type', 'regular') === 'regular' ? 'selected' : '' }}>Regular</option>
+                                    <option value="broadcast" {{ old('rate_type') === 'broadcast' ? 'selected' : '' }}>Broadcast</option>
+                                </select>
+                                <p class="form-hint">Regular for normal calls, Broadcast for voice broadcast calls</p>
+                                <x-input-error :messages="$errors->get('rate_type')" class="mt-2" />
+                            </div>
                             <div class="form-group">
                                 <label for="effective_date" class="form-label">Effective Date</label>
                                 <input type="date" id="effective_date" name="effective_date" value="{{ old('effective_date', now()->format('Y-m-d')) }}" required class="form-input">

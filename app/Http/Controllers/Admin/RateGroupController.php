@@ -86,6 +86,10 @@ class RateGroupController extends Controller
             $ratesQuery->where('status', $request->status);
         }
 
+        if ($request->filled('rate_type')) {
+            $ratesQuery->where('rate_type', $request->rate_type);
+        }
+
         $rates = $ratesQuery->orderBy('prefix')->paginate(50);
 
         $recentImports = $rateGroup->rateImports()
@@ -160,7 +164,7 @@ class RateGroupController extends Controller
 
             fputcsv($handle, [
                 'prefix', 'destination', 'rate_per_minute', 'connection_fee',
-                'min_duration', 'billing_increment', 'effective_date', 'end_date', 'status',
+                'min_duration', 'billing_increment', 'effective_date', 'end_date', 'status', 'rate_type',
             ]);
 
             $rateGroup->rates()
@@ -177,6 +181,7 @@ class RateGroupController extends Controller
                             $rate->effective_date?->format('Y-m-d'),
                             $rate->end_date?->format('Y-m-d'),
                             $rate->status,
+                            $rate->rate_type ?? 'regular',
                         ]);
                     }
                 });
@@ -290,6 +295,7 @@ class RateGroupController extends Controller
                 'effective_date' => $effectiveDate,
                 'end_date' => !empty($data['end_date'] ?? '') ? $data['end_date'] : null,
                 'status' => in_array($data['status'] ?? '', ['active', 'disabled']) ? $data['status'] : 'active',
+                'rate_type' => in_array($data['rate_type'] ?? '', ['regular', 'broadcast']) ? $data['rate_type'] : 'regular',
             ];
 
             if ($mode === 'add_only' && isset($existingPrefixes[$prefix])) {

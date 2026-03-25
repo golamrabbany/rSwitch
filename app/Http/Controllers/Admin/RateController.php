@@ -85,6 +85,9 @@ class RateController extends Controller
             'effective_date' => 'required|date',
             'end_date' => 'nullable|date|after:effective_date',
             'status' => ['required', Rule::in(['active', 'disabled'])],
+            'rate_type' => ['nullable', Rule::in(['regular', 'broadcast'])],
         ]);
+
+        $validated['rate_type'] = $validated['rate_type'] ?? 'regular';
     }
 }

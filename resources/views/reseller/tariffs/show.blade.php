@@ -150,6 +150,7 @@
                             <th class="text-right">Increment</th>
                             <th>Effective</th>
                             <th>Status</th>
+                            <th>Rate Type</th>
                             @if(!$isBaseTariff)
                                 <th class="text-center">Actions</th>
                             @endif
@@ -172,10 +173,17 @@
                                         <span class="badge badge-gray">Disabled</span>
                                     @endif
                                 </td>
+                                <td>
+                                    @if($rate->rate_type === 'broadcast')
+                                        <span class="badge badge-purple">Broadcast</span>
+                                    @else
+                                        <span class="badge badge-gray">Regular</span>
+                                    @endif
+                                </td>
                                 @if(!$isBaseTariff)
                                     <td>
                                         <div class="flex items-center justify-center gap-1">
-                                            <button @click="openEdit({{ json_encode(['id' => $rate->id, 'prefix' => $rate->prefix, 'destination' => $rate->destination, 'rate_per_minute' => number_format($rate->rate_per_minute, 6, '.', ''), 'connection_fee' => number_format($rate->connection_fee, 6, '.', ''), 'min_duration' => $rate->min_duration, 'billing_increment' => $rate->billing_increment]) }})" class="action-icon" title="Edit">
+                                            <button @click="openEdit({{ json_encode(['id' => $rate->id, 'prefix' => $rate->prefix, 'destination' => $rate->destination, 'rate_per_minute' => number_format($rate->rate_per_minute, 6, '.', ''), 'connection_fee' => number_format($rate->connection_fee, 6, '.', ''), 'min_duration' => $rate->min_duration, 'billing_increment' => $rate->billing_increment, 'rate_type' => $rate->rate_type ?? 'regular']) }})" class="action-icon" title="Edit">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                                 </svg>
@@ -193,7 +201,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $isBaseTariff ? 8 : 9 }}" class="text-center py-12">
+                                <td colspan="{{ $isBaseTariff ? 9 : 10 }}" class="text-center py-12">
                                     <div class="empty-state">
                                         <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -288,6 +296,14 @@
                                         <input type="number" name="connection_fee" x-model="form.connection_fee" step="0.000001" min="0" class="form-input font-mono">
                                         <p class="text-xs text-gray-400 mt-1">One-time fee per call</p>
                                     </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Rate Type</label>
+                                    <select name="rate_type" x-model="form.rate_type" class="form-input">
+                                        <option value="regular">Regular</option>
+                                        <option value="broadcast">Broadcast</option>
+                                    </select>
+                                    <p class="text-xs text-gray-400 mt-1">Regular for normal calls, Broadcast for voice broadcast calls</p>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
@@ -455,7 +471,7 @@ function pageData() {
         show: false,
         mode: 'add',
         rateId: null,
-        form: { prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '6' },
+        form: { prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '6', rate_type: 'regular' },
         deleteModal: false,
         deletePrefix: '',
         deleteAction: '',
@@ -463,7 +479,7 @@ function pageData() {
         openAdd() {
             this.mode = 'add';
             this.rateId = null;
-            this.form = { prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '6' };
+            this.form = { prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '6', rate_type: 'regular' };
             this.show = true;
         },
         openEdit(data) {
@@ -476,6 +492,7 @@ function pageData() {
                 connection_fee: data.connection_fee,
                 min_duration: String(data.min_duration),
                 billing_increment: String(data.billing_increment),
+                rate_type: data.rate_type || 'regular',
             };
             this.show = true;
         }

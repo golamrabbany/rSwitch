@@ -60,14 +60,14 @@ class TariffController extends Controller
         $sheet->setTitle('Base Tariff');
 
         // Header row
-        $headers = ['Prefix', 'Destination', 'Rate/Minute', 'Connection Fee', 'Min Duration (s)', 'Billing Increment (s)', 'Effective Date'];
+        $headers = ['Prefix', 'Destination', 'Rate/Minute', 'Connection Fee', 'Min Duration (s)', 'Billing Increment (s)', 'Rate Type', 'Effective Date'];
         foreach ($headers as $col => $header) {
             $cell = chr(65 + $col) . '1';
             $sheet->setCellValue($cell, $header);
         }
 
         // Style header
-        $headerRange = 'A1:G1';
+        $headerRange = 'A1:H1';
         $sheet->getStyle($headerRange)->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '059669']],
@@ -85,18 +85,19 @@ class TariffController extends Controller
             $sheet->setCellValue("D{$row}", (float) $rate->connection_fee);
             $sheet->setCellValue("E{$row}", $rate->min_duration);
             $sheet->setCellValue("F{$row}", $rate->billing_increment);
-            $sheet->setCellValue("G{$row}", $rate->effective_date);
+            $sheet->setCellValue("G{$row}", ucfirst($rate->rate_type ?? 'regular'));
+            $sheet->setCellValue("H{$row}", $rate->effective_date);
 
             // Alternate row color
             if ($row % 2 === 0) {
-                $sheet->getStyle("A{$row}:G{$row}")->getFill()
+                $sheet->getStyle("A{$row}:H{$row}")->getFill()
                     ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F0FDF4');
             }
             $row++;
         }
 
         // Auto-width columns
-        foreach (range('A', 'G') as $col) {
+        foreach (range('A', 'H') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
@@ -292,12 +293,12 @@ class TariffController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle($tariff->name);
 
-        $headers = ['Prefix', 'Destination', 'Rate/Minute', 'Connection Fee', 'Min Duration (s)', 'Billing Increment (s)', 'Effective Date'];
+        $headers = ['Prefix', 'Destination', 'Rate/Minute', 'Connection Fee', 'Min Duration (s)', 'Billing Increment (s)', 'Rate Type', 'Effective Date'];
         foreach ($headers as $col => $header) {
             $sheet->setCellValue(chr(65 + $col) . '1', $header);
         }
 
-        $sheet->getStyle('A1:G1')->applyFromArray([
+        $sheet->getStyle('A1:H1')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '059669']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
@@ -313,14 +314,15 @@ class TariffController extends Controller
             $sheet->setCellValue("D{$row}", (float) $rate->connection_fee);
             $sheet->setCellValue("E{$row}", $rate->min_duration);
             $sheet->setCellValue("F{$row}", $rate->billing_increment);
-            $sheet->setCellValue("G{$row}", $rate->effective_date);
+            $sheet->setCellValue("G{$row}", ucfirst($rate->rate_type ?? 'regular'));
+            $sheet->setCellValue("H{$row}", $rate->effective_date);
             if ($row % 2 === 0) {
-                $sheet->getStyle("A{$row}:G{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F0FDF4');
+                $sheet->getStyle("A{$row}:H{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F0FDF4');
             }
             $row++;
         }
 
-        foreach (range('A', 'G') as $col) {
+        foreach (range('A', 'H') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
         $sheet->getStyle('C2:D' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.000000');
@@ -389,6 +391,9 @@ class TariffController extends Controller
             $minDur = intval($row[$this->colLetter($colMap, 'min_duration')] ?? 0);
             $increment = intval($row[$this->colLetter($colMap, 'billing_increment')] ?? 6);
 
+            $rateType = isset($colMap['rate_type']) ? strtolower(trim($row[$this->colLetter($colMap, 'rate_type')] ?? '')) : '';
+            $rateType = in_array($rateType, ['regular', 'broadcast']) ? $rateType : 'regular';
+
             if ($mode === 'add_only' && isset($existing[$prefix])) {
                 $skipped++;
                 continue;
@@ -401,6 +406,7 @@ class TariffController extends Controller
                     'connection_fee' => $connFee,
                     'min_duration' => $minDur,
                     'billing_increment' => max(1, $increment),
+                    'rate_type' => $rateType,
                 ]);
                 $imported++;
                 continue;
@@ -416,6 +422,7 @@ class TariffController extends Controller
                 'billing_increment' => max(1, $increment),
                 'effective_date' => now()->toDateString(),
                 'status' => 'active',
+                'rate_type' => $rateType,
             ]);
             $existing[$prefix] = $prefix;
             $imported++;
@@ -473,6 +480,7 @@ class TariffController extends Controller
             'connection_fee' => ['nullable', 'numeric', 'min:0'],
             'min_duration' => ['nullable', 'integer', 'min:0'],
             'billing_increment' => ['nullable', 'integer', 'min:1'],
+            'rate_type' => ['nullable', 'in:regular,broadcast'],
         ]);
 
         $rate->update([
@@ -482,6 +490,7 @@ class TariffController extends Controller
             'connection_fee' => $validated['connection_fee'] ?? 0,
             'min_duration' => $validated['min_duration'] ?? 0,
             'billing_increment' => $validated['billing_increment'] ?? 6,
+            'rate_type' => $validated['rate_type'] ?? 'regular',
         ]);
 
         Redis::publish('rswitch:rate.updated', json_encode(['rate_group_id' => $tariff->id]));
@@ -503,6 +512,7 @@ class TariffController extends Controller
             'rate_per_minute' => ['required', 'numeric', 'min:0'],
             'connection_fee' => ['nullable', 'numeric', 'min:0'],
             'billing_increment' => ['nullable', 'integer', 'min:1'],
+            'rate_type' => ['nullable', 'in:regular,broadcast'],
         ]);
 
         $rate = Rate::create([
@@ -515,6 +525,7 @@ class TariffController extends Controller
             'billing_increment' => $validated['billing_increment'] ?? 6,
             'effective_date' => now()->toDateString(),
             'status' => 'active',
+            'rate_type' => $validated['rate_type'] ?? 'regular',
         ]);
 
         // Notify Python billing service to clear cache

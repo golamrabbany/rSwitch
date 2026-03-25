@@ -68,6 +68,7 @@
                         <th style="text-align: right">Connection Fee</th>
                         <th style="text-align: right">Min Duration</th>
                         <th style="text-align: right">Billing Increment</th>
+                        <th>Rate Type</th>
                         <th>Effective Date</th>
                     </tr>
                 </thead>
@@ -80,11 +81,18 @@
                             <td style="text-align: right" class="tabular-nums text-gray-600">{{ format_currency($rate->connection_fee, 6) }}</td>
                             <td style="text-align: right" class="text-gray-600">{{ $rate->min_duration }}s</td>
                             <td style="text-align: right" class="text-gray-600">{{ $rate->billing_increment }}s</td>
+                            <td>
+                                @if($rate->rate_type === 'broadcast')
+                                    <span class="badge badge-purple">Broadcast</span>
+                                @else
+                                    <span class="badge badge-gray">Regular</span>
+                                @endif
+                            </td>
                             <td class="text-gray-500">{{ $rate->effective_date }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-12">
+                            <td colspan="8" class="text-center py-12">
                                 <div class="empty-state">
                                     <p class="empty-text">
                                         @if(request('search'))

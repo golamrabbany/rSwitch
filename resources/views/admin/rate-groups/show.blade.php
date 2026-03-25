@@ -151,13 +151,18 @@
                         <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
                         <option value="disabled" {{ request('status') === 'disabled' ? 'selected' : '' }}>Disabled</option>
                     </select>
+                    <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                        <a href="{{ route('admin.rate-groups.show', array_merge(['rate_group' => $rateGroup->id], request()->except('rate_type', 'page'))) }}" class="px-3 py-2 text-sm font-medium {{ !request('rate_type') ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50' }}">All</a>
+                        <a href="{{ route('admin.rate-groups.show', array_merge(['rate_group' => $rateGroup->id], request()->except('page'), ['rate_type' => 'regular'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('rate_type') === 'regular' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50' }}">Regular</a>
+                        <a href="{{ route('admin.rate-groups.show', array_merge(['rate_group' => $rateGroup->id], request()->except('page'), ['rate_type' => 'broadcast'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('rate_type') === 'broadcast' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50' }}">Broadcast</a>
+                    </div>
                     <button type="submit" class="btn-search-admin">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
                         Filter
                     </button>
-                    @if(request()->hasAny(['prefix', 'destination', 'status']))
+                    @if(request()->hasAny(['prefix', 'destination', 'status', 'rate_type']))
                         <a href="{{ route('admin.rate-groups.show', $rateGroup) }}" class="btn-clear">Clear</a>
                     @endif
                 </form>
@@ -175,6 +180,7 @@
                             <th class="text-right">Increment</th>
                             <th>Effective</th>
                             <th>Status</th>
+                            <th>Rate Type</th>
                             <th class="text-center">Actions</th>
                         </tr>
                     </thead>
@@ -194,6 +200,13 @@
                                         <span class="badge badge-success">Active</span>
                                     @else
                                         <span class="badge badge-gray">Disabled</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($rate->rate_type === 'broadcast')
+                                        <span class="badge badge-purple">Broadcast</span>
+                                    @else
+                                        <span class="badge badge-gray">Regular</span>
                                     @endif
                                 </td>
                                 <td>
@@ -223,7 +236,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center py-12">
+                                <td colspan="9" class="text-center py-12">
                                     <div class="empty-state">
                                         <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -386,7 +399,7 @@
                                     <h4 class="text-sm font-medium text-gray-900 mb-2">CSV Format</h4>
                                     <div class="text-xs text-gray-600 space-y-1">
                                         <p><strong>Required:</strong> prefix, destination, rate_per_minute</p>
-                                        <p><strong>Optional:</strong> connection_fee, min_duration, billing_increment, end_date, status</p>
+                                        <p><strong>Optional:</strong> connection_fee, min_duration, billing_increment, end_date, status, rate_type</p>
                                     </div>
                                     <div class="mt-3 p-2 bg-white rounded border border-gray-200 font-mono text-xs text-gray-700 overflow-x-auto">
                                         <pre>prefix,destination,rate_per_minute,connection_fee
