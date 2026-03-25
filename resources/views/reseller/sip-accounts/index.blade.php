@@ -208,7 +208,7 @@
                                     <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                     <span class="text-xs text-red-700" x-text="kycError"></span>
                                 </div>
-                                <div x-show="open && mode === 'add' && filteredClients.length > 0" @click.away="open = false" class="absolute z-20 mt-1 w-full bg-white rounded-lg border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
+                                <div x-show="open && mode === 'add' && filteredClients.length > 0" @click.away="open = false" class="absolute z-50 mt-1 w-full bg-white rounded-lg border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
                                     <template x-for="c in filteredClients" :key="c.id">
                                         <button type="button" @click="selectClient(c)" class="w-full px-3 py-2 text-left text-sm hover:bg-emerald-50 flex items-center justify-between">
                                             <div>
