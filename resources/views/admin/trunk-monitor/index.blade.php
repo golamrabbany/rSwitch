@@ -85,23 +85,27 @@
 
     {{-- Trunks Table --}}
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <span class="text-sm text-gray-600">{{ $totalTrunks }} trunk(s) configured</span>
+        <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                Trunk Monitor Total : {{ $totalTrunks }}
+            </span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Direction</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Health</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Calls</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Utilization</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Checked</th>
+                <thead>
+                    <tr class="border-b border-gray-200">
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Direction</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Health</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Calls</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Utilization</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Checked</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
+                <tbody>
                     @forelse($trunks as $trunk)
                         @php
                             $inCalls = $activeInbound[$trunk->id] ?? 0;
@@ -109,9 +113,9 @@
                             $totalCalls = $inCalls + $outCalls;
                             $utilization = $trunk->max_channels > 0 ? round(($totalCalls / $trunk->max_channels) * 100, 1) : 0;
                         @endphp
-                        <tr class="hover:bg-gray-50 transition-colors {{ $trunk->health_status === 'down' ? 'bg-red-50/50' : '' }}">
-                            {{-- Trunk Name + IP --}}
-                            <td class="px-4 py-3">
+                        <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group {{ $trunk->health_status === 'down' ? '!bg-red-50/50' : '' }}">
+                            <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $loop->iteration }}</td>
+                            <td class="px-3 py-2">
                                 <a href="{{ route('admin.trunks.show', $trunk) }}" class="text-indigo-600 hover:text-indigo-500 font-medium">{{ $trunk->name }}</a>
                                 <div class="text-xs text-gray-400 font-mono">{{ $trunk->host }}:{{ $trunk->port ?? 5060 }}</div>
                                 @if($trunk->provider)
@@ -119,8 +123,7 @@
                                 @endif
                             </td>
 
-                            {{-- Direction --}}
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-2">
                                 @switch($trunk->direction)
                                     @case('incoming')
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Incoming</span>
@@ -134,29 +137,21 @@
                                 @endswitch
                             </td>
 
-                            {{-- Status --}}
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-2">
                                 @switch($trunk->status)
                                     @case('active')
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active
-                                        </span>
+                                        <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active</span>
                                         @break
                                     @case('disabled')
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Disabled
-                                        </span>
+                                        <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Disabled</span>
                                         @break
                                     @case('auto_disabled')
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Auto-Disabled
-                                        </span>
+                                        <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Auto-Disabled</span>
                                         @break
                                 @endswitch
                             </td>
 
-                            {{-- Health --}}
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-2">
                                 @switch($trunk->health_status)
                                     @case('up')
                                         <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
@@ -190,8 +185,7 @@
                                 @endswitch
                             </td>
 
-                            {{-- Active Calls --}}
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-2">
                                 @if($totalCalls > 0)
                                     <span class="text-sm font-semibold text-gray-900">{{ $totalCalls }}</span>
                                     <div class="text-xs text-gray-400">
@@ -204,8 +198,7 @@
                                 @endif
                             </td>
 
-                            {{-- Utilization --}}
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-2">
                                 <div class="flex items-center gap-2">
                                     <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden" style="max-width: 80px;">
                                         <div class="h-full rounded-full {{ $utilization >= 80 ? 'bg-red-500' : ($utilization >= 50 ? 'bg-amber-500' : 'bg-emerald-500') }}" style="width: {{ min($utilization, 100) }}%"></div>
@@ -215,8 +208,7 @@
                                 <div class="text-xs text-gray-400 mt-0.5">{{ $totalCalls }}/{{ $trunk->max_channels }} ch</div>
                             </td>
 
-                            {{-- Last Checked --}}
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-2">
                                 @if($trunk->health_last_checked_at)
                                     <div class="text-xs text-gray-600">{{ $trunk->health_last_checked_at->diffForHumans() }}</div>
                                     <div class="text-xs text-gray-400">{{ $trunk->health_last_checked_at->format('H:i:s') }}</div>
@@ -227,7 +219,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-12 text-center">
+                            <td colspan="8" class="px-3 py-12 text-center">
                                 <div class="text-gray-500">No trunks configured</div>
                             </td>
                         </tr>

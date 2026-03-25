@@ -35,7 +35,7 @@
     </div>
 
     {{-- Section 2: Filter Card --}}
-    <div class="filter-card">
+    <div class="filter-card mb-3">
         <form method="GET" class="filter-row">
             @if($roleFilter)
                 <input type="hidden" name="role" value="{{ $roleFilter }}">
@@ -141,75 +141,81 @@
     </div>
 
     {{-- Section 3: Table --}}
-    <div class="data-table-container">
+    @if($users->total() > 0)
+    @endif
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {{-- Summary Bar --}}
         @if($users->total() > 0)
-            <div class="px-4 py-3 bg-gray-50 border-b border-gray-100">
-                <span class="text-sm text-gray-600">
-                    Showing <span class="font-semibold">{{ $users->firstItem() }}–{{ $users->lastItem() }}</span> of <span class="font-semibold">{{ number_format($users->total()) }}</span> results
+            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                    {{ $roleFilter === 'client' ? 'Client' : 'Reseller' }} Accounts Total : {{ number_format($users->total()) }} &middot; Showing {{ $users->firstItem() }} to {{ $users->lastItem() }}
                 </span>
             </div>
         @endif
-        <table class="data-table">
+
+        {{-- Table --}}
+        <table class="w-full text-sm">
             <thead>
-                <tr>
-                    <th>Account</th>
+                <tr class="border-b border-gray-200">
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Account</th>
                     @if($roleFilter === 'client')
-                        <th>Reseller</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Reseller</th>
                     @endif
-                    <th>Balance</th>
-                    <th>Tariff</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Balance</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Tariff</th>
                     @if($roleFilter !== 'client')
-                        <th>Type</th>
-                        <th>Channels</th>
-                        <th>Clients/SIP</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Channels</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Clients/SIP</th>
                     @else
-                        <th>Chn/SIP</th>
-                        <th>KYC</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Chn/SIP</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">KYC</th>
                     @endif
-                    <th>Status</th>
-                    <th class="text-center">Actions</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($users as $user)
-                    <tr>
-                        <td>
-                            <div class="user-cell">
-                                <div class="avatar avatar-indigo">
-                                    {{ strtoupper(substr($user->name, 0, 1)) }}
-                                </div>
-                                <div>
-                                    <div class="user-name">{{ $user->name }}</div>
-                                    <div class="user-email">{{ $user->email }}</div>
-                                </div>
-                            </div>
+                    <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
+                        <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $users->firstItem() + $loop->index }}</td>
+                        <td class="px-3 py-2">
+                            <a href="{{ route('admin.users.show', $user) }}" class="block">
+                                <p class="font-semibold text-gray-800 group-hover:text-indigo-600 transition-colors">{{ $user->name }}</p>
+                                <p class="text-xs text-gray-400 mt-0.5">{{ $user->email }}</p>
+                            </a>
                         </td>
                         @if($roleFilter === 'client')
-                            <td>
+                            <td class="px-3 py-2">
                                 @if($user->parent)
-                                    <a href="{{ route('admin.users.show', $user->parent) }}" class="text-indigo-600 hover:text-indigo-700 font-medium">
-                                        {{ $user->parent->name }}
-                                    </a>
+                                    <a href="{{ route('admin.users.show', $user->parent) }}" class="text-indigo-600 hover:text-indigo-700 font-medium text-sm">{{ $user->parent->name }}</a>
                                 @else
-                                    <span class="text-gray-400">-</span>
+                                    <span class="text-gray-300">-</span>
                                 @endif
                             </td>
                         @endif
-                        <td class="font-medium">{{ format_currency($user->balance) }}</td>
-                        <td>{{ $user->rateGroup?->name ?? '-' }}</td>
+                        <td class="px-3 py-2">
+                            <span class="font-bold text-gray-900 tabular-nums">{{ format_currency($user->balance) }}</span>
+                            <p class="text-xs text-gray-400 mt-0.5">{{ ucfirst($user->billing_type) }}</p>
+                        </td>
+                        <td class="px-3 py-2 text-gray-600">{{ $user->rateGroup?->name ?? '-' }}</td>
                         @if($roleFilter !== 'client')
-                            <td>
-                                @if($user->billing_type === 'prepaid')
-                                    <span class="badge badge-blue">Prepaid</span>
-                                @else
-                                    <span class="badge badge-purple">Postpaid</span>
-                                @endif
+                            <td class="px-3 py-2 text-gray-700 text-center">
+                                <span class="font-semibold tabular-nums">{{ $user->max_channels }}</span>
                             </td>
-                            <td>{{ $user->max_channels }}</td>
-                            <td>{{ $user->children_count }}/{{ $user->sip_accounts_count }}</td>
+                            <td class="px-3 py-2 text-center">
+                                <span class="tabular-nums text-gray-700">{{ $user->children_count }}</span>
+                                <span class="text-gray-300 mx-0.5">/</span>
+                                <span class="tabular-nums text-gray-700">{{ $user->sip_accounts_count }}</span>
+                            </td>
                         @else
-                            <td>{{ $user->max_channels }}/{{ $user->sip_accounts_count }}</td>
-                            <td>
+                            <td class="px-3 py-2 text-center">
+                                <span class="tabular-nums text-gray-700">{{ $user->max_channels }}</span>
+                                <span class="text-gray-300 mx-0.5">/</span>
+                                <span class="tabular-nums text-gray-700">{{ $user->sip_accounts_count }}</span>
+                            </td>
+                            <td class="px-3 py-2">
                                 @switch($user->kyc_status)
                                     @case('approved') <span class="badge badge-success">Approved</span> @break
                                     @case('pending') <span class="badge badge-warning">Pending</span> @break
@@ -218,25 +224,31 @@
                                 @endswitch
                             </td>
                         @endif
-                        <td>
+                        <td class="px-3 py-2">
                             @if($user->status === 'active')
-                                <span class="badge badge-success">Active</span>
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active
+                                </span>
                             @elseif($user->status === 'suspended')
-                                <span class="badge badge-warning">Suspended</span>
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Suspended
+                                </span>
                             @else
-                                <span class="badge badge-danger">Disabled</span>
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Disabled
+                                </span>
                             @endif
                         </td>
-                        <td class="text-center whitespace-nowrap">
-                            <div class="flex items-center justify-center gap-1">
-                                <a href="{{ route('admin.users.show', $user) }}" class="action-icon" title="View">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <td class="px-3 py-2 text-center">
+                            <div class="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <a href="{{ route('admin.users.show', $user) }}" class="p-1.5 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors" title="View">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                     </svg>
                                 </a>
-                                <a href="{{ route('admin.users.edit', $user) }}" class="action-icon" title="Edit">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <a href="{{ route('admin.users.edit', $user) }}" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
                                 </a>
@@ -245,14 +257,11 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center py-12">
-                            <div class="empty-state">
-                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                </svg>
-                                <p class="empty-text">No users found</p>
-                                <a href="{{ route('admin.users.create') }}" class="empty-link-admin">Create your first user</a>
-                            </div>
+                        <td colspan="{{ $roleFilter === 'client' ? 9 : 8 }}" class="px-4 py-12 text-center">
+                            <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                            <p class="text-sm text-gray-400">No users found</p>
                         </td>
                     </tr>
                 @endforelse

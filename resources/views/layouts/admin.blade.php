@@ -32,15 +32,16 @@
             <nav class="flex-1 px-3 py-4 overflow-y-auto">
                 <!-- Dashboard -->
                 <a href="{{ route('admin.dashboard') }}" class="nav-item {{ request()->routeIs('admin.dashboard') ? 'active' : 'text-gray-600' }}">
-                    <svg class="nav-icon {{ request()->routeIs('admin.dashboard') ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="nav-icon" style="color:{{ request()->routeIs('admin.dashboard') ? '#4f46e5' : '#818cf8' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
                     </svg>
                     <span class="nav-text">Dashboard</span>
                 </a>
 
-                <div class="my-3 border-t border-gray-100"></div>
-
                 @php $isSuperAdmin = auth()->user()->isSuperAdmin(); @endphp
+
+                {{-- Section: Platform --}}
+                <p class="px-3 pt-2 pb-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Platform</p>
 
                 <!-- Admin Management Menu (Super Admin Only) -->
                 @if($isSuperAdmin)
@@ -53,7 +54,7 @@
                     <div x-data="{ open: {{ $adminMgmtActive ? 'true' : 'false' }} }" class="mb-1">
                         <button @click="open = !open" class="nav-parent {{ $adminMgmtActive ? 'has-active' : 'text-gray-600' }}">
                             <div class="flex items-center">
-                                <svg class="nav-icon {{ $adminMgmtActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="nav-icon" style="color:{{ $adminMgmtActive ? '#4f46e5' : '#f87171' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                                 </svg>
                                 <span class="nav-text">Admin Management</span>
@@ -69,7 +70,6 @@
                         </div>
                     </div>
 
-                    <div class="my-3 border-t border-gray-100"></div>
                 @endif
 
                 <!-- Accounts Menu -->
@@ -89,7 +89,7 @@
                 <div x-data="{ open: {{ $usersActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $usersActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
-                            <svg class="nav-icon {{ $usersActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="nav-icon" style="color:{{ $usersActive ? '#4f46e5' : '#10b981' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                             </svg>
                             <span class="nav-text">Accounts</span>
@@ -105,6 +105,9 @@
                     </div>
                 </div>
 
+                {{-- Section: Services --}}
+                <p class="px-3 pt-2 pb-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Services</p>
+
                 <!-- Telecom Menu -->
                 @php
                     $telecomActive = request()->routeIs('admin.sip-accounts.*', 'admin.dids.*', 'admin.ring-groups.*');
@@ -115,7 +118,7 @@
                 <div x-data="{ open: {{ $telecomActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $telecomActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
-                            <svg class="nav-icon {{ $telecomActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="nav-icon" style="color:{{ $telecomActive ? '#4f46e5' : '#3b82f6' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                             </svg>
                             <span class="nav-text">Telecom</span>
@@ -144,7 +147,7 @@
                 <div x-data="{ open: {{ $broadcastActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $broadcastActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
-                            <svg class="nav-icon {{ $broadcastActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="nav-icon" style="color:{{ $broadcastActive ? '#4f46e5' : '#a855f7' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
                             </svg>
                             <span class="nav-text">Voice Broadcast</span>
@@ -160,9 +163,12 @@
                     </div>
                 </div>
 
+                {{-- Section: Analytics --}}
+                <p class="px-3 pt-2 pb-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Analytics</p>
+
                 <!-- CDR -->
                 <a href="{{ route('admin.cdr.index') }}" class="nav-item {{ request()->routeIs('admin.cdr.*') ? 'active' : 'text-gray-600' }}">
-                    <svg class="nav-icon {{ request()->routeIs('admin.cdr.*') ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="nav-icon" style="color:{{ request()->routeIs('admin.cdr.*') ? '#4f46e5' : '#f59e0b' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     <span class="nav-text">CDR / Reports</span>
@@ -173,7 +179,7 @@
                 <div x-data="{ open: {{ $operationalActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $operationalActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
-                            <svg class="nav-icon {{ $operationalActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="nav-icon" style="color:{{ $operationalActive ? '#4f46e5' : '#06b6d4' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                             </svg>
                             <span class="nav-text">Operational Reports</span>
@@ -200,7 +206,7 @@
                 <div x-data="{ open: {{ $financialReportActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $financialReportActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
-                            <svg class="nav-icon {{ $financialReportActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="nav-icon" style="color:{{ $financialReportActive ? '#4f46e5' : '#ec4899' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                             </svg>
                             <span class="nav-text">Financial Reports</span>
@@ -215,14 +221,15 @@
                     </div>
                 </div>
 
-                <div class="my-3 border-t border-gray-100"></div>
+                {{-- Section: Finance --}}
+                <p class="px-3 pt-2 pb-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Finance</p>
 
                 <!-- Finance Menu -->
                 @php $financeActive = request()->routeIs('admin.transactions.*', 'admin.balance.*', 'admin.invoices.*', 'admin.payments.*'); @endphp
                 <div x-data="{ open: {{ $financeActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $financeActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
-                            <svg class="nav-icon {{ $financeActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="nav-icon" style="color:{{ $financeActive ? '#4f46e5' : '#10b981' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                             <span class="nav-text">Finance</span>
@@ -241,11 +248,14 @@
 
                 <!-- System Menu (Super Admin Only) -->
                 @if($isSuperAdmin)
+                    {{-- Section: System --}}
+                    <p class="px-3 pt-2 pb-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">System</p>
+
                     @php $systemActive = request()->routeIs('admin.audit-logs.*', 'admin.blacklist.*', 'admin.whitelist.*', 'admin.webhooks.*', 'admin.settings.*', 'admin.bulk-import.*', 'admin.transfer-logs.*', 'admin.rate-imports.*'); @endphp
                     <div x-data="{ open: {{ $systemActive ? 'true' : 'false' }} }" class="mb-1">
                         <button @click="open = !open" class="nav-parent {{ $systemActive ? 'has-active' : 'text-gray-600' }}">
                             <div class="flex items-center">
-                                <svg class="nav-icon {{ $systemActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="nav-icon" style="color:{{ $systemActive ? '#4f46e5' : '#6b7280' }};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                 </svg>
@@ -267,12 +277,13 @@
             </nav>
 
             <!-- Sidebar Footer -->
-            <div class="p-4 border-t border-gray-100">
-                <div class="flex items-center px-2 py-2 text-xs text-gray-400">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    v1.0.0 - Admin Panel
+            <div class="px-4 py-3 border-t border-gray-100">
+                <div class="flex items-center justify-between px-2 text-xs text-gray-400">
+                    <span>rSwitch v1.0</span>
+                    <span class="flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Online
+                    </span>
                 </div>
             </div>
         </aside>

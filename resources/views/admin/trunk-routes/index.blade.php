@@ -148,7 +148,7 @@
     </div>
 
     {{-- Filter Card --}}
-    <div class="filter-card">
+    <div class="filter-card mb-3">
         <form method="GET" class="filter-row flex-wrap">
             <div class="filter-search-box">
                 <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,42 +186,45 @@
     </div>
 
     {{-- Data Table --}}
-    <div class="data-table-container">
-        <table class="data-table">
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        @if($routes->total() > 0)
+            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                    Routing Rules Total : {{ number_format($routes->total()) }} &middot; Showing {{ $routes->firstItem() }} to {{ $routes->lastItem() }}
+                </span>
+            </div>
+        @endif
+        <table class="w-full text-sm">
             <thead>
-                <tr>
-                    <th>Prefix</th>
-                    <th>Trunk</th>
-                    <th>Time Window</th>
-                    <th>Days</th>
-                    <th>Priority</th>
-                    <th>Weight</th>
-                    <th>Status</th>
-                    <th class="text-center">Actions</th>
+                <tr class="border-b border-gray-200">
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Prefix</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time Window</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Days</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Weight</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($routes as $route)
-                    <tr class="{{ !$loop->first && $route->prefix !== $routes[$loop->index - 1]->prefix ? 'border-t-2 border-gray-300' : '' }}">
-                        <td>
+                    <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group {{ !$loop->first && $route->prefix !== $routes[$loop->index - 1]->prefix ? '!border-t-2 !border-t-gray-300' : '' }}">
+                        <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $routes->firstItem() + $loop->index }}</td>
+                        <td class="px-3 py-2">
                             <span class="font-mono font-medium text-gray-900">{{ $route->prefix }}</span>
                         </td>
-                        <td>
-                            <div class="user-cell">
-                                <div class="avatar avatar-indigo">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <a href="{{ route('admin.trunks.show', $route->trunk) }}" class="user-name hover:text-indigo-600">
-                                        {{ $route->trunk->name }}
-                                    </a>
-                                    <div class="user-email">{{ $route->trunk->provider }}</div>
-                                </div>
+                        <td class="px-3 py-2">
+                            <div>
+                                <a href="{{ route('admin.trunks.show', $route->trunk) }}" class="font-medium text-gray-900 hover:text-indigo-600">
+                                    {{ $route->trunk->name }}
+                                </a>
+                                <div class="text-xs text-gray-500">{{ $route->trunk->provider }}</div>
                             </div>
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             @if($route->time_start)
                                 <span class="font-mono text-sm text-gray-900">
                                     {{ substr($route->time_start, 0, 5) }} - {{ substr($route->time_end, 0, 5) }}
@@ -231,43 +234,45 @@
                                 <span class="text-sm text-gray-400 italic">Always</span>
                             @endif
                         </td>
-                        <td>
+                        <td class="px-3 py-2">
                             @if($route->days_of_week)
                                 <span class="text-xs font-medium text-gray-700">{{ strtoupper($route->days_of_week) }}</span>
                             @else
                                 <span class="text-sm text-gray-400">All</span>
                             @endif
                         </td>
-                        <td class="font-medium">{{ $route->priority }}</td>
-                        <td class="font-medium">{{ $route->weight }}</td>
-                        <td>
+                        <td class="px-3 py-2 font-medium">{{ $route->priority }}</td>
+                        <td class="px-3 py-2 font-medium">{{ $route->weight }}</td>
+                        <td class="px-3 py-2">
                             @if($route->status === 'active')
-                                <span class="badge badge-success">Active</span>
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active</span>
                             @else
-                                <span class="badge badge-danger">Disabled</span>
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Disabled</span>
                             @endif
                         </td>
-                        <td class="text-center">
-                            <a href="{{ route('admin.trunk-routes.edit', $route) }}" class="action-icon" title="Edit">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                </svg>
-                            </a>
-                            <form method="POST" action="{{ route('admin.trunk-routes.destroy', $route) }}" class="inline"
-                                  onsubmit="return confirm('Delete this routing rule?')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="action-icon text-red-500 hover:text-red-700" title="Delete">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        <td class="px-3 py-2 text-center">
+                            <div class="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <a href="{{ route('admin.trunk-routes.edit', $route) }}" class="p-1 rounded text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
-                                </button>
-                            </form>
+                                </a>
+                                <form method="POST" action="{{ route('admin.trunk-routes.destroy', $route) }}" class="inline"
+                                      onsubmit="return confirm('Delete this routing rule?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors" title="Delete">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center py-12">
+                        <td colspan="9" class="text-center py-12">
                             <div class="empty-state">
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
