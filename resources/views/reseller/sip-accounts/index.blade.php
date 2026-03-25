@@ -204,11 +204,21 @@
                                 <input type="hidden" name="user_id" :value="form.user_id">
                                 <input type="text" x-model="search" @focus="open = true" @click="open = true" @input="open = true; form.user_id = ''" :disabled="mode === 'edit'" class="form-input" :class="mode === 'edit' ? 'bg-gray-50 text-gray-500' : ''" placeholder="Search client..." autocomplete="off">
                                 <p class="text-xs text-gray-400 mt-1">Select the client who owns this SIP account</p>
+                                <div x-show="kycError" x-cloak class="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+                                    <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                    <span class="text-xs text-red-700" x-text="kycError"></span>
+                                </div>
                                 <div x-show="open && mode === 'add' && filteredClients.length > 0" @click.away="open = false" class="absolute z-20 mt-1 w-full bg-white rounded-lg border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
                                     <template x-for="c in filteredClients" :key="c.id">
                                         <button type="button" @click="selectClient(c)" class="w-full px-3 py-2 text-left text-sm hover:bg-emerald-50 flex items-center justify-between">
-                                            <span class="font-medium text-gray-900" x-text="c.name"></span>
-                                            <span class="text-xs text-gray-400" x-text="c.email"></span>
+                                            <div>
+                                                <span class="font-medium text-gray-900" x-text="c.name"></span>
+                                                <span class="text-xs text-gray-400 ml-1" x-text="c.email"></span>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-xs font-mono" :class="parseFloat(c.balance) > 0 ? 'text-emerald-600' : 'text-red-500'" x-text="'{{ currency_symbol() }}' + parseFloat(c.balance || 0).toFixed(2)"></span>
+                                                <span class="block text-xs" :class="c.kyc_status === 'approved' ? 'text-emerald-500' : 'text-amber-500'" x-text="c.kyc_status === 'approved' ? 'Approved' : (c.kyc_status || 'No KYC')"></span>
+                                            </div>
                                         </button>
                                     </template>
                                 </div>
@@ -220,6 +230,7 @@
                                 $sipMinLen = \App\Models\SystemSetting::get('sip_pin_min_length', 4);
                                 $sipMaxLen = \App\Models\SystemSetting::get('sip_pin_max_length', 10);
                             @endphp
+                            <div :style="kycError ? 'opacity: 0.4; pointer-events: none;' : ''">
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label class="form-label">Username (PIN)</label>
@@ -304,6 +315,8 @@
                                 </div>
                             </div>
 
+                            </div>{{-- /kycError disable wrapper --}}
+
                             {{-- Status (edit only) --}}
                             <template x-if="mode === 'edit'">
                                 <div>
@@ -320,7 +333,7 @@
 
                         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100 rounded-b-xl">
                             <button type="button" @click="showModal = false" class="btn-secondary">Cancel</button>
-                            <button type="submit" class="btn-primary-reseller">
+                            <button type="submit" class="btn-primary-reseller" :disabled="kycError !== ''" :class="kycError !== '' ? 'opacity-50 cursor-not-allowed' : ''">
                                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                 </svg>
@@ -337,7 +350,7 @@
 
 @push('scripts')
 <script>
-const _clients = @json($users->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email]));
+const _clients = @json($users->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'kyc_status' => $u->kyc_status, 'balance' => $u->balance]));
 
 function clientSearch() {
     return {
@@ -348,6 +361,11 @@ function clientSearch() {
             this.form.user_id = String(c.id);
             this.search = c.name;
             this.open = false;
+            if (c.kyc_status !== 'approved') {
+                this.kycError = c.name + '\'s KYC is not approved (' + (c.kyc_status || 'not submitted') + '). SIP account cannot be created.';
+            } else {
+                this.kycError = '';
+            }
         },
         initSearch() {
             this.$watch('search', (val) => {
@@ -375,6 +393,7 @@ function sipPage() {
         mode: 'add',
         editId: null,
         editUsername: '',
+        kycError: '',
         form: {
             user_id: '',
             password: '{{ \Illuminate\Support\Str::random(16) }}',
@@ -388,6 +407,7 @@ function sipPage() {
             this.mode = 'add';
             this.editId = null;
             this.editUsername = '';
+            this.kycError = '';
             this.form = {
                 user_id: '',
                 password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-4),
