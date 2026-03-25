@@ -107,3 +107,10 @@ exten => 602,1,NoOp(DTMF Test)
  same => n,Wait(1)
  same => n,SayDigits(1234567890)
  same => n,Hangup()
+
+; --- Context: Voice Broadcast (called via .call files) ---
+[from-broadcast]
+exten => s,1,Answer()
+ same => n,Wait(0.5)
+ same => n,AGI(agi://${AGI_HOST}:${AGI_PORT}/broadcast_call)
+ same => n,Hangup()

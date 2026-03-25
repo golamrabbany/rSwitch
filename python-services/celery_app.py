@@ -37,6 +37,7 @@ app.conf.update(
         "billing.tasks.rate_and_charge": {"queue": "billing"},
         "billing.tasks.rate_batch": {"queue": "billing"},
         "billing.credit_control.check_balances": {"queue": "billing"},
+        "broadcast.tasks.*": {"queue": "broadcast"},
         "monitoring.tasks.*": {"queue": "monitoring"},
     },
 
@@ -52,8 +53,18 @@ app.conf.update(
             "task": "billing.credit_control.check_balances",
             "schedule": 30.0,
         },
+        # Broadcast: check scheduled broadcasts every 60 seconds
+        "check-scheduled-broadcasts": {
+            "task": "broadcast.tasks.check_scheduled_broadcasts",
+            "schedule": 60.0,
+        },
+        # Broadcast: cleanup stuck numbers every 2 minutes
+        "cleanup-stuck-broadcast-numbers": {
+            "task": "broadcast.tasks.cleanup_stuck_broadcast_numbers",
+            "schedule": 120.0,
+        },
     },
 )
 
 # Auto-discover tasks in these modules
-app.autodiscover_tasks(["billing", "monitoring"])
+app.autodiscover_tasks(["billing", "broadcast", "monitoring"])
