@@ -248,7 +248,8 @@ install_system_dependencies() {
             nano \
             python3 \
             python3-pip \
-            policycoreutils-python-utils
+            policycoreutils-python-utils \
+            ffmpeg
     else
         export DEBIAN_FRONTEND=noninteractive
 
@@ -277,7 +278,8 @@ install_system_dependencies() {
             vim \
             nano \
             python3-venv \
-            python3-pip
+            python3-pip \
+            ffmpeg
     fi
 
     log_success "System dependencies installed"
@@ -979,9 +981,18 @@ live_dangerously = no
 timestamp = yes
 EOF
 
-    # Create voicebroadcast directory
+    # Create voicebroadcast + voice-files directories
     mkdir -p /var/spool/asterisk/voicebroadcast
+    mkdir -p /var/spool/asterisk/outgoing
+    mkdir -p /var/spool/asterisk/recording
     chown asterisk:asterisk /var/spool/asterisk/voicebroadcast
+    chown asterisk:asterisk /var/spool/asterisk/recording
+    # outgoing: www-data writes .call files, asterisk reads them
+    chown asterisk:asterisk /var/spool/asterisk/outgoing
+    chmod 775 /var/spool/asterisk/outgoing
+    usermod -aG asterisk www-data 2>/dev/null || true
+    mkdir -p "$INSTALL_DIR/storage/app/private/voice-files"
+    chown www-data:www-data "$INSTALL_DIR/storage/app/private/voice-files"
 
     # File descriptor limits — high for 3000+ concurrent calls
     cat > /etc/security/limits.d/asterisk.conf << 'LIMEOF'
@@ -1132,6 +1143,8 @@ AMI_HOST=127.0.0.1
 AMI_PORT=5038
 AMI_USER=rswitch
 AMI_SECRET=${AMI_SECRET_FOR_ENV}
+
+BROADCAST_VOICE_PATH=/var/spool/asterisk/voicebroadcast
 EOF
 
     # Generate application key
@@ -1394,7 +1407,7 @@ stdout_logfile=/var/log/rswitch-python-api.out.log
 stopwaitsecs=10
 
 [program:rswitch-celery]
-command=${INSTALL_DIR}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring -c 4
+command=${INSTALL_DIR}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 4
 directory=${INSTALL_DIR}/python-services
 environment=PYTHONPATH="${INSTALL_DIR}/python-services"
 user=${WEB_USER}

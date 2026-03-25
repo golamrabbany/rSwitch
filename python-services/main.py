@@ -367,6 +367,7 @@ async def _listen_laravel_events():
         pubsub.subscribe(
             "rswitch:rate.updated",
             "rswitch:sip.updated",
+            "rswitch:broadcast.start",
         )
 
         logger.info("Listening for Laravel events on Redis pub/sub")
@@ -390,6 +391,22 @@ async def _listen_laravel_events():
                         )
                     except Exception as e:
                         logger.error(f"Error processing rate event: {e}")
+
+                elif channel == "rswitch:broadcast.start":
+                    # Start broadcast processing via Celery
+                    import json
+                    try:
+                        payload = json.loads(data)
+                        broadcast_id = payload.get("broadcast_id")
+                        if broadcast_id:
+                            from broadcast.tasks import process_broadcast
+                            process_broadcast.delay(broadcast_id)
+                            logger.info(
+                                f"Broadcast {broadcast_id} queued for processing "
+                                f"(triggered by Laravel)"
+                            )
+                    except Exception as e:
+                        logger.error(f"Error processing broadcast event: {e}")
 
             await asyncio.sleep(0.1)
 

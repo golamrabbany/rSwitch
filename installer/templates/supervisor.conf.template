@@ -58,7 +58,7 @@ stdout_logfile_backups=3
 stopwaitsecs=10
 
 [program:rswitch-celery]
-command={{INSTALL_DIR}}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring -c 4
+command={{INSTALL_DIR}}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 4
 directory={{INSTALL_DIR}}/python-services
 environment=PYTHONPATH="{{INSTALL_DIR}}/python-services"
 user=www-data

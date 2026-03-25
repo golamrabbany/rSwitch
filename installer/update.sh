@@ -162,8 +162,22 @@ update_application() {
     # Create required directories
     mkdir -p /var/spool/asterisk/recording
     mkdir -p /var/spool/asterisk/voicebroadcast
+    mkdir -p /var/spool/asterisk/outgoing
+    mkdir -p "$INSTALL_DIR/storage/app/private/voice-files"
     chown asterisk:asterisk /var/spool/asterisk/recording
     chown asterisk:asterisk /var/spool/asterisk/voicebroadcast
+    chown asterisk:asterisk /var/spool/asterisk/outgoing
+    chmod 775 /var/spool/asterisk/outgoing
+    usermod -aG asterisk www-data 2>/dev/null || true
+    chown www-data:www-data "$INSTALL_DIR/storage/app/private/voice-files"
+
+    # Ensure ffmpeg is installed (needed for voice file conversion)
+    if ! command -v ffmpeg &>/dev/null; then
+        log_info "Installing ffmpeg (required for voice broadcast)..."
+        apt-get update -qq && apt-get install -y -qq ffmpeg >/dev/null 2>&1 || \
+        yum install -y -q ffmpeg >/dev/null 2>&1 || \
+        log_warning "Could not install ffmpeg — voice file upload will not work"
+    fi
 
     # Apply kernel tuning if not already present
     if [[ ! -f /etc/sysctl.d/99-rswitch-asterisk.conf ]]; then
@@ -254,6 +268,16 @@ SORCERYEOF
         fi
         chown -R www-data:www-data "$INSTALL_DIR/python-services"
         log_success "Python services updated"
+    fi
+
+    # Update supervisor config (add broadcast queue if missing)
+    if [[ -f "$INSTALL_DIR/installer/templates/supervisor.conf.template" ]]; then
+        SUPERVISOR_CONF="/etc/supervisor/conf.d/rswitch.conf"
+        [[ ! -f "$SUPERVISOR_CONF" ]] && SUPERVISOR_CONF="/etc/supervisord.d/rswitch.conf"
+        if [[ -f "$SUPERVISOR_CONF" ]] && ! grep -q "broadcast" "$SUPERVISOR_CONF"; then
+            log_info "Adding broadcast queue to Celery worker..."
+            sed -i 's/-Q billing,monitoring/-Q billing,monitoring,broadcast/' "$SUPERVISOR_CONF"
+        fi
     fi
 
     # Restart all supervisor services
