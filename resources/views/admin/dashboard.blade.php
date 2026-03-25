@@ -4,12 +4,12 @@
     {{-- ═══════════════════════════════════════════════════════════
          SECTION A: NOC Live Operations Strip (dark, always on top)
          ═══════════════════════════════════════════════════════════ --}}
-    <div class="bg-slate-900 -mx-6 px-6 py-4 mb-6 rounded-xl">
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-0 divide-x divide-slate-700">
+    <div class="rounded-xl mb-6" style="background:#0f172a; margin-left:-1.5rem; margin-right:-1.5rem; padding:1rem 1.5rem;">
+        <div style="display:grid; grid-template-columns: repeat(5, 1fr);">
             {{-- Live Calls --}}
-            <div class="px-5 py-1">
+            <div style="padding:0.25rem 1.25rem; border-right:1px solid #334155;">
                 <div class="flex items-center gap-2 mb-1">
-                    <p class="text-slate-400 text-xs font-medium uppercase tracking-wide">Live Calls</p>
+                    <p class="text-xs font-medium uppercase tracking-wide" style="color:#94a3b8;">Live Calls</p>
                     <span id="ws-status" class="w-2 h-2 rounded-full bg-gray-500" title="WebSocket: connecting..."></span>
                 </div>
                 <div class="flex items-center gap-2">
@@ -19,42 +19,42 @@
                         <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                     </span>
                 </div>
-                <p class="text-xs text-slate-500">concurrent channels</p>
+                <p class="text-xs" style="color:#64748b;">concurrent channels</p>
             </div>
 
             {{-- CPS --}}
-            <div class="px-5 py-1">
-                <p class="text-slate-400 text-xs font-medium uppercase tracking-wide mb-1">CPS</p>
+            <div style="padding:0.25rem 1.25rem; border-right:1px solid #334155;">
+                <p class="text-xs font-medium uppercase tracking-wide mb-1" style="color:#94a3b8;">CPS</p>
                 <p class="text-2xl font-bold text-white tabular-nums" id="live-cps">0.0</p>
-                <p class="text-xs text-slate-500">calls per second</p>
+                <p class="text-xs" style="color:#64748b;">calls per second</p>
             </div>
 
             {{-- Live ASR --}}
-            <div class="px-5 py-1">
+            <div style="padding:0.25rem 1.25rem; border-right:1px solid #334155;">
                 <div class="flex items-center gap-2 mb-1">
-                    <p class="text-slate-400 text-xs font-medium uppercase tracking-wide">Live ASR</p>
-                    <span id="live-asr-badge" class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400">--</span>
+                    <p class="text-xs font-medium uppercase tracking-wide" style="color:#94a3b8;">Live ASR</p>
+                    <span id="live-asr-badge" class="text-xs font-medium px-1.5 py-0.5 rounded-full" style="background:#334155; color:#94a3b8;">--</span>
                 </div>
                 <p class="text-2xl font-bold tabular-nums text-white" id="live-asr">0.0<span class="text-lg">%</span></p>
-                <p class="text-xs text-slate-500">answer seizure ratio</p>
+                <p class="text-xs" style="color:#64748b;">answer seizure ratio</p>
             </div>
 
             {{-- Today's Activity --}}
-            <div class="px-5 py-1">
-                <p class="text-slate-400 text-xs font-medium uppercase tracking-wide mb-1">Today</p>
+            <div style="padding:0.25rem 1.25rem; border-right:1px solid #334155;">
+                <p class="text-xs font-medium uppercase tracking-wide mb-1" style="color:#94a3b8;">Today</p>
                 <p class="text-2xl font-bold text-white tabular-nums" id="live-today-calls">0</p>
                 <div class="flex items-center gap-2 text-xs">
                     <span class="text-emerald-400"><span id="live-today-answered">0</span> ans</span>
-                    <span class="text-slate-600">|</span>
+                    <span style="color:#475569;">|</span>
                     <span class="text-red-400"><span id="live-today-failed">0</span> fail</span>
                 </div>
             </div>
 
             {{-- Date & Time --}}
-            <div class="px-5 py-1 hidden md:block text-right">
-                <p class="text-slate-400 text-xs font-medium uppercase tracking-wide mb-1">System Time</p>
+            <div style="padding:0.25rem 1.25rem; text-align:right;">
+                <p class="text-xs font-medium uppercase tracking-wide mb-1" style="color:#94a3b8;">System Time</p>
                 <p class="text-lg font-bold text-white">{{ now()->format('g:i A') }}</p>
-                <p class="text-xs text-slate-500">{{ now()->format('D, M j, Y') }}</p>
+                <p class="text-xs" style="color:#64748b;">{{ now()->format('D, M j, Y') }}</p>
             </div>
         </div>
     </div>
@@ -197,31 +197,31 @@
     {{-- ═══════════════════════════════════════════════════
          SECTION D: Platform Inventory Bar (6-col compact)
          ═══════════════════════════════════════════════════ --}}
-    <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
-        <a href="{{ route('admin.users.index', ['role' => 'reseller']) }}" class="bg-white rounded-lg border-l-4 border-emerald-500 px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
+    <div class="mb-6" style="display:grid; grid-template-columns: repeat(6, 1fr); gap:0.75rem;">
+        <a href="{{ route('admin.users.index', ['role' => 'reseller']) }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #10b981;">
             <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['resellers']) }}</p>
             <p class="text-xs text-gray-500">Resellers</p>
         </a>
-        <a href="{{ route('admin.users.index', ['role' => 'client']) }}" class="bg-white rounded-lg border-l-4 border-sky-500 px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
+        <a href="{{ route('admin.users.index', ['role' => 'client']) }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #0ea5e9;">
             <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['clients']) }}</p>
             <p class="text-xs text-gray-500">Clients</p>
         </a>
-        <a href="{{ route('admin.sip-accounts.index') }}" class="bg-white rounded-lg border-l-4 border-indigo-500 px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
+        <a href="{{ route('admin.sip-accounts.index') }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #6366f1;">
             <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['sip_accounts']) }}</p>
             <p class="text-xs text-gray-500">SIP Accounts</p>
         </a>
         @if(auth()->user()->isSuperAdmin())
-        <a href="{{ route('admin.trunks.index') }}" class="bg-white rounded-lg border-l-4 border-purple-500 px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
+        <a href="{{ route('admin.trunks.index') }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #a855f7;">
             <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['active_trunks']) }}</p>
             <p class="text-xs text-gray-500">Active Trunks</p>
         </a>
         @endif
-        <a href="{{ route('admin.dids.index') }}" class="bg-white rounded-lg border-l-4 border-blue-500 px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
+        <a href="{{ route('admin.dids.index') }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #3b82f6;">
             <p class="text-xl font-bold text-gray-900">{{ number_format($entityCounts['active_dids']) }}</p>
             <p class="text-xs text-gray-500">Active DIDs</p>
         </a>
         @if(auth()->user()->isSuperAdmin())
-        <a href="{{ route('admin.trunk-routes.index') }}" class="bg-white rounded-lg border-l-4 border-rose-500 px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
+        <a href="{{ route('admin.trunk-routes.index') }}" class="bg-white rounded-lg px-4 py-3 shadow-sm hover:shadow-md transition-shadow" style="border-left:4px solid #f43f5e;">
             @php $routeCount = \App\Models\TrunkRoute::where('status', 'active')->count(); @endphp
             <p class="text-xl font-bold text-gray-900">{{ number_format($routeCount) }}</p>
             <p class="text-xs text-gray-500">Routes</p>
@@ -544,20 +544,25 @@
             elAsr.innerHTML = asr.toFixed(1) + '<span class="text-lg">%</span>';
 
             if (todayCalls === 0) {
-                elAsr.className = 'text-2xl font-bold tabular-nums text-slate-500';
-                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400';
+                elAsr.className = 'text-2xl font-bold tabular-nums text-white';
+                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full';
+                elAsrBadge.style.cssText = 'background:#334155; color:#94a3b8;';
                 elAsrBadge.textContent = '--';
             } else if (asr >= 60) {
                 elAsr.className = 'text-2xl font-bold tabular-nums text-emerald-400';
-                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400';
+                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full';
+                elAsrBadge.style.cssText = 'background:#064e3b; color:#6ee7b7;';
                 elAsrBadge.textContent = 'Good';
             } else if (asr >= 40) {
-                elAsr.className = 'text-2xl font-bold tabular-nums text-amber-400';
-                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-900/50 text-amber-400';
+                elAsr.className = 'text-2xl font-bold tabular-nums';
+                elAsr.style.color = '#fbbf24';
+                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full';
+                elAsrBadge.style.cssText = 'background:#78350f; color:#fbbf24;';
                 elAsrBadge.textContent = 'Fair';
             } else {
                 elAsr.className = 'text-2xl font-bold tabular-nums text-red-400';
-                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full bg-red-900/50 text-red-400';
+                elAsrBadge.className = 'text-xs font-medium px-1.5 py-0.5 rounded-full';
+                elAsrBadge.style.cssText = 'background:#7f1d1d; color:#fca5a5;';
                 elAsrBadge.textContent = 'Low';
             }
 
