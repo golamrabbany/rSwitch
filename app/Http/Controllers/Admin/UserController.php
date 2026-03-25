@@ -128,6 +128,8 @@ class UserController extends Controller
             'balance' => $validated['balance'] ?? 0,
             'credit_limit' => $validated['credit_limit'] ?? 0,
             'max_channels' => $validated['max_channels'] ?? 10,
+            'sip_range_start' => $request->input('sip_range_start'),
+            'sip_range_end' => $request->input('sip_range_end'),
             'status' => 'active',
         ]);
 
@@ -284,6 +286,8 @@ class UserController extends Controller
             'rate_group_id' => $validated['rate_group_id'],
             'credit_limit' => $validated['credit_limit'] ?? 0,
             'max_channels' => $validated['max_channels'] ?? 10,
+            'sip_range_start' => $request->input('sip_range_start'),
+            'sip_range_end' => $request->input('sip_range_end'),
             'daily_spend_limit' => $validated['daily_spend_limit'],
             'daily_call_limit' => $validated['daily_call_limit'],
         ]);

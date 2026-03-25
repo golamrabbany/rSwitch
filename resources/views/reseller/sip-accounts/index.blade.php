@@ -235,6 +235,9 @@
                                         <input type="text" disabled :value="editUsername" class="form-input font-mono bg-gray-50 text-gray-500">
                                     </template>
                                     <p class="text-xs text-gray-400 mt-1">{{ $sipPrefix ? "Prefix '{$sipPrefix}' + {$sipMinLen}-{$sipMaxLen} digits" : "Numeric, {$sipMinLen}-{$sipMaxLen} digits" }}</p>
+                                    @if(auth()->user()->sip_range_start && auth()->user()->sip_range_end)
+                                        <p class="text-xs text-indigo-500 mt-0.5 font-medium">Range: {{ auth()->user()->sip_range_start }} — {{ auth()->user()->sip_range_end }}</p>
+                                    @endif
                                 </div>
                                 <div>
                                     <label class="form-label" x-text="mode === 'add' ? 'Password' : 'New Password'"></label>

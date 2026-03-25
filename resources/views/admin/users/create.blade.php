@@ -170,6 +170,31 @@
                     </div>
                 </div>
 
+                {{-- SIP Range (Reseller only) --}}
+                <div class="form-card" x-show="role === 'reseller'" x-cloak>
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">SIP Account Range</h3>
+                        <p class="form-card-subtitle">Assign a number range for this reseller's SIP accounts</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Range Start</label>
+                                <input type="text" name="sip_range_start" value="{{ old('sip_range_start') }}" class="form-input font-mono" placeholder="e.g. 09603100000">
+                                <p class="form-hint">First allowed SIP account number</p>
+                                <x-input-error :messages="$errors->get('sip_range_start')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Range End</label>
+                                <input type="text" name="sip_range_end" value="{{ old('sip_range_end') }}" class="form-input font-mono" placeholder="e.g. 09603100050">
+                                <p class="form-hint">Last allowed SIP account number</p>
+                                <x-input-error :messages="$errors->get('sip_range_end')" class="mt-2" />
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2">Leave empty to allow any PIN (subject to global prefix/length settings). Reseller can only create SIP accounts within this range.</p>
+                    </div>
+                </div>
+
                 {{-- Form Actions --}}
                 <div class="flex items-center justify-end gap-3">
                     <a href="{{ route('admin.users.index', $roleParam ? ['role' => $roleParam] : []) }}" class="btn-secondary">Cancel</a>

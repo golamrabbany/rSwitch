@@ -106,6 +106,15 @@ class SipAccountController extends Controller
             return back()->withInput()->with('warning', "Cannot create SIP account: {$client->name}'s KYC is not approved.");
         }
 
+        // SIP range check
+        $reseller = auth()->user();
+        if ($reseller->sip_range_start && $reseller->sip_range_end) {
+            $username = $validated['username'];
+            if (strcmp($username, $reseller->sip_range_start) < 0 || strcmp($username, $reseller->sip_range_end) > 0) {
+                return back()->withInput()->with('warning', "PIN must be within your assigned range: {$reseller->sip_range_start} to {$reseller->sip_range_end}.");
+            }
+        }
+
         $sip = SipAccount::create($validated);
 
         $this->provisioning->provision($sip);
