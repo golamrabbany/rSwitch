@@ -161,8 +161,7 @@
                                 <x-input-error :messages="$errors->get('user_id')" class="mt-2" />
                             </div>
 
-                            <div :style="kycError ? 'opacity: 0.4; pointer-events: none;' : ''">
-                            <div class="form-group">
+                            <div class="form-group" :style="kycError ? 'opacity: 0.4; pointer-events: none;' : ''">
                                 <label for="username" class="form-label">Username (SIP PIN)</label>
                                 @php
                                     $sipPrefix = \App\Models\SystemSetting::get('sip_pin_prefix', '');
@@ -179,13 +178,12 @@
                                 <x-input-error :messages="$errors->get('username')" class="mt-2" />
                             </div>
 
-                            <div class="form-group">
+                            <div class="form-group" :style="kycError ? 'opacity: 0.4; pointer-events: none;' : ''">
                                 <label for="max_channels" class="form-label">Max Channels</label>
                                 <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', '2') }}" required min="1" max="100" class="form-input">
                                 <p class="form-hint">Concurrent call limit (1-100)</p>
                                 <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                             </div>
-                            </div>{{-- /kycError disable wrapper --}}
                         </div>
                     </div>
                 </div>
