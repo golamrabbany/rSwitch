@@ -204,7 +204,7 @@
                                 <input type="hidden" name="user_id" :value="form.user_id">
                                 <div class="relative">
                                     <input type="text" x-model="search" @focus="open = true" @click="open = true" @input="open = true; form.user_id = ''; kycError = ''" :disabled="mode === 'edit'" class="form-input pr-16" :class="mode === 'edit' ? 'bg-gray-50 text-gray-500' : ''" placeholder="Search client by name or email..." autocomplete="off">
-                                    <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                    <div x-show="mode === 'add'" class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                         <button type="button" x-show="search" x-cloak @click="search = ''; form.user_id = ''; kycError = ''; open = false" class="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
