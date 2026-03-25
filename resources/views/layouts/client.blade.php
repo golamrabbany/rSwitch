@@ -60,6 +60,7 @@
                         <a href="{{ route('client.dids.index') }}" class="nav-child {{ request()->routeIs('client.dids.*') ? 'active' : 'text-gray-500' }}">DIDs</a>
                         <a href="{{ route('client.cdr.index') }}" class="nav-child {{ request()->routeIs('client.cdr.*') ? 'active' : 'text-gray-500' }}">CDR / Reports</a>
                         <a href="{{ route('client.voice-files.index') }}" class="nav-child {{ request()->routeIs('client.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Files</a>
+                        <a href="{{ route('client.broadcasts.index') }}" class="nav-child {{ request()->routeIs('client.broadcasts.*') ? 'active' : 'text-gray-500' }}">Broadcasts</a>
                     </div>
                 </div>
 

@@ -170,6 +170,18 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('voice-files/{voiceFile}/download', [Admin\VoiceFileController::class, 'download'])->name('voice-files.download');
     Route::post('voice-files/{voiceFile}/approve', [Admin\VoiceFileController::class, 'approve'])->name('voice-files.approve');
     Route::post('voice-files/{voiceFile}/reject', [Admin\VoiceFileController::class, 'reject'])->name('voice-files.reject');
+
+    // Voice Broadcast — Broadcasts
+    Route::get('broadcasts', [Admin\BroadcastController::class, 'index'])->name('broadcasts.index');
+    Route::get('broadcasts/create', [Admin\BroadcastController::class, 'create'])->name('broadcasts.create');
+    Route::post('broadcasts', [Admin\BroadcastController::class, 'store'])->name('broadcasts.store');
+    Route::get('broadcasts/client-data', [Admin\BroadcastController::class, 'clientData'])->name('broadcasts.client-data');
+    Route::get('broadcasts/{broadcast}', [Admin\BroadcastController::class, 'show'])->name('broadcasts.show');
+    Route::post('broadcasts/{broadcast}/start', [Admin\BroadcastController::class, 'start'])->name('broadcasts.start');
+    Route::post('broadcasts/{broadcast}/pause', [Admin\BroadcastController::class, 'pause'])->name('broadcasts.pause');
+    Route::post('broadcasts/{broadcast}/resume', [Admin\BroadcastController::class, 'resume'])->name('broadcasts.resume');
+    Route::post('broadcasts/{broadcast}/cancel', [Admin\BroadcastController::class, 'cancel'])->name('broadcasts.cancel');
+    Route::get('broadcasts/{broadcast}/results', [Admin\BroadcastController::class, 'results'])->name('broadcasts.results');
 });
 
 // Recharge Admin routes (view-only access + balance operations)
@@ -239,6 +251,18 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::get('voice-files/{voiceFile}', [Reseller\VoiceFileController::class, 'show'])->name('voice-files.show');
         Route::get('voice-files/{voiceFile}/play', [Reseller\VoiceFileController::class, 'play'])->name('voice-files.play');
 
+        // Voice Broadcast — Broadcasts
+        Route::get('broadcasts', [Reseller\BroadcastController::class, 'index'])->name('broadcasts.index');
+        Route::get('broadcasts/create', [Reseller\BroadcastController::class, 'create'])->name('broadcasts.create');
+        Route::post('broadcasts', [Reseller\BroadcastController::class, 'store'])->name('broadcasts.store');
+        Route::get('broadcasts/client-data', [Reseller\BroadcastController::class, 'clientData'])->name('broadcasts.client-data');
+        Route::get('broadcasts/{broadcast}', [Reseller\BroadcastController::class, 'show'])->name('broadcasts.show');
+        Route::post('broadcasts/{broadcast}/start', [Reseller\BroadcastController::class, 'start'])->name('broadcasts.start');
+        Route::post('broadcasts/{broadcast}/pause', [Reseller\BroadcastController::class, 'pause'])->name('broadcasts.pause');
+        Route::post('broadcasts/{broadcast}/resume', [Reseller\BroadcastController::class, 'resume'])->name('broadcasts.resume');
+        Route::post('broadcasts/{broadcast}/cancel', [Reseller\BroadcastController::class, 'cancel'])->name('broadcasts.cancel');
+        Route::get('broadcasts/{broadcast}/results', [Reseller\BroadcastController::class, 'results'])->name('broadcasts.results');
+
         // Financial
         Route::get('transactions', [Reseller\TransactionController::class, 'index'])->name('transactions.index');
         Route::get('transactions/export', [Reseller\TransactionController::class, 'export'])->name('transactions.export');
@@ -281,6 +305,17 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::get('voice-files/{voiceFile}', [Client\VoiceFileController::class, 'show'])->name('voice-files.show');
         Route::get('voice-files/{voiceFile}/play', [Client\VoiceFileController::class, 'play'])->name('voice-files.play');
         Route::delete('voice-files/{voiceFile}', [Client\VoiceFileController::class, 'destroy'])->name('voice-files.destroy');
+
+        // Voice Broadcast — Broadcasts
+        Route::get('broadcasts', [Client\BroadcastController::class, 'index'])->name('broadcasts.index');
+        Route::get('broadcasts/create', [Client\BroadcastController::class, 'create'])->name('broadcasts.create');
+        Route::post('broadcasts', [Client\BroadcastController::class, 'store'])->name('broadcasts.store');
+        Route::get('broadcasts/{broadcast}', [Client\BroadcastController::class, 'show'])->name('broadcasts.show');
+        Route::post('broadcasts/{broadcast}/start', [Client\BroadcastController::class, 'start'])->name('broadcasts.start');
+        Route::post('broadcasts/{broadcast}/pause', [Client\BroadcastController::class, 'pause'])->name('broadcasts.pause');
+        Route::post('broadcasts/{broadcast}/resume', [Client\BroadcastController::class, 'resume'])->name('broadcasts.resume');
+        Route::post('broadcasts/{broadcast}/cancel', [Client\BroadcastController::class, 'cancel'])->name('broadcasts.cancel');
+        Route::get('broadcasts/{broadcast}/results', [Client\BroadcastController::class, 'results'])->name('broadcasts.results');
 
         Route::get('transactions', [Client\TransactionController::class, 'index'])->name('transactions.index');
 

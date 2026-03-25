@@ -119,6 +119,7 @@
                     </button>
                     <div x-show="open" x-collapse class="nav-children">
                         <a href="{{ route('reseller.voice-files.index') }}" class="nav-child {{ request()->routeIs('reseller.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Files</a>
+                        <a href="{{ route('reseller.broadcasts.index') }}" class="nav-child {{ request()->routeIs('reseller.broadcasts.*') ? 'active' : 'text-gray-500' }}">Broadcasts</a>
                     </div>
                 </div>
 

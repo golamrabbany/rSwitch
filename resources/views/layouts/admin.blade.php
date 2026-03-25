@@ -210,6 +210,7 @@
                     </button>
                     <div x-show="open" x-collapse class="nav-children">
                         <a href="{{ route('admin.voice-files.index') }}" class="nav-child {{ request()->routeIs('admin.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Files</a>
+                        <a href="{{ route('admin.broadcasts.index') }}" class="nav-child {{ request()->routeIs('admin.broadcasts.*') ? 'active' : 'text-gray-500' }}">Broadcasts</a>
                     </div>
                 </div>
 
