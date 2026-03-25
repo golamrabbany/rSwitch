@@ -85,6 +85,26 @@
         </div>
     </div>
 
+    {{-- Broadcast Quick Stats --}}
+    @if(($broadcastStats['total'] ?? 0) > 0)
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-900">Broadcasts</p>
+                    <p class="text-xs text-gray-500">{{ $broadcastStats['running'] }} running &middot; {{ $broadcastStats['completed'] }} completed &middot; {{ $broadcastStats['total'] }} total</p>
+                </div>
+            </div>
+            <a href="{{ route('reseller.broadcasts.index') }}" class="text-xs text-indigo-600 hover:text-indigo-500 font-medium">View All</a>
+        </div>
+    </div>
+    @endif
+
     {{-- Call Stats (7 Days) + Today Comparison --}}
     @php
         $totalDur = $weekStats['total_duration'];

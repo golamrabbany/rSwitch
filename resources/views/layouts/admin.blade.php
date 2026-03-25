@@ -195,7 +195,7 @@
                 </div>
 
                 <!-- Voice Broadcast -->
-                @php $broadcastActive = request()->routeIs('admin.voice-files.*', 'admin.broadcasts.*'); @endphp
+                @php $broadcastActive = request()->routeIs('admin.voice-files.*', 'admin.broadcasts.*', 'admin.dnc.*'); @endphp
                 <div x-data="{ open: {{ $broadcastActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $broadcastActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
@@ -211,6 +211,7 @@
                     <div x-show="open" x-collapse class="nav-children">
                         <a href="{{ route('admin.voice-files.index') }}" class="nav-child {{ request()->routeIs('admin.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Files</a>
                         <a href="{{ route('admin.broadcasts.index') }}" class="nav-child {{ request()->routeIs('admin.broadcasts.*') ? 'active' : 'text-gray-500' }}">Broadcasts</a>
+                        <a href="{{ route('admin.dnc.index') }}" class="nav-child {{ request()->routeIs('admin.dnc.*') ? 'active' : 'text-gray-500' }}">DNC List</a>
                     </div>
                 </div>
 

@@ -32,6 +32,12 @@
             </div>
         </div>
         <div class="page-actions">
+            <a href="{{ route('admin.broadcasts.export-results', $broadcast) }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Export CSV
+            </a>
             <a href="{{ route('admin.broadcasts.show', $broadcast) }}" class="btn-action-secondary">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -102,28 +108,38 @@
 
     {{-- Survey Response Breakdown --}}
     @if($broadcast->type === 'survey' && !empty($surveyBreakdown))
-        <div class="detail-card mb-6">
-            <div class="detail-card-header">
-                <h3 class="detail-card-title">Survey Response Breakdown</h3>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="lg:col-span-2 detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Survey Response Breakdown</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="space-y-3">
+                        @foreach($surveyBreakdown as $option)
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                        <span class="text-sm font-bold text-indigo-600">{{ $option['digit'] }}</span>
+                                    </div>
+                                    <span class="text-sm text-gray-700">{{ $option['label'] }}</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-32 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-indigo-500 h-2 rounded-full" style="width: {{ $option['percentage'] }}%"></div>
+                                    </div>
+                                    <span class="text-sm font-medium text-gray-700 w-16 text-right">{{ $option['count'] }} ({{ $option['percentage'] }}%)</span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
             </div>
-            <div class="detail-card-body">
-                <div class="space-y-3">
-                    @foreach($surveyBreakdown as $option)
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                                    <span class="text-sm font-bold text-indigo-600">{{ $option['digit'] }}</span>
-                                </div>
-                                <span class="text-sm text-gray-700">{{ $option['label'] }}</span>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <div class="w-32 bg-gray-200 rounded-full h-2">
-                                    <div class="bg-indigo-500 h-2 rounded-full" style="width: {{ $option['percentage'] }}%"></div>
-                                </div>
-                                <span class="text-sm font-medium text-gray-700 w-16 text-right">{{ $option['count'] }} ({{ $option['percentage'] }}%)</span>
-                            </div>
-                        </div>
-                    @endforeach
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Response Distribution</h3>
+                </div>
+                <div class="detail-card-body flex items-center justify-center">
+                    <canvas id="surveyChart" style="max-height: 220px;"></canvas>
                 </div>
             </div>
         </div>
@@ -218,5 +234,31 @@
         <div class="mt-4 flex justify-end">
             {{ $results->withQueryString()->onEachSide(1)->links('pagination::simple-tailwind') }}
         </div>
+    @endif
+    @if($broadcast->type === 'survey' && !empty($surveyBreakdown))
+        @push('scripts')
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+        <script>
+            new Chart(document.getElementById('surveyChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: {!! json_encode(array_column($surveyBreakdown, 'label')) !!},
+                    datasets: [{
+                        data: {!! json_encode(array_column($surveyBreakdown, 'count')) !!},
+                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#14b8a6'],
+                        borderWidth: 2,
+                        borderColor: '#fff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyleWidth: 8 } }
+                    }
+                }
+            });
+        </script>
+        @endpush
     @endif
 </x-admin-layout>

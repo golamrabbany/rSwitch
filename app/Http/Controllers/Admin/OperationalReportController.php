@@ -1335,6 +1335,11 @@ class OperationalReportController extends Controller
         if ($request->filled('call_flow')) {
             $query->where('call_flow', $request->call_flow);
         }
+
+        // Call type filter (regular/broadcast)
+        if ($request->filled('call_type')) {
+            $query->where('call_type', $request->call_type);
+        }
     }
 
     /**

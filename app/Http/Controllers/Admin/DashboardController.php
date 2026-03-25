@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Broadcast;
 use App\Services\DashboardStatsService;
 
 class DashboardController extends Controller
@@ -27,6 +28,14 @@ class DashboardController extends Controller
         $systemHealth = $service->getSystemHealth();
         $financialSummary = $service->getFinancialSummary($scopeIds);
 
+        // Broadcast stats
+        $broadcastQuery = Broadcast::ownedBy($user);
+        $broadcastStats = [
+            'running' => (clone $broadcastQuery)->where('status', 'running')->count(),
+            'completed' => (clone $broadcastQuery)->where('status', 'completed')->count(),
+            'total' => (clone $broadcastQuery)->count(),
+        ];
+
         return view('admin.dashboard', compact(
             'entityCounts',
             'weekStats',
@@ -38,7 +47,8 @@ class DashboardController extends Controller
             'topDestinations',
             'activeCalls',
             'systemHealth',
-            'financialSummary'
+            'financialSummary',
+            'broadcastStats'
         ));
     }
 }

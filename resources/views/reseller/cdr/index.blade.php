@@ -73,6 +73,15 @@
                         @endforeach
                     </select>
                 </div>
+                <div>
+                    <label for="call_type" class="block text-xs font-medium text-gray-500 mb-1">Call Type</label>
+                    <select id="call_type" name="call_type"
+                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <option value="">All Types</option>
+                        <option value="regular" {{ request('call_type') === 'regular' ? 'selected' : '' }}>Regular</option>
+                        <option value="broadcast" {{ request('call_type') === 'broadcast' ? 'selected' : '' }}>Broadcast</option>
+                    </select>
+                </div>
                 <div class="lg:col-span-2">
                     <label for="search" class="block text-xs font-medium text-gray-500 mb-1">Caller / Callee</label>
                     <input type="text" id="search" name="search" value="{{ request('search') }}"
@@ -105,6 +114,7 @@
                     <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Billsec</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Disposition</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                 </tr>
             </thead>
@@ -151,6 +161,13 @@
                                     <span class="text-gray-400">—</span>
                             @endswitch
                         </td>
+                        <td class="px-4 py-3 text-sm">
+                            @if($record->call_type === 'broadcast')
+                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">Broadcast</span>
+                            @else
+                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">Regular</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-sm text-right">
                             <a href="{{ route('reseller.cdr.show', ['uuid' => $record->uuid, 'date' => $record->call_start?->format('Y-m-d')]) }}"
                                class="text-indigo-600 hover:text-indigo-500">View</a>
@@ -158,7 +175,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-500">
+                        <td colspan="9" class="px-4 py-8 text-center text-sm text-gray-500">
                             No call records found for this date range.
                         </td>
                     </tr>

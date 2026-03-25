@@ -35,70 +35,101 @@
         </div>
     </div>
 
-    {{-- Stat Cards --}}
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="stat-card">
-            <div class="stat-icon bg-emerald-100">
-                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                </svg>
+    {{-- Stat Cards + Progress with live polling --}}
+    <div x-data="broadcastStats()" x-init="init()">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="stat-card">
+                <div class="stat-icon bg-emerald-100">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-value" x-text="fmt(total)">{{ number_format($broadcast->total_numbers) }}</p>
+                    <p class="stat-label">Total Numbers</p>
+                </div>
             </div>
-            <div class="stat-content">
-                <p class="stat-value">{{ number_format($broadcast->total_numbers) }}</p>
-                <p class="stat-label">Total Numbers</p>
+            <div class="stat-card">
+                <div class="stat-icon bg-blue-100">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-value" x-text="fmt(answered + failed)">{{ number_format($broadcast->dialed_count) }}</p>
+                    <p class="stat-label">Dialed</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon bg-emerald-100">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-value" x-text="fmt(answered)">{{ number_format($broadcast->answered_count) }}</p>
+                    <p class="stat-label">Answered</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon bg-red-100">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <p class="stat-value" x-text="fmt(failed)">{{ number_format($broadcast->failed_count) }}</p>
+                    <p class="stat-label">Failed</p>
+                </div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-blue-100">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                </svg>
+
+        <div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-700">Progress</span>
+                <span class="text-sm font-medium text-gray-700" x-text="progress + '%'"></span>
             </div>
-            <div class="stat-content">
-                <p class="stat-value">{{ number_format($broadcast->dialed_count) }}</p>
-                <p class="stat-label">Dialed</p>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+                <div class="bg-emerald-500 h-3 rounded-full transition-all duration-500" :style="'width: ' + progress + '%'"></div>
             </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-emerald-100">
-                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </div>
-            <div class="stat-content">
-                <p class="stat-value">{{ number_format($broadcast->answered_count) }}</p>
-                <p class="stat-label">Answered</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-red-100">
-                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </div>
-            <div class="stat-content">
-                <p class="stat-value">{{ number_format($broadcast->failed_count) }}</p>
-                <p class="stat-label">Failed</p>
+            <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <span x-text="fmt(answered + failed) + ' dialed of ' + fmt(total)"></span>
+                <span x-text="fmt(answered) + ' answered'"></span>
             </div>
         </div>
     </div>
 
-    {{-- Progress Bar --}}
-    <div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-gray-700">Progress</span>
-            <span class="text-sm font-medium text-gray-700">
-                {{ $broadcast->total_numbers > 0 ? round($broadcast->dialed_count / $broadcast->total_numbers * 100) : 0 }}%
-            </span>
-        </div>
-        <div class="w-full bg-gray-200 rounded-full h-3">
-            <div class="bg-emerald-500 h-3 rounded-full transition-all duration-500" style="width: {{ $broadcast->total_numbers > 0 ? round($broadcast->dialed_count / $broadcast->total_numbers * 100) : 0 }}%"></div>
-        </div>
-        <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
-            <span>{{ number_format($broadcast->dialed_count) }} dialed of {{ number_format($broadcast->total_numbers) }}</span>
-            <span>{{ number_format($broadcast->answered_count) }} answered</span>
-        </div>
-    </div>
+    @push('scripts')
+    <script>
+        function broadcastStats() {
+            return {
+                total: {{ $broadcast->total_numbers }},
+                answered: {{ $broadcast->answered_count }},
+                failed: {{ $broadcast->failed_count }},
+                progress: {{ $broadcast->total_numbers > 0 ? round($broadcast->dialed_count / $broadcast->total_numbers * 100) : 0 }},
+                status: '{{ $broadcast->status }}',
+                polling: null,
+                fmt(n) { return n.toLocaleString(); },
+                init() {
+                    if (['running', 'queued', 'paused'].includes(this.status)) {
+                        this.polling = setInterval(() => this.refresh(), 5000);
+                    }
+                },
+                async refresh() {
+                    try {
+                        const res = await fetch('{{ route("reseller.broadcasts.stats", $broadcast) }}');
+                        const d = await res.json();
+                        this.total = d.total; this.answered = d.answered; this.failed = d.failed; this.progress = d.progress;
+                        if (['completed', 'cancelled', 'failed'].includes(d.status) && d.status !== this.status) {
+                            clearInterval(this.polling); location.reload();
+                        }
+                        this.status = d.status;
+                    } catch (e) {}
+                }
+            };
+        }
+    </script>
+    @endpush
 
     {{-- Control Buttons --}}
     <div class="flex items-center gap-3 mb-6">

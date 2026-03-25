@@ -61,6 +61,11 @@
                     <option value="{{ $d }}" {{ request('disposition') === $d ? 'selected' : '' }}>{{ $d }}</option>
                 @endforeach
             </select>
+            <select name="call_type" class="filter-select">
+                <option value="">All Types</option>
+                <option value="regular" {{ request('call_type') === 'regular' ? 'selected' : '' }}>Regular</option>
+                <option value="broadcast" {{ request('call_type') === 'broadcast' ? 'selected' : '' }}>Broadcast</option>
+            </select>
             <div class="filter-search-box flex-1 min-w-0">
                 <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -68,7 +73,7 @@
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Search caller/callee..." class="filter-input">
             </div>
             <button type="submit" class="btn-search">Filter</button>
-            @if(request()->hasAny(['disposition', 'search']))
+            @if(request()->hasAny(['disposition', 'call_type', 'search']))
                 <a href="{{ route('client.cdr.index') }}" class="btn-clear">Clear</a>
             @endif
         </form>
@@ -93,6 +98,7 @@
                     <th style="text-align: right">Rate/Min</th>
                     <th style="text-align: right">Cost</th>
                     <th>Disposition</th>
+                    <th>Type</th>
                     <th style="text-align: center">Actions</th>
                 </tr>
             </thead>
@@ -124,6 +130,13 @@
                             @endswitch
                         </td>
                         <td>
+                            @if($r->call_type === 'broadcast')
+                                <span class="badge badge-info">Broadcast</span>
+                            @else
+                                <span class="badge badge-gray">Regular</span>
+                            @endif
+                        </td>
+                        <td>
                             <div class="flex items-center justify-center">
                                 <a href="{{ route('client.cdr.show', ['uuid' => $r->uuid, 'date' => $r->call_start?->format('Y-m-d')]) }}" class="action-icon" title="View">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,7 +148,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="text-center py-12"><div class="empty-state"><p class="empty-text">No call records found for this date range</p></div></td></tr>
+                    <tr><td colspan="9" class="text-center py-12"><div class="empty-state"><p class="empty-text">No call records found for this date range</p></div></td></tr>
                 @endforelse
             </tbody>
         </table>

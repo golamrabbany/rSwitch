@@ -110,19 +110,85 @@ class BroadcastController extends Controller
     {
         abort_unless($broadcast->user_id === auth()->id(), 403);
 
-        $numbers = $broadcast->numbers()
-            ->orderByDesc('updated_at')
-            ->paginate(50);
+        $results = $broadcast->numbers()->orderByDesc('updated_at')->paginate(50);
 
-        $surveyStats = null;
+        $statsRow = $broadcast->numbers()
+            ->selectRaw('COUNT(*) as total, SUM(status = "answered") as answered, SUM(status IN ("failed","no_answer","busy")) as failed, COALESCE(SUM(cost), 0) as cost, AVG(CASE WHEN duration > 0 THEN duration END) as avg_duration')
+            ->first();
+
+        $stats = [
+            'total' => $statsRow->total ?? $broadcast->total_numbers,
+            'answered' => $statsRow->answered ?? 0,
+            'failed' => $statsRow->failed ?? 0,
+            'cost' => $statsRow->cost ?? 0,
+            'avg_duration' => $statsRow->avg_duration ? round($statsRow->avg_duration) . 's' : '0s',
+        ];
+
+        $surveyBreakdown = [];
         if ($broadcast->isSurvey()) {
-            $surveyStats = $broadcast->numbers()
+            $surveyResponses = $broadcast->numbers()
                 ->whereNotNull('survey_response')
                 ->selectRaw('survey_response, COUNT(*) as count')
                 ->groupBy('survey_response')
-                ->pluck('count', 'survey_response');
+                ->orderBy('survey_response')
+                ->get();
+
+            $totalResponses = $surveyResponses->sum('count');
+            $config = is_array($broadcast->survey_config) ? $broadcast->survey_config : json_decode($broadcast->survey_config ?? '[]', true);
+            $labels = collect($config)->pluck('label', 'digit')->toArray();
+
+            foreach ($surveyResponses as $resp) {
+                $surveyBreakdown[] = [
+                    'digit' => $resp->survey_response,
+                    'label' => $labels[$resp->survey_response] ?? "Option {$resp->survey_response}",
+                    'count' => $resp->count,
+                    'percentage' => $totalResponses > 0 ? round(($resp->count / $totalResponses) * 100, 1) : 0,
+                ];
+            }
         }
 
-        return view('client.broadcasts.results', compact('broadcast', 'numbers', 'surveyStats'));
+        return view('client.broadcasts.results', compact('broadcast', 'results', 'stats', 'surveyBreakdown'));
+    }
+
+    public function stats(Broadcast $broadcast)
+    {
+        abort_unless($broadcast->user_id === auth()->id(), 403);
+
+        $statsRow = $broadcast->numbers()
+            ->selectRaw('COUNT(*) as total, SUM(status = "answered") as answered, SUM(status IN ("failed","no_answer","busy")) as failed, SUM(status = "pending") as pending, SUM(status = "dialing") as dialing')
+            ->first();
+
+        return response()->json([
+            'status' => $broadcast->status,
+            'total' => (int) ($statsRow->total ?? $broadcast->total_numbers),
+            'answered' => (int) ($statsRow->answered ?? 0),
+            'failed' => (int) ($statsRow->failed ?? 0),
+            'pending' => (int) ($statsRow->pending ?? 0),
+            'dialing' => (int) ($statsRow->dialing ?? 0),
+            'progress' => $broadcast->total_numbers > 0
+                ? round((($statsRow->answered + $statsRow->failed) / $broadcast->total_numbers) * 100, 1)
+                : 0,
+        ]);
+    }
+
+    public function exportResults(Broadcast $broadcast)
+    {
+        abort_unless($broadcast->user_id === auth()->id(), 403);
+
+        $numbers = $broadcast->numbers()->orderBy('phone_number')->get();
+        $filename = 'broadcast-' . $broadcast->id . '-results.csv';
+
+        return response()->stream(function () use ($numbers, $broadcast) {
+            $out = fopen('php://output', 'w');
+            $cols = ['Phone Number', 'Status', 'Attempts', 'Duration (s)', 'Cost'];
+            if ($broadcast->isSurvey()) $cols[] = 'Survey Response';
+            fputcsv($out, $cols);
+            foreach ($numbers as $n) {
+                $row = [$n->phone_number, $n->status, $n->attempts, $n->duration ?? 0, $n->cost ?? 0];
+                if ($broadcast->isSurvey()) $row[] = $n->survey_response ?? '';
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, 200, ['Content-Type' => 'text/csv', 'Content-Disposition' => "attachment; filename=\"{$filename}\""]);
     }
 }

@@ -128,6 +128,14 @@
                     </select>
                 </div>
                 <div class="cdr-filter-item">
+                    <label for="call_type" class="cdr-filter-label">Call Type</label>
+                    <select id="call_type" name="call_type" class="filter-select">
+                        <option value="">All Types</option>
+                        <option value="regular" {{ request('call_type') === 'regular' ? 'selected' : '' }}>Regular</option>
+                        <option value="broadcast" {{ request('call_type') === 'broadcast' ? 'selected' : '' }}>Broadcast</option>
+                    </select>
+                </div>
+                <div class="cdr-filter-item">
                     <label for="status" class="cdr-filter-label">Status</label>
                     <select id="status" name="status" class="filter-select">
                         <option value="">All</option>
@@ -159,7 +167,7 @@
                     </svg>
                     Filter
                 </button>
-                @if(request()->hasAny(['disposition', 'call_flow', 'status', 'trunk_id', 'user_id', 'search']))
+                @if(request()->hasAny(['disposition', 'call_flow', 'call_type', 'status', 'trunk_id', 'user_id', 'search']))
                     <a href="{{ route('admin.cdr.index') }}" class="btn-clear">Clear Filters</a>
                 @endif
             </div>
@@ -178,6 +186,7 @@
                     <th class="text-right">Billsec</th>
                     <th class="text-right">Cost</th>
                     <th>Disposition</th>
+                    <th>Type</th>
                     <th>Status</th>
                     <th class="text-center">Actions</th>
                 </tr>
@@ -231,6 +240,13 @@
                                 @default
                                     <span class="text-gray-400">—</span>
                             @endswitch
+                        </td>
+                        <td>
+                            @if($record->call_type === 'broadcast')
+                                <span class="badge badge-info">Broadcast</span>
+                            @else
+                                <span class="badge badge-gray">Regular</span>
+                            @endif
                         </td>
                         <td>
                             @switch($record->status)

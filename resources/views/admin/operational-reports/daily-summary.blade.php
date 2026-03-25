@@ -49,6 +49,11 @@
                     <a href="{{ route('admin.operational-reports.daily', array_merge(request()->except('disposition'), ['disposition' => 'NO ANSWER'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'NO ANSWER' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">No Answer</a>
                     <a href="{{ route('admin.operational-reports.daily', array_merge(request()->except('disposition'), ['disposition' => 'FAILED'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('disposition') === 'FAILED' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Failed</a>
                 </div>
+                <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                    <a href="{{ route('admin.operational-reports.daily', array_merge(request()->except('call_type'), [])) }}" class="px-3 py-2 text-sm font-medium {{ !request('call_type') ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
+                    <a href="{{ route('admin.operational-reports.daily', array_merge(request()->except('call_type'), ['call_type' => 'regular'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('call_type') === 'regular' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Regular</a>
+                    <a href="{{ route('admin.operational-reports.daily', array_merge(request()->except('call_type'), ['call_type' => 'broadcast'])) }}" class="px-3 py-2 text-sm font-medium border-l {{ request('call_type') === 'broadcast' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Broadcast</a>
+                </div>
                 <select name="trunk_id" class="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer">
                     <option value="">All Trunks</option>
                     @foreach($trunks as $trunk)
@@ -92,7 +97,7 @@
                 {{-- Buttons --}}
                 <div class="flex items-center gap-2">
                     <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 whitespace-nowrap">Search</button>
-                    @if(request()->hasAny(['reseller_id', 'user_id', 'trunk_id', 'disposition', 'call_flow', 'date_from', 'date_to']))
+                    @if(request()->hasAny(['reseller_id', 'user_id', 'trunk_id', 'disposition', 'call_flow', 'call_type', 'date_from', 'date_to']))
                         <a href="{{ route('admin.operational-reports.daily') }}" class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap">Clear</a>
                     @endif
                 </div>

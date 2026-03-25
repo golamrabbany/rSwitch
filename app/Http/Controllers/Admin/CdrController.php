@@ -182,6 +182,10 @@ class CdrController extends Controller
             $query->where('call_flow', $request->call_flow);
         }
 
+        if ($request->filled('call_type')) {
+            $query->where('call_type', $request->call_type);
+        }
+
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }

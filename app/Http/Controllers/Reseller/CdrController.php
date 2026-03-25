@@ -164,6 +164,10 @@ class CdrController extends Controller
             $query->where('disposition', $request->disposition);
         }
 
+        if ($request->filled('call_type')) {
+            $query->where('call_type', $request->call_type);
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {

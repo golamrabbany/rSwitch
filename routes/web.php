@@ -184,6 +184,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::post('broadcasts/{broadcast}/resume', [Admin\BroadcastController::class, 'resume'])->name('broadcasts.resume');
     Route::post('broadcasts/{broadcast}/cancel', [Admin\BroadcastController::class, 'cancel'])->name('broadcasts.cancel');
     Route::get('broadcasts/{broadcast}/results', [Admin\BroadcastController::class, 'results'])->name('broadcasts.results');
+    Route::get('broadcasts/{broadcast}/export-results', [Admin\BroadcastController::class, 'exportResults'])->name('broadcasts.export-results');
+    Route::get('broadcasts/{broadcast}/stats', [Admin\BroadcastController::class, 'stats'])->name('broadcasts.stats');
+
+    // Voice Broadcast — DNC List
+    Route::get('dnc', [Admin\DncController::class, 'index'])->name('dnc.index');
+    Route::post('dnc', [Admin\DncController::class, 'store'])->name('dnc.store');
+    Route::delete('dnc/{dncNumber}', [Admin\DncController::class, 'destroy'])->name('dnc.destroy');
+    Route::post('dnc/bulk-destroy', [Admin\DncController::class, 'bulkDestroy'])->name('dnc.bulk-destroy');
 });
 
 // Recharge Admin routes (view-only access + balance operations)
@@ -264,6 +272,8 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::post('broadcasts/{broadcast}/resume', [Reseller\BroadcastController::class, 'resume'])->name('broadcasts.resume');
         Route::post('broadcasts/{broadcast}/cancel', [Reseller\BroadcastController::class, 'cancel'])->name('broadcasts.cancel');
         Route::get('broadcasts/{broadcast}/results', [Reseller\BroadcastController::class, 'results'])->name('broadcasts.results');
+        Route::get('broadcasts/{broadcast}/export-results', [Reseller\BroadcastController::class, 'exportResults'])->name('broadcasts.export-results');
+        Route::get('broadcasts/{broadcast}/stats', [Reseller\BroadcastController::class, 'stats'])->name('broadcasts.stats');
 
         // Financial
         Route::get('transactions', [Reseller\TransactionController::class, 'index'])->name('transactions.index');
@@ -318,6 +328,8 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::post('broadcasts/{broadcast}/resume', [Client\BroadcastController::class, 'resume'])->name('broadcasts.resume');
         Route::post('broadcasts/{broadcast}/cancel', [Client\BroadcastController::class, 'cancel'])->name('broadcasts.cancel');
         Route::get('broadcasts/{broadcast}/results', [Client\BroadcastController::class, 'results'])->name('broadcasts.results');
+        Route::get('broadcasts/{broadcast}/export-results', [Client\BroadcastController::class, 'exportResults'])->name('broadcasts.export-results');
+        Route::get('broadcasts/{broadcast}/stats', [Client\BroadcastController::class, 'stats'])->name('broadcasts.stats');
 
         Route::get('transactions', [Client\TransactionController::class, 'index'])->name('transactions.index');
 
