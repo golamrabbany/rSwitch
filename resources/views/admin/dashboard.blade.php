@@ -1,6 +1,59 @@
 <x-admin-layout>
     <x-slot name="header">Dashboard</x-slot>
 
+    {{-- Live Operations Section --}}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="live-section">
+        {{-- Concurrent Calls --}}
+        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-gray-500 text-xs font-medium uppercase tracking-wide">Live Calls</p>
+                <span id="ws-status" class="w-2 h-2 rounded-full bg-gray-300" title="WebSocket: connecting..."></span>
+            </div>
+            <div class="flex items-center gap-2">
+                <p class="text-3xl font-bold text-gray-900 tabular-nums" id="live-concurrent">0</p>
+                <span id="live-pulse" class="relative flex h-3 w-3 hidden">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">concurrent channels</p>
+        </div>
+
+        {{-- CPS --}}
+        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-gray-500 text-xs font-medium uppercase tracking-wide">CPS</p>
+                <span class="text-xs font-medium text-gray-400">calls/sec</span>
+            </div>
+            <p class="text-3xl font-bold text-gray-900 tabular-nums" id="live-cps">0.0</p>
+            <p class="text-xs text-gray-400 mt-1">calls per second</p>
+        </div>
+
+        {{-- Live ASR --}}
+        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-gray-500 text-xs font-medium uppercase tracking-wide">Live ASR</p>
+                <span id="live-asr-badge" class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">--</span>
+            </div>
+            <p class="text-3xl font-bold tabular-nums" id="live-asr">0.0<span class="text-lg">%</span></p>
+            <p class="text-xs text-gray-400 mt-1">today's answer rate</p>
+        </div>
+
+        {{-- Today's Activity --}}
+        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-gray-500 text-xs font-medium uppercase tracking-wide">Today's Activity</p>
+                <span class="text-xs font-medium text-gray-400">live</span>
+            </div>
+            <p class="text-3xl font-bold text-gray-900 tabular-nums" id="live-today-calls">0</p>
+            <div class="flex items-center gap-3 mt-1 text-xs">
+                <span class="text-emerald-600"><span id="live-today-answered">0</span> answered</span>
+                <span class="text-gray-300">|</span>
+                <span class="text-red-500"><span id="live-today-failed">0</span> failed</span>
+            </div>
+        </div>
+    </div>
+
     {{-- Hero Section with Live Stats --}}
     <div class="mb-6">
         <div class="flex items-center justify-between mb-6">
@@ -640,6 +693,165 @@
     </div>
 
     @push('scripts')
+    <script>
+    (function() {
+        // --- Live Operations WebSocket ---
+        var WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws/live-calls';
+        var ws = null;
+        var reconnectAttempts = 0;
+        var maxReconnect = 10;
+
+        // Counters
+        var concurrent = 0;
+        var todayCalls = {{ $todayStats['today_calls'] ?? 0 }};
+        var todayAnswered = {{ $todayStats['today_answered'] ?? 0 }};
+        var todayFailed = {{ ($todayStats['today_calls'] ?? 0) - ($todayStats['today_answered'] ?? 0) }};
+        var callStartTimestamps = []; // for CPS calculation
+        var answeredCallIds = {}; // track which calls were answered
+
+        // DOM references
+        var elConcurrent = document.getElementById('live-concurrent');
+        var elCps = document.getElementById('live-cps');
+        var elAsr = document.getElementById('live-asr');
+        var elAsrBadge = document.getElementById('live-asr-badge');
+        var elTodayCalls = document.getElementById('live-today-calls');
+        var elTodayAnswered = document.getElementById('live-today-answered');
+        var elTodayFailed = document.getElementById('live-today-failed');
+        var elWsStatus = document.getElementById('ws-status');
+        var elPulse = document.getElementById('live-pulse');
+
+        function updateDOM() {
+            elConcurrent.textContent = concurrent;
+            elTodayCalls.textContent = todayCalls.toLocaleString();
+            elTodayAnswered.textContent = todayAnswered.toLocaleString();
+            elTodayFailed.textContent = todayFailed.toLocaleString();
+
+            // Pulse indicator
+            if (concurrent > 0) {
+                elPulse.classList.remove('hidden');
+            } else {
+                elPulse.classList.add('hidden');
+            }
+
+            // ASR calculation
+            var asr = todayCalls > 0 ? ((todayAnswered / todayCalls) * 100) : 0;
+            elAsr.innerHTML = asr.toFixed(1) + '<span class="text-lg">%</span>';
+
+            // ASR color coding
+            if (todayCalls === 0) {
+                elAsr.className = 'text-3xl font-bold tabular-nums text-gray-400';
+                elAsrBadge.className = 'text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500';
+                elAsrBadge.textContent = '--';
+            } else if (asr >= 60) {
+                elAsr.className = 'text-3xl font-bold tabular-nums text-emerald-600';
+                elAsrBadge.className = 'text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600';
+                elAsrBadge.textContent = 'Good';
+            } else if (asr >= 40) {
+                elAsr.className = 'text-3xl font-bold tabular-nums text-amber-600';
+                elAsrBadge.className = 'text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-600';
+                elAsrBadge.textContent = 'Fair';
+            } else {
+                elAsr.className = 'text-3xl font-bold tabular-nums text-red-600';
+                elAsrBadge.className = 'text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-600';
+                elAsrBadge.textContent = 'Low';
+            }
+
+            // CPS: count call_start timestamps in the last 1 second
+            var now = Date.now();
+            callStartTimestamps = callStartTimestamps.filter(function(t) { return now - t < 1000; });
+            elCps.textContent = callStartTimestamps.length.toFixed(1);
+        }
+
+        function setWsStatus(status) {
+            if (status === 'connected') {
+                elWsStatus.className = 'w-2 h-2 rounded-full bg-emerald-500';
+                elWsStatus.title = 'WebSocket: connected';
+            } else if (status === 'disconnected') {
+                elWsStatus.className = 'w-2 h-2 rounded-full bg-red-500';
+                elWsStatus.title = 'WebSocket: disconnected';
+            } else {
+                elWsStatus.className = 'w-2 h-2 rounded-full bg-gray-300';
+                elWsStatus.title = 'WebSocket: connecting...';
+            }
+        }
+
+        function connect() {
+            setWsStatus('connecting');
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = function() {
+                reconnectAttempts = 0;
+                setWsStatus('connected');
+            };
+
+            ws.onmessage = function(event) {
+                var data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+
+            ws.onclose = function() {
+                setWsStatus('disconnected');
+                if (reconnectAttempts < maxReconnect) {
+                    reconnectAttempts++;
+                    setTimeout(connect, Math.min(1000 * reconnectAttempts, 10000));
+                }
+            };
+
+            ws.onerror = function() {
+                setWsStatus('disconnected');
+            };
+        }
+
+        function handleMessage(data) {
+            switch (data.type) {
+                case 'snapshot':
+                    concurrent = data.stats ? (data.stats.active_calls_count || 0) : 0;
+                    break;
+                case 'call_start':
+                    concurrent++;
+                    todayCalls++;
+                    callStartTimestamps.push(Date.now());
+                    // Track this call as not-yet-answered
+                    if (data.unique_id) {
+                        answeredCallIds[data.unique_id] = false;
+                    }
+                    break;
+                case 'call_answered':
+                    todayAnswered++;
+                    // Mark as answered
+                    if (data.unique_id) {
+                        answeredCallIds[data.unique_id] = true;
+                    }
+                    break;
+                case 'call_end':
+                    concurrent = Math.max(0, concurrent - 1);
+                    // If this call was never answered, count as failed
+                    if (data.unique_id && !answeredCallIds[data.unique_id]) {
+                        todayFailed++;
+                    }
+                    // Clean up tracking
+                    if (data.unique_id) {
+                        delete answeredCallIds[data.unique_id];
+                    }
+                    break;
+            }
+            updateDOM();
+        }
+
+        // Initial DOM render with server-side data
+        updateDOM();
+
+        // Update CPS display every second
+        setInterval(function() {
+            var now = Date.now();
+            callStartTimestamps = callStartTimestamps.filter(function(t) { return now - t < 1000; });
+            elCps.textContent = callStartTimestamps.length.toFixed(1);
+        }, 1000);
+
+        // Connect WebSocket
+        connect();
+    })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
         function callVolumeChart() {

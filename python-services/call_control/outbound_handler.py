@@ -18,13 +18,17 @@ Flow:
 11. Set channel variables for dialplan
 """
 
+import json
 import logging
+import os
 import re
+import time
 import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
+import redis as redis_lib
 from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
@@ -118,6 +122,35 @@ class OutboundCallHandler:
                 await agi.set_variable("ROUTE_ACTION", "REJECT")
                 await agi.set_variable("ROUTE_REJECT_REASON", "no_balance")
                 return
+
+        # 4b. Credit control: calculate max call duration for prepaid users
+        rate_per_minute = Decimal("0")
+        if row.rate_group_id and row.billing_type == "prepaid":
+            rate_row = session.execute(
+                text("""
+                    SELECT rate_per_minute FROM rates
+                    WHERE rate_group_id = :rg_id
+                    AND status = 'active'
+                    AND effective_date <= CURDATE()
+                    AND (end_date IS NULL OR end_date > CURDATE())
+                    AND :dest LIKE CONCAT(prefix, '%')
+                    ORDER BY LENGTH(prefix) DESC
+                    LIMIT 1
+                """),
+                {"rg_id": row.rate_group_id, "dest": extension},
+            ).first()
+
+            if rate_row:
+                rate_per_minute = Decimal(str(rate_row.rate_per_minute))
+                if rate_per_minute > 0:
+                    available_balance = Decimal(str(row.balance or 0)) + Decimal(str(row.credit_limit or 0))
+                    rate_per_second = rate_per_minute / Decimal("60")
+                    if rate_per_second > 0:
+                        max_seconds = int(available_balance / rate_per_second)
+                        # Cap at 4 hours max, minimum 60 seconds
+                        max_seconds = max(60, min(max_seconds, 14400))
+                        await agi.set_variable("RSWITCH_MAX_DURATION", str(max_seconds))
+                        await agi.verbose(f"rSwitch: Credit control max_duration={max_seconds}s")
 
         # 5. Check daily limits
         if row.daily_call_limit or row.daily_spend_limit:
@@ -374,6 +407,27 @@ class OutboundCallHandler:
         await agi.set_variable("ROUTE_CLI_NUM", cli_num)
         await agi.set_variable("CDR_UUID", cdr_uuid)
         await agi.set_variable("RECORD_CALL", "1" if row.allow_recording else "0")
+
+        # Set absolute timeout for prepaid credit control
+        max_dur = await agi.get_variable("RSWITCH_MAX_DURATION")
+        if max_dur:
+            await agi.set_variable("CHANNEL(ABSOLUTE_TIMEOUT)", max_dur)
+            await agi.verbose(f"rSwitch: ABSOLUTE_TIMEOUT set to {max_dur}s")
+
+        # Store call metadata in Redis for credit control safety-net
+        try:
+            redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+            r = redis_lib.from_url(redis_url)
+            call_key = f"rswitch:active_call:{cdr_uuid}"
+            r.setex(call_key, 14400, json.dumps({
+                "user_id": int(row.uid),
+                "billing_type": row.billing_type,
+                "rate_per_minute": float(rate_per_minute),
+                "channel": channel,
+                "start_time": time.time(),
+            }))
+        except Exception as e:
+            logger.warning(f"rSwitch: Failed to store credit control metadata: {e}")
 
         await agi.verbose(
             f"rSwitch: Route {extension} via {primary.trunk_name} "

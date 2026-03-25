@@ -36,6 +36,7 @@ app.conf.update(
     task_routes={
         "billing.tasks.rate_and_charge": {"queue": "billing"},
         "billing.tasks.rate_batch": {"queue": "billing"},
+        "billing.credit_control.check_balances": {"queue": "billing"},
         "monitoring.tasks.*": {"queue": "monitoring"},
     },
 
@@ -45,6 +46,11 @@ app.conf.update(
         "rate-unrated-cdrs": {
             "task": "billing.tasks.rate_batch",
             "schedule": 120.0,  # every 2 minutes
+        },
+        # Credit control: check active prepaid calls every 30 seconds
+        "credit-control-check": {
+            "task": "billing.credit_control.check_balances",
+            "schedule": 30.0,
         },
     },
 )

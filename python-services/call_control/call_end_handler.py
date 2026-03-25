@@ -13,8 +13,10 @@ Flow:
 """
 
 import logging
+import os
 from datetime import datetime
 
+import redis as redis_lib
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -124,3 +126,11 @@ class CallEndHandler:
                 logger.info(f"Queued billing for CDR {cdr.id}")
             except Exception as e:
                 logger.warning(f"Could not queue billing for CDR {cdr.id}: {e}")
+
+        # 7. Clean up credit control metadata from Redis
+        try:
+            redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+            r = redis_lib.from_url(redis_url)
+            r.delete(f"rswitch:active_call:{cdr_uuid}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up credit control key for {cdr_uuid}: {e}")

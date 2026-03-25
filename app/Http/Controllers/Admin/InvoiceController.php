@@ -7,7 +7,9 @@ use App\Models\Invoice;
 use App\Models\User;
 use App\Notifications\InvoiceIssuedNotification;
 use App\Services\AuditService;
+use App\Services\InvoiceGenerationService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -100,7 +102,7 @@ class InvoiceController extends Controller
 
     public function show(Invoice $invoice)
     {
-        $invoice->load('user', 'payments');
+        $invoice->load('user', 'payments', 'items');
 
         return view('admin.invoices.show', compact('invoice'));
     }
@@ -144,10 +146,60 @@ class InvoiceController extends Controller
 
     public function pdf(Invoice $invoice)
     {
-        $invoice->load('user');
+        $invoice->load('user', 'items');
 
         $pdf = Pdf::loadView('pdf.invoice', compact('invoice'));
 
         return $pdf->download("{$invoice->invoice_number}.pdf");
+    }
+
+    public function generateReseller()
+    {
+        $resellers = User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email']);
+
+        return view('admin.invoices.generate-reseller', compact('resellers'));
+    }
+
+    public function storeReseller(Request $request, InvoiceGenerationService $service)
+    {
+        $validated = $request->validate([
+            'reseller_id' => ['required', 'exists:users,id'],
+            'period_start' => ['required', 'date'],
+            'period_end' => ['required', 'date', 'after_or_equal:period_start'],
+        ]);
+
+        $reseller = User::findOrFail($validated['reseller_id']);
+        abort_unless($reseller->isReseller(), 422, 'User is not a reseller.');
+
+        try {
+            $invoice = $service->generateForReseller(
+                $reseller,
+                Carbon::parse($validated['period_start']),
+                Carbon::parse($validated['period_end'])
+            );
+
+            return redirect()->route('admin.invoices.show', $invoice)
+                ->with('success', "Invoice {$invoice->invoice_number} generated for {$reseller->name}.");
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->with('warning', $e->getMessage());
+        }
+    }
+
+    public function previewReseller(Request $request, InvoiceGenerationService $service)
+    {
+        $validated = $request->validate([
+            'reseller_id' => ['required', 'exists:users,id'],
+            'period_start' => ['required', 'date'],
+            'period_end' => ['required', 'date', 'after_or_equal:period_start'],
+        ]);
+
+        $reseller = User::findOrFail($validated['reseller_id']);
+        $preview = $service->previewForReseller(
+            $reseller,
+            Carbon::parse($validated['period_start']),
+            Carbon::parse($validated['period_end'])
+        );
+
+        return response()->json($preview);
     }
 }

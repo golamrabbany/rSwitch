@@ -183,6 +183,52 @@
                 </div>
             </div>
 
+            {{-- Line Items --}}
+            @if($invoice->items->count() > 0)
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                        </svg>
+                        <h3 class="detail-card-title">Line Items ({{ $invoice->items->count() }})</h3>
+                    </div>
+                </div>
+                <div class="detail-card-body p-0">
+                    <table class="data-table data-table-compact">
+                        <thead>
+                            <tr>
+                                <th>Description</th>
+                                <th>Type</th>
+                                <th style="text-align: right">Calls</th>
+                                <th style="text-align: right">Minutes</th>
+                                <th style="text-align: right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($invoice->items as $item)
+                                <tr>
+                                    <td class="text-gray-900">{{ $item->description }}</td>
+                                    <td>
+                                        @if($item->type === 'call_charges')
+                                            <span class="badge badge-blue">Calls</span>
+                                        @elseif($item->type === 'did_charges')
+                                            <span class="badge badge-purple">DID</span>
+                                        @else
+                                            <span class="badge badge-gray">Adj</span>
+                                        @endif
+                                    </td>
+                                    <td style="text-align: right" class="tabular-nums">{{ number_format($item->quantity) }}</td>
+                                    <td style="text-align: right" class="tabular-nums">{{ $item->minutes > 0 ? number_format($item->minutes, 1) : '—' }}</td>
+                                    <td style="text-align: right" class="tabular-nums font-mono font-medium text-gray-900">{{ format_currency($item->amount) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
+
             {{-- Payments --}}
             @if($invoice->payments->count() > 0)
             <div class="detail-card">

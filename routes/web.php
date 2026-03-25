@@ -156,6 +156,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::resource('invoices', Admin\InvoiceController::class)->only(['index', 'create', 'store', 'show', 'update']);
     Route::get('invoices/{invoice}/pdf', [Admin\InvoiceController::class, 'pdf'])->name('invoices.pdf');
+    Route::get('invoices-generate-reseller', [Admin\InvoiceController::class, 'generateReseller'])->name('invoices.generate-reseller');
+    Route::post('invoices-generate-reseller', [Admin\InvoiceController::class, 'storeReseller'])->name('invoices.store-reseller');
+    Route::post('invoices-preview-reseller', [Admin\InvoiceController::class, 'previewReseller'])->name('invoices.preview-reseller');
 
     Route::get('payments', [Admin\PaymentController::class, 'index'])->name('payments.index');
     Route::get('payments/{payment}', [Admin\PaymentController::class, 'show'])->name('payments.show');

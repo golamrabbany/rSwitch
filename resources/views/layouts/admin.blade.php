@@ -175,7 +175,7 @@
                 </div>
 
                 <!-- Financial Reports -->
-                @php $financialReportActive = request()->routeIs('admin.operational-reports.profit-loss*'); @endphp
+                @php $financialReportActive = request()->routeIs('admin.operational-reports.profit-loss*', 'admin.invoices.generate-reseller*'); @endphp
                 <div x-data="{ open: {{ $financialReportActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $financialReportActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
@@ -190,6 +190,7 @@
                     </button>
                     <div x-show="open" x-collapse class="nav-children">
                         <a href="{{ route('admin.operational-reports.profit-loss') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.profit-loss*') ? 'active' : 'text-gray-500' }}">Profit & Loss</a>
+                        <a href="{{ route('admin.invoices.generate-reseller') }}" class="nav-child {{ request()->routeIs('admin.invoices.generate-reseller*') ? 'active' : 'text-gray-500' }}">Reseller Invoice</a>
                     </div>
                 </div>
 
