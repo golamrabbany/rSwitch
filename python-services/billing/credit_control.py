@@ -32,8 +32,8 @@ def check_active_call_balances():
     settings = get_settings()
     r = redis_lib.from_url(settings.redis_url)
 
-    # Find all active call keys
-    keys = r.keys("rswitch:active_call:*")
+    # Find all active call keys (SCAN is non-blocking, unlike KEYS)
+    keys = list(r.scan_iter(match="rswitch:active_call:*", count=100))
     if not keys:
         return {"checked": 0, "disconnected": 0}
 

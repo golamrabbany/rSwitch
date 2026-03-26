@@ -7,18 +7,23 @@ Replaces:
   → rate_batch (safety net every 2 minutes for missed CDRs)
 """
 
+import json
 import logging
+import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 import redis as redis_lib
 from celery import shared_task
+from sqlalchemy import text
 
 from shared.config import get_settings
 from shared.database import get_session
 from shared.models.call_record import CallRecord
 from billing.rating import RatingService
 from billing.balance import BalanceService
+import os
+import socket
 from billing.exceptions import RateNotFoundException, InsufficientBalanceException
 
 logger = logging.getLogger(__name__)
@@ -64,22 +69,19 @@ def rate_and_charge(self, call_record_id: int) -> dict:
         if result["status"] != "rated":
             return result
 
-        # Step 2: Charge the user's balance
-        total_cost = Decimal(result["total_cost"])
-        if total_cost > Decimal("0"):
-            try:
-                balance_service.charge_call(call_record_id)
-                result["charged"] = True
-            except InsufficientBalanceException as e:
-                logger.warning(
-                    f"rate_and_charge: insufficient balance "
-                    f"[cdr={call_record_id}, user={e.user_id}, "
-                    f"amount={e.amount}, available={e.available}]"
-                )
-                result["charged"] = False
-                result["charge_error"] = "insufficient_balance"
-        else:
-            result["charged"] = True  # Zero cost, no charge needed
+        # Step 2: Charge client + reseller in ONE atomic transaction
+        try:
+            charge_result = balance_service.charge_call(call_record_id)
+            result["charged"] = charge_result["client_charged"]
+            result["reseller_charged"] = charge_result["reseller_charged"]
+        except InsufficientBalanceException as e:
+            logger.warning(
+                f"rate_and_charge: insufficient balance "
+                f"[cdr={call_record_id}, user={e.user_id}, "
+                f"amount={e.amount}, available={e.available}]"
+            )
+            result["charged"] = False
+            result["charge_error"] = "insufficient_balance"
 
         return result
 
@@ -135,12 +137,11 @@ def rate_batch() -> dict:
 
             if result["status"] == "rated":
                 rated += 1
-                total_cost = Decimal(result["total_cost"])
-                if total_cost > Decimal("0"):
-                    try:
-                        balance_service.charge_call(cdr_id)
-                    except InsufficientBalanceException:
-                        charge_failures += 1
+                # Charge client + reseller in one atomic transaction
+                try:
+                    balance_service.charge_call(cdr_id)
+                except InsufficientBalanceException:
+                    charge_failures += 1
             else:
                 unbillable += 1
 
@@ -165,3 +166,135 @@ def rate_batch() -> dict:
 
     logger.info(f"rate_batch completed: {summary}")
     return summary
+
+
+@shared_task(name="billing.tasks.hangup_reseller_calls")
+def hangup_reseller_calls(reseller_id: int) -> dict:
+    """
+    Hangup all active calls for a reseller whose balance is exhausted.
+
+    Two-pass approach for reliability:
+    1. Redis SCAN — find active_call keys with matching reseller_id (non-blocking)
+    2. DB fallback — query call_records for in_progress CDRs (catches any missed)
+
+    Uses ONE AMI connection for all hangups (not one per channel).
+    """
+    settings = get_settings()
+    r = redis_lib.from_url(settings.redis_url)
+
+    channels_to_hangup = []
+    redis_keys_to_clean = []
+
+    # ── Pass 1: Redis SCAN (non-blocking, unlike KEYS) ──
+    try:
+        for key in r.scan_iter(match="rswitch:active_call:*", count=100):
+            data = r.get(key)
+            if not data:
+                continue
+            try:
+                call = json.loads(data)
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+            if call.get("reseller_id") == reseller_id:
+                channel = call.get("channel")
+                if channel:
+                    channels_to_hangup.append(channel)
+                    redis_keys_to_clean.append(key)
+    except Exception as e:
+        logger.error(f"hangup_reseller_calls: Redis scan failed: {e}")
+
+    # ── Pass 2: DB fallback for any CDRs not in Redis ──
+    try:
+        with get_session() as session:
+            active_cdrs = session.execute(
+                text("""
+                    SELECT uuid FROM call_records
+                    WHERE reseller_id = :rid AND status = 'in_progress'
+                """),
+                {"rid": reseller_id},
+            ).fetchall()
+
+            found_channels = set(channels_to_hangup)
+            for (uuid_val,) in active_cdrs:
+                data = r.get(f"rswitch:active_call:{uuid_val}")
+                if data:
+                    try:
+                        call = json.loads(data)
+                        channel = call.get("channel")
+                        if channel and channel not in found_channels:
+                            channels_to_hangup.append(channel)
+                            redis_keys_to_clean.append(
+                                f"rswitch:active_call:{uuid_val}"
+                            )
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+    except Exception as e:
+        logger.error(f"hangup_reseller_calls: DB query failed: {e}")
+
+    if not channels_to_hangup:
+        return {"reseller_id": reseller_id, "hung_up": 0, "total_found": 0}
+
+    # ── Batch hangup: ONE AMI connection for all channels ──
+    hung_up = _batch_hangup_channels(channels_to_hangup)
+
+    # Clean up Redis keys
+    for key in redis_keys_to_clean:
+        try:
+            r.delete(key)
+        except Exception:
+            pass
+
+    summary = {
+        "reseller_id": reseller_id,
+        "hung_up": hung_up,
+        "total_found": len(channels_to_hangup),
+    }
+
+    logger.info(f"hangup_reseller_calls completed: {summary}")
+    return summary
+
+
+def _batch_hangup_channels(channels: list[str]) -> int:
+    """
+    Hangup multiple channels using ONE AMI connection.
+    Opens socket once, authenticates once, sends all hangups, closes once.
+    10ms spacing between commands to avoid AMI flood.
+    """
+    host = os.environ.get("AMI_HOST", "127.0.0.1")
+    port = int(os.environ.get("AMI_PORT", "5038"))
+    user = os.environ.get("AMI_USER", "laravel")
+    secret = os.environ.get("AMI_SECRET", "")
+
+    hung_up = 0
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(10)
+
+    try:
+        s.connect((host, port))
+        s.recv(1024)  # AMI banner
+
+        # Login once
+        s.send(f"Action: Login\r\nUsername: {user}\r\nSecret: {secret}\r\n\r\n".encode())
+        s.recv(4096)
+
+        # Send all hangups on same connection
+        for channel in channels:
+            try:
+                s.send(f"Action: Hangup\r\nChannel: {channel}\r\nCause: 0\r\n\r\n".encode())
+                s.recv(4096)
+                hung_up += 1
+                logger.info(f"AMI hangup: {channel}")
+            except Exception as e:
+                logger.error(f"AMI hangup failed for {channel}: {e}")
+
+            time.sleep(0.01)  # 10ms spacing
+
+        # Logoff once
+        s.send(b"Action: Logoff\r\n\r\n")
+    except Exception as e:
+        logger.error(f"AMI batch hangup connection failed: {e}")
+    finally:
+        s.close()
+
+    return hung_up

@@ -36,6 +36,18 @@ from call_control.agi_protocol import AgiConnection
 
 logger = logging.getLogger(__name__)
 
+# Module-level Redis connection pool — reused across all calls (no TCP per call)
+_redis_pool = None
+
+
+def _get_redis() -> redis_lib.Redis:
+    """Get Redis client from shared connection pool (created once, reused)."""
+    global _redis_pool
+    if _redis_pool is None:
+        redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+        _redis_pool = redis_lib.ConnectionPool.from_url(redis_url, max_connections=20)
+    return redis_lib.Redis(connection_pool=_redis_pool)
+
 
 class OutboundCallHandler:
     """Handles outbound call routing decisions via AGI."""
@@ -123,7 +135,50 @@ class OutboundCallHandler:
                 await agi.set_variable("ROUTE_REJECT_REASON", "no_balance")
                 return
 
-        # 4b. Credit control: calculate max call duration for prepaid users
+        # 4a. Reseller blocked check (Redis flag — instant, no DB query)
+        if row.parent_id:
+            try:
+                r = _get_redis()
+                if r.exists(f"rswitch:reseller_blocked:{row.parent_id}"):
+                    await agi.verbose(f"rSwitch: Reseller {row.parent_id} is blocked (insufficient balance)")
+                    await agi.set_variable("ROUTE_ACTION", "REJECT")
+                    await agi.set_variable("ROUTE_REJECT_REASON", "reseller_blocked")
+                    return
+            except Exception as e:
+                logger.warning(f"rSwitch: Redis check failed for reseller block: {e}")
+
+        # 4b. Reseller rate_group + balance check (for clients under resellers)
+        if row.parent_id:
+            reseller = session.execute(
+                text("""
+                    SELECT id, role, balance, credit_limit, billing_type, rate_group_id
+                    FROM users WHERE id = :pid LIMIT 1
+                """),
+                {"pid": row.parent_id},
+            ).first()
+
+            # Only check if parent is a reseller (not super_admin)
+            if reseller and reseller.role == 'reseller':
+                # CHECK 1: Reseller MUST have a rate_group — billing is incomplete without it
+                if not reseller.rate_group_id:
+                    await agi.verbose(f"rSwitch: Reseller {reseller.id} has no rate_group — call blocked")
+                    await agi.set_variable("ROUTE_ACTION", "REJECT")
+                    await agi.set_variable("ROUTE_REJECT_REASON", "reseller_no_rate")
+                    return
+
+                # CHECK 2: Reseller must have sufficient balance (prepaid only)
+                if reseller.billing_type == 'prepaid':
+                    reseller_balance = Decimal(str(reseller.balance or 0))
+                    reseller_credit = Decimal(str(reseller.credit_limit or 0))
+                    reseller_available = reseller_balance + reseller_credit
+
+                    if reseller_available <= Decimal("0"):
+                        await agi.verbose(f"rSwitch: Reseller insufficient balance ({reseller_available})")
+                        await agi.set_variable("ROUTE_ACTION", "REJECT")
+                        await agi.set_variable("ROUTE_REJECT_REASON", "reseller_no_balance")
+                        return
+
+        # 4c. Credit control: calculate max call duration for prepaid users
         rate_per_minute = Decimal("0")
         if row.rate_group_id and row.billing_type == "prepaid":
             rate_row = session.execute(
@@ -416,11 +471,11 @@ class OutboundCallHandler:
 
         # Store call metadata in Redis for credit control safety-net
         try:
-            redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
-            r = redis_lib.from_url(redis_url)
+            r = _get_redis()
             call_key = f"rswitch:active_call:{cdr_uuid}"
             r.setex(call_key, 14400, json.dumps({
                 "user_id": int(row.uid),
+                "reseller_id": int(row.parent_id) if row.parent_id else None,
                 "billing_type": row.billing_type,
                 "rate_per_minute": float(rate_per_minute),
                 "channel": channel,

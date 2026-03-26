@@ -6,10 +6,12 @@ Uses Decimal for precision (matches PHP bcmath).
 """
 
 import logging
+import os
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
+import redis as redis_lib
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -168,6 +170,10 @@ class BalanceService:
             f"new_balance={new_balance}, type={type}"
         )
 
+        # Auto-unblock reseller if balance restored above zero
+        if new_balance > Decimal("0"):
+            self._unblock_reseller(user_id)
+
         return transaction
 
     # ─────────────────────────────────────────────────────
@@ -207,14 +213,24 @@ class BalanceService:
         return after_charge >= floor
 
     # ─────────────────────────────────────────────────────
-    # charge_call — Charge user for a rated CDR
+    # charge_call — Charge client + reseller in ONE transaction
     # PHP equivalent: BalanceService::chargeCall()
     # ─────────────────────────────────────────────────────
 
-    def charge_call(self, call_record_id: int) -> Optional[Transaction]:
+    def charge_call(self, call_record_id: int) -> dict:
         """
-        Charge a user for a completed, rated call.
-        Opens its own session with transaction.
+        Charge a client (and optionally their reseller) for a rated call.
+
+        Both deductions happen in a SINGLE database transaction when possible.
+        If reseller debit fails (insufficient balance), the client charge
+        still commits — because the call already happened, we must not
+        lose revenue from the client.
+
+        The InsufficientBalanceException in debit() is raised BEFORE any
+        DB writes (it's a Python-level check), so the session stays clean
+        and the client's pending changes can still commit safely.
+
+        Returns dict with charge results.
         """
         from shared.database import get_session
 
@@ -223,47 +239,106 @@ class BalanceService:
             if not cdr:
                 raise ValueError(f"CallRecord {call_record_id} not found")
 
-            amount = Decimal(str(cdr.total_cost or 0))
+            result = {
+                "client_transaction": None,
+                "reseller_transaction": None,
+                "client_charged": False,
+                "reseller_charged": False,
+            }
 
-            # Zero-cost call — create record but don't debit
-            if amount <= Decimal("0"):
+            client_amount = Decimal(str(cdr.total_cost or 0))
+            reseller_amount = Decimal(str(cdr.reseller_cost or 0))
+
+            # ── Step 1: Charge the client ──
+            if client_amount > Decimal("0"):
+                client_txn = self.debit(
+                    session=session,
+                    user_id=cdr.user_id,
+                    amount=client_amount,
+                    type="call_charge",
+                    reference_type="call_record",
+                    reference_id=cdr.id,
+                    description=(
+                        f"Call to {cdr.callee} "
+                        f"({cdr.billable_duration}s @ {cdr.rate_per_minute}/min)"
+                    ),
+                )
+                result["client_transaction"] = client_txn
+                result["client_charged"] = True
+            else:
+                # Zero-cost call — log a zero transaction
                 locked_user = (
                     session.query(User)
                     .filter(User.id == cdr.user_id)
                     .with_for_update()
                     .first()
                 )
-                if not locked_user:
-                    return None
+                if locked_user:
+                    transaction = Transaction()
+                    transaction.user_id = locked_user.id
+                    transaction.type = "call_charge"
+                    transaction.amount = Decimal("0.0000")
+                    transaction.balance_after = Decimal(str(locked_user.balance))
+                    transaction.reference_type = "call_record"
+                    transaction.reference_id = cdr.id
+                    transaction.description = (
+                        f"Call to {cdr.callee} ({cdr.billable_duration}s) - zero cost"
+                    )
+                    transaction.created_at = datetime.now()
+                    session.add(transaction)
+                    session.flush()
+                    result["client_transaction"] = transaction
+                    result["client_charged"] = True
 
-                transaction = Transaction()
-                transaction.user_id = locked_user.id
-                transaction.type = "call_charge"
-                transaction.amount = Decimal("0.0000")
-                transaction.balance_after = Decimal(str(locked_user.balance))
-                transaction.reference_type = "call_record"
-                transaction.reference_id = cdr.id
-                transaction.description = (
-                    f"Call to {cdr.callee} ({cdr.billable_duration}s) - zero cost"
-                )
-                transaction.created_at = datetime.now()
-                session.add(transaction)
-                session.commit()
-                return transaction
+            # ── Step 2: Charge the reseller (same transaction) ──
+            # If reseller debit fails, client charge still commits.
+            # InsufficientBalanceException is raised BEFORE any DB writes
+            # in debit(), so the session remains clean.
+            if reseller_amount > Decimal("0"):
+                user = session.query(User).get(cdr.user_id)
+                if user and user.parent_id:
+                    parent = session.query(User).get(user.parent_id)
+                    if parent and parent.role != 'super_admin':
+                        try:
+                            reseller_txn = self.debit(
+                                session=session,
+                                user_id=parent.id,
+                                amount=reseller_amount,
+                                type="reseller_call_charge",
+                                reference_type="call_record",
+                                reference_id=cdr.id,
+                                description=(
+                                    f"Reseller cost: call to {cdr.callee} "
+                                    f"({cdr.billable_duration}s)"
+                                ),
+                            )
+                            result["reseller_transaction"] = reseller_txn
+                            result["reseller_charged"] = True
+                        except InsufficientBalanceException as e:
+                            # Reseller can't pay — but call already happened.
+                            # Client charge must still commit. Reseller owes a debt.
+                            logger.warning(
+                                f"charge_call: reseller insufficient balance "
+                                f"[cdr={call_record_id}, reseller={e.user_id}, "
+                                f"amount={e.amount}, available={e.available}] "
+                                f"— client still charged, blocking reseller"
+                            )
+                            result["reseller_charged"] = False
 
-            # Debit the user's balance
-            return self.debit(
-                session=session,
-                user_id=cdr.user_id,
-                amount=amount,
-                type="call_charge",
-                reference_type="call_record",
-                reference_id=cdr.id,
-                description=(
-                    f"Call to {cdr.callee} "
-                    f"({cdr.billable_duration}s @ {cdr.rate_per_minute}/min)"
-                ),
+                            # Block reseller + hangup active calls
+                            self._block_reseller(parent.id)
+
+            # ── Commit: client always charged, reseller if possible ──
+            session.commit()
+
+            logger.info(
+                f"charge_call: cdr={call_record_id}, "
+                f"client={client_amount}, reseller={reseller_amount}, "
+                f"client_charged={result['client_charged']}, "
+                f"reseller_charged={result['reseller_charged']}"
             )
+
+            return result
 
     # ─────────────────────────────────────────────────────
     # get_available_balance
@@ -276,3 +351,54 @@ class BalanceService:
         return (
             Decimal(str(user.balance)) + Decimal(str(user.credit_limit))
         ).quantize(Decimal("0.0001"))
+
+    # ─────────────────────────────────────────────────────
+    # Reseller auto-cutoff helpers
+    # ─────────────────────────────────────────────────────
+
+    _redis_pool = None
+
+    def _get_redis(self) -> redis_lib.Redis:
+        """Get Redis client from shared connection pool (created once, reused)."""
+        if BalanceService._redis_pool is None:
+            redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+            BalanceService._redis_pool = redis_lib.ConnectionPool.from_url(
+                redis_url, max_connections=10
+            )
+        return redis_lib.Redis(connection_pool=BalanceService._redis_pool)
+
+    def _block_reseller(self, reseller_id: int) -> None:
+        """
+        Block a reseller (insufficient balance) and hangup their active calls.
+        1. Set Redis flag → new calls rejected instantly by AGI
+        2. Trigger async Celery task → hangup all active calls
+        """
+        try:
+            r = self._get_redis()
+            key = f"rswitch:reseller_blocked:{reseller_id}"
+            r.setex(key, 86400, "insufficient_balance")  # 24h TTL safety
+            logger.info(f"Reseller {reseller_id} BLOCKED — Redis flag set")
+        except Exception as e:
+            logger.error(f"Failed to set reseller block flag: {e}")
+
+        # Trigger async hangup of all active calls for this reseller
+        try:
+            from billing.tasks import hangup_reseller_calls
+            hangup_reseller_calls.delay(reseller_id)
+            logger.info(f"Triggered hangup task for reseller {reseller_id}")
+        except Exception as e:
+            logger.error(f"Failed to trigger hangup task: {e}")
+
+    def _unblock_reseller(self, user_id: int) -> None:
+        """
+        Clear the reseller blocked flag if balance is now positive.
+        Called automatically after any credit operation.
+        """
+        try:
+            r = self._get_redis()
+            key = f"rswitch:reseller_blocked:{user_id}"
+            if r.exists(key):
+                r.delete(key)
+                logger.info(f"Reseller {user_id} UNBLOCKED — balance restored")
+        except Exception as e:
+            logger.error(f"Failed to clear reseller block flag: {e}")

@@ -7,6 +7,7 @@ use App\Models\CallRecord;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 
 class BalanceService
 {
@@ -99,6 +100,11 @@ class BalanceService
             $lockedUser->update(['balance' => $newBalance]);
             $user->balance = $newBalance;
 
+            // Auto-unblock reseller if balance restored above zero
+            if (bccomp($newBalance, '0', 4) > 0) {
+                $this->unblockReseller($lockedUser->id);
+            }
+
             return Transaction::create([
                 'user_id' => $lockedUser->id,
                 'type' => $type,
@@ -181,5 +187,22 @@ class BalanceService
     public function getAvailableBalance(User $user): string
     {
         return bcadd((string) $user->balance, (string) $user->credit_limit, 4);
+    }
+
+    /**
+     * Clear the reseller blocked flag in Redis.
+     * Called automatically when a credit restores balance above zero.
+     */
+    private function unblockReseller(int $userId): void
+    {
+        try {
+            $key = "rswitch:reseller_blocked:{$userId}";
+            if (Redis::exists($key)) {
+                Redis::del($key);
+                \Log::info("Reseller {$userId} UNBLOCKED — balance restored");
+            }
+        } catch (\Exception $e) {
+            \Log::error("Failed to clear reseller block flag: " . $e->getMessage());
+        }
     }
 }
