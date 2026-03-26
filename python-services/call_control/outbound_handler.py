@@ -332,7 +332,7 @@ class OutboundCallHandler:
                        tr.remove_prefix, tr.add_prefix, t.tech_prefix,
                        tr.time_start, tr.time_end, tr.days_of_week, tr.timezone,
                        t.name as trunk_name, t.id as tid,
-                       t.cli_mode, t.cli_prefix, t.max_channels as trunk_max_channels
+                       t.cli_mode, t.cli_override_number, t.max_channels as trunk_max_channels
                 FROM trunk_routes tr
                 JOIN trunks t ON tr.trunk_id = t.id
                 WHERE tr.status = 'active'
@@ -422,9 +422,9 @@ class OutboundCallHandler:
         cli_name = row.caller_id_name or username
         cli_num = row.caller_id_number or caller_id
 
-        if primary.cli_mode == "trunk_cli" and primary.cli_prefix:
-            cli_num = primary.cli_prefix
-        elif primary.cli_mode == "strip_cli":
+        if primary.cli_mode == "override" and primary.cli_override_number:
+            cli_num = primary.cli_override_number
+        elif primary.cli_mode == "hide":
             cli_num = extension
 
         # 11. Create CDR
