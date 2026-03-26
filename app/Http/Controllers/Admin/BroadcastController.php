@@ -171,6 +171,36 @@ class BroadcastController extends Controller
         return back()->with('success', 'Broadcast cancelled.');
     }
 
+    public function edit(Broadcast $broadcast)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+        return view('admin.broadcasts.edit', compact('broadcast'));
+    }
+
+    public function update(Request $request, Broadcast $broadcast)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:120'],
+        ]);
+
+        $broadcast->update($request->only('name', 'max_concurrent', 'ring_timeout'));
+
+        return redirect()->route('admin.broadcasts.show', $broadcast)->with('success', 'Broadcast updated.');
+    }
+
+    public function suspend(Broadcast $broadcast)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $broadcast->update(['status' => 'paused']);
+
+        return back()->with('success', 'Broadcast suspended.');
+    }
+
     public function results(Broadcast $broadcast)
     {
         $results = $broadcast->numbers()->orderByDesc('updated_at')->paginate(50);

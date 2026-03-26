@@ -257,6 +257,53 @@
                     </div>
                 </div>
 
+                {{-- Schedule --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Schedule</h3>
+                        <p class="form-card-subtitle">When to start the broadcast</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="form-group">
+                            <div class="flex gap-3">
+                                <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
+                                       :class="scheduleType === 'now' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
+                                    <input type="radio" name="schedule_type" value="now" x-model="scheduleType" class="sr-only">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                    <span class="font-medium text-sm">Start Manually</span>
+                                </label>
+                                <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
+                                       :class="scheduleType === 'scheduled' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
+                                    <input type="radio" name="schedule_type" value="scheduled" x-model="scheduleType" class="sr-only">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <span class="font-medium text-sm">Schedule for Later</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div x-show="scheduleType === 'now'" x-transition class="text-sm text-gray-500">
+                            <p>Broadcast will be created as <strong>draft</strong>. You can start it manually from the broadcast detail page.</p>
+                        </div>
+
+                        <div x-show="scheduleType === 'scheduled'" x-transition>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="form-group">
+                                    <label class="form-label">Date</label>
+                                    <input type="date" name="scheduled_date" value="{{ old('scheduled_date') }}" class="form-input" min="{{ now()->format('Y-m-d') }}">
+                                    <x-input-error :messages="$errors->get('scheduled_date')" class="mt-2" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Time</label>
+                                    <input type="time" name="scheduled_time" value="{{ old('scheduled_time') }}" class="form-input">
+                                    <x-input-error :messages="$errors->get('scheduled_time')" class="mt-2" />
+                                </div>
+                            </div>
+                            <p class="form-hint mt-2">Broadcast will auto-start at the scheduled time. Server timezone: {{ config('app.timezone') }}</p>
+                            <x-input-error :messages="$errors->get('scheduled_at')" class="mt-2" />
+                        </div>
+                    </div>
+                </div>
+
                 {{-- Phone Numbers --}}
                 <div class="form-card">
                     <div class="form-card-header">
@@ -322,53 +369,6 @@
                     </div>
                 </div>
 
-                {{-- Schedule --}}
-                <div class="form-card">
-                    <div class="form-card-header">
-                        <h3 class="form-card-title">Schedule</h3>
-                        <p class="form-card-subtitle">When to start the broadcast</p>
-                    </div>
-                    <div class="form-card-body">
-                        <div class="form-group">
-                            <div class="flex gap-3">
-                                <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
-                                       :class="scheduleType === 'now' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
-                                    <input type="radio" name="schedule_type" value="now" x-model="scheduleType" class="sr-only">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                                    <span class="font-medium text-sm">Start Manually</span>
-                                </label>
-                                <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
-                                       :class="scheduleType === 'scheduled' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
-                                    <input type="radio" name="schedule_type" value="scheduled" x-model="scheduleType" class="sr-only">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                    <span class="font-medium text-sm">Schedule for Later</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div x-show="scheduleType === 'now'" x-transition class="text-sm text-gray-500">
-                            <p>Broadcast will be created as <strong>draft</strong>. You can start it manually from the broadcast detail page.</p>
-                        </div>
-
-                        <div x-show="scheduleType === 'scheduled'" x-transition>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label class="form-label">Date</label>
-                                    <input type="date" name="scheduled_date" value="{{ old('scheduled_date') }}" class="form-input" min="{{ now()->format('Y-m-d') }}">
-                                    <x-input-error :messages="$errors->get('scheduled_date')" class="mt-2" />
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Time</label>
-                                    <input type="time" name="scheduled_time" value="{{ old('scheduled_time') }}" class="form-input">
-                                    <x-input-error :messages="$errors->get('scheduled_time')" class="mt-2" />
-                                </div>
-                            </div>
-                            <p class="form-hint mt-2">Broadcast will auto-start at the scheduled time. Server timezone: {{ config('app.timezone') }}</p>
-                            <x-input-error :messages="$errors->get('scheduled_at')" class="mt-2" />
-                        </div>
-                    </div>
-                </div>
-
                 {{-- Form Actions --}}
                 <div class="flex justify-end">
                     <button type="submit" class="btn-action-primary-admin">
@@ -382,65 +382,58 @@
             <div class="space-y-4" style="position:sticky; top:1rem;">
                 {{-- How It Works --}}
                 <div class="detail-card">
-                    <div class="detail-card-header">
-                        <h3 class="detail-card-title">How It Works</h3>
-                    </div>
-                    <div class="detail-card-body">
-                        <div class="space-y-3">
-                            <div class="flex items-start gap-3">
-                                <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                                    <span class="text-xs font-bold text-indigo-600">1</span>
-                                </div>
-                                <p class="text-sm text-gray-600">Select a client and configure the broadcast</p>
-                            </div>
-                            <div class="flex items-start gap-3">
-                                <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                                    <span class="text-xs font-bold text-indigo-600">2</span>
-                                </div>
-                                <p class="text-sm text-gray-600">Upload phone numbers and set call parameters</p>
-                            </div>
-                            <div class="flex items-start gap-3">
-                                <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                                    <span class="text-xs font-bold text-indigo-600">3</span>
-                                </div>
-                                <p class="text-sm text-gray-600">Start the broadcast to begin dialing</p>
-                            </div>
-                            <div class="flex items-start gap-3">
-                                <div class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                                    <span class="text-xs font-bold text-emerald-600">4</span>
-                                </div>
-                                <p class="text-sm text-gray-600">Monitor progress and view results</p>
-                            </div>
+                    <div class="detail-card-header"><h3 class="detail-card-title">How It Works</h3></div>
+                    <div class="detail-card-body text-sm text-gray-600 space-y-3">
+                        <div class="flex items-start gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                            <p>Select client, type & template</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                            <p>Choose schedule (now or later)</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                            <p>Add phone numbers (manual or CSV)</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+                            <p>Start broadcast & monitor results</p>
                         </div>
                     </div>
                 </div>
 
-                {{-- Broadcast Tips --}}
+                {{-- Requirements --}}
                 <div class="detail-card">
-                    <div class="detail-card-header">
-                        <h3 class="detail-card-title">Broadcast Tips</h3>
+                    <div class="detail-card-header"><h3 class="detail-card-title">Requirements</h3></div>
+                    <div class="detail-card-body text-sm text-gray-500 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span>Client KYC</span>
+                            <span class="font-medium text-gray-700">Approved</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Voice Template</span>
+                            <span class="font-medium text-gray-700">Approved</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>SIP Account</span>
+                            <span class="font-medium text-gray-700">Active</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Client Balance</span>
+                            <span class="font-medium text-gray-700">Sufficient</span>
+                        </div>
                     </div>
-                    <div class="detail-card-body">
-                        <ul class="text-sm text-gray-600 space-y-2">
-                            <li class="flex items-start gap-2">
-                                <svg class="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>The client must have an <strong>approved voice file</strong> and active SIP account</span>
-                            </li>
-                            <li class="flex items-start gap-2">
-                                <svg class="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>Calls are billed to the <strong>client's balance</strong></span>
-                            </li>
-                            <li class="flex items-start gap-2">
-                                <svg class="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span>Ensure the client has <strong>sufficient balance</strong> before starting</span>
-                            </li>
-                        </ul>
+                </div>
+
+                {{-- Tips --}}
+                <div class="detail-card">
+                    <div class="detail-card-header"><h3 class="detail-card-title">Tips</h3></div>
+                    <div class="detail-card-body text-xs text-gray-500 space-y-2">
+                        <p>Calls are billed to the client's prepaid balance.</p>
+                        <p>Broadcast auto-pauses if balance runs low.</p>
+                        <p>Use 5-10 concurrent calls for best results.</p>
+                        <p>Schedule broadcasts during business hours for higher answer rates.</p>
                     </div>
                 </div>
             </div>

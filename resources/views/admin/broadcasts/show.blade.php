@@ -31,11 +31,41 @@
             </div>
         </div>
         <div class="page-actions">
+            @if(auth()->user()->isSuperAdmin())
+                {{-- Edit --}}
+                <a href="{{ route('admin.broadcasts.edit', $broadcast) }}" class="btn-action-secondary">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Edit
+                </a>
+
+                {{-- Pause/Suspend (if running) --}}
+                @if($broadcast->status === 'running')
+                    <form method="POST" action="{{ route('admin.broadcasts.suspend', $broadcast) }}" class="inline">@csrf
+                        <button type="submit" class="btn-action-secondary text-amber-600 border-amber-300 hover:bg-amber-50">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Pause
+                        </button>
+                    </form>
+                @endif
+
+                {{-- Cancel (if not already completed/cancelled/failed) --}}
+                @if(!in_array($broadcast->status, ['completed', 'cancelled', 'failed']))
+                    <form method="POST" action="{{ route('admin.broadcasts.cancel', $broadcast) }}" class="inline" onsubmit="return confirm('Cancel this broadcast?')">@csrf
+                        <button type="submit" class="btn-action-secondary text-red-600 border-red-300 hover:bg-red-50">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            Cancel
+                        </button>
+                    </form>
+                @endif
+            @endif
+
+            <a href="{{ route('admin.broadcasts.results', $broadcast) }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Results
+            </a>
             <a href="{{ route('admin.broadcasts.index') }}" class="btn-action-secondary">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                </svg>
-                Back to List
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back
             </a>
         </div>
     </div>

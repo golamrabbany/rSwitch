@@ -190,6 +190,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('broadcasts/{broadcast}/results', [Admin\BroadcastController::class, 'results'])->name('broadcasts.results');
     Route::get('broadcasts/{broadcast}/export-results', [Admin\BroadcastController::class, 'exportResults'])->name('broadcasts.export-results');
     Route::get('broadcasts/{broadcast}/stats', [Admin\BroadcastController::class, 'stats'])->name('broadcasts.stats');
+    Route::get('broadcasts/{broadcast}/edit', [Admin\BroadcastController::class, 'edit'])->name('broadcasts.edit');
+    Route::put('broadcasts/{broadcast}', [Admin\BroadcastController::class, 'update'])->name('broadcasts.update');
+    Route::post('broadcasts/{broadcast}/suspend', [Admin\BroadcastController::class, 'suspend'])->name('broadcasts.suspend');
 
     // Voice Broadcast — DNC List
     Route::get('dnc', [Admin\DncController::class, 'index'])->name('dnc.index');
