@@ -19,8 +19,9 @@ class BalanceController extends Controller
     public function create()
     {
         $users = User::whereIn('role', ['reseller', 'client'])
+            ->with(['parent:id,name,role'])
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'balance', 'role']);
+            ->get(['id', 'name', 'email', 'balance', 'role', 'parent_id']);
 
         return view('admin.balance.create', compact('users'));
     }
@@ -34,6 +35,7 @@ class BalanceController extends Controller
             'source' => ['nullable', 'string', 'max:50'],
             'remarks' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:500'],
+            'adjust_reseller' => ['nullable', 'boolean'],
         ]);
 
         $user = User::findOrFail($validated['user_id']);
@@ -41,6 +43,16 @@ class BalanceController extends Controller
         $notes = $validated['notes'] ?? '';
         $source = $validated['source'] ?? null;
         $remarks = $validated['remarks'] ?? null;
+        $adjustReseller = (bool) ($validated['adjust_reseller'] ?? false);
+
+        // Find parent reseller if checkbox was checked
+        $reseller = null;
+        if ($adjustReseller && $user->parent_id) {
+            $reseller = User::find($user->parent_id);
+            if (!$reseller || !$reseller->isReseller()) {
+                $reseller = null;
+            }
+        }
 
         if ($validated['operation'] === 'credit') {
             $transaction = $this->balanceService->credit(
@@ -54,6 +66,21 @@ class BalanceController extends Controller
                 remarks: $remarks,
             );
 
+            // Also credit parent reseller
+            $resellerTxn = null;
+            if ($reseller) {
+                $resellerTxn = $this->balanceService->credit(
+                    user: $reseller,
+                    amount: $amount,
+                    type: 'client_payment',
+                    referenceType: 'manual_admin',
+                    description: "Client topup ({$user->name}) by " . auth()->user()->name,
+                    createdBy: auth()->id(),
+                    source: $source,
+                    remarks: $remarks,
+                );
+            }
+
             Payment::create([
                 'user_id' => $user->id,
                 'amount' => $amount,
@@ -64,16 +91,23 @@ class BalanceController extends Controller
                 'status' => 'completed',
                 'completed_at' => now(),
                 'transaction_id' => $transaction->id,
+                'reseller_transaction_id' => $resellerTxn?->id,
             ]);
 
             AuditService::logAction('balance.credit', $user, [
                 'amount' => $amount,
                 'notes' => $notes,
                 'transaction_id' => $transaction->id,
+                'reseller_credited' => $reseller ? true : false,
             ]);
 
+            $msg = "Credited \${$amount} to {$user->name}.";
+            if ($reseller) {
+                $msg .= " Also credited to reseller {$reseller->name}.";
+            }
+
             return redirect()->route('admin.transactions.index', ['user_id' => $user->id])
-                ->with('success', "Credited \${$amount} to {$user->name}.");
+                ->with('success', $msg);
         }
 
         $transaction = $this->balanceService->debit(
@@ -87,13 +121,33 @@ class BalanceController extends Controller
             remarks: $remarks,
         );
 
+        // Also debit parent reseller
+        if ($reseller) {
+            $this->balanceService->debit(
+                user: $reseller,
+                amount: $amount,
+                type: 'adjustment',
+                referenceType: 'manual_admin',
+                description: "Client debit ({$user->name}) by " . auth()->user()->name,
+                createdBy: auth()->id(),
+                source: $source,
+                remarks: $remarks,
+            );
+        }
+
         AuditService::logAction('balance.debit', $user, [
             'amount' => $amount,
             'notes' => $notes,
             'transaction_id' => $transaction->id,
+            'reseller_debited' => $reseller ? true : false,
         ]);
 
+        $msg = "Debited \${$amount} from {$user->name}.";
+        if ($reseller) {
+            $msg .= " Also debited from reseller {$reseller->name}.";
+        }
+
         return redirect()->route('admin.transactions.index', ['user_id' => $user->id])
-            ->with('success', "Debited \${$amount} from {$user->name}.");
+            ->with('success', $msg);
     }
 }

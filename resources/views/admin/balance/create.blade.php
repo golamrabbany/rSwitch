@@ -267,6 +267,22 @@
                                 <p class="form-hint">This will be recorded in the transaction log for audit purposes</p>
                                 <x-input-error :messages="$errors->get('notes')" class="mt-2" />
                             </div>
+
+                            {{-- Also adjust parent reseller --}}
+                            <div class="form-group md:col-span-2"
+                                 x-show="selectedUser && selectedUser.parent && selectedUser.parent.role === 'reseller'"
+                                 x-cloak>
+                                <div class="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50">
+                                    <input type="checkbox" name="adjust_reseller" value="1" id="adjustReseller"
+                                           class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <label for="adjustReseller" class="text-sm">
+                                        <span class="font-medium text-gray-900"
+                                              x-text="operation === 'credit' ? 'Also credit parent reseller' : 'Also debit parent reseller'"></span>
+                                        <span class="block text-gray-500 mt-0.5"
+                                              x-text="selectedUser?.parent?.name + ' — same amount will be applied'"></span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
