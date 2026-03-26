@@ -58,7 +58,7 @@ class TransitCallHandler:
         routes = session.execute(
             text("""
                 SELECT tr.id, tr.prefix, tr.priority, tr.weight, tr.trunk_id,
-                       tr.remove_prefix, tr.add_prefix, tr.tech_prefix,
+                       tr.remove_prefix, tr.add_prefix, t.tech_prefix,
                        t.name as trunk_name, t.id as tid,
                        t.cli_mode, t.cli_prefix, t.max_channels as trunk_max_channels
                 FROM trunk_routes tr

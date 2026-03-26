@@ -329,7 +329,7 @@ class OutboundCallHandler:
         routes = session.execute(
             text("""
                 SELECT tr.id, tr.prefix, tr.priority, tr.weight, tr.trunk_id,
-                       tr.remove_prefix, tr.add_prefix, tr.tech_prefix,
+                       tr.remove_prefix, tr.add_prefix, t.tech_prefix,
                        tr.time_start, tr.time_end, tr.days_of_week, tr.timezone,
                        t.name as trunk_name, t.id as tid,
                        t.cli_mode, t.cli_prefix, t.max_channels as trunk_max_channels
