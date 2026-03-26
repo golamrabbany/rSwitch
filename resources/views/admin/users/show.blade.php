@@ -183,6 +183,20 @@
                                                     </select>
                                                 </div>
 
+                                                {{-- Also adjust parent reseller --}}
+                                                @if($user->isClient() && $user->parent && $user->parent->isReseller())
+                                                    <div class="form-group mb-4">
+                                                        <div class="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50">
+                                                            <input type="checkbox" name="adjust_reseller" value="1" id="adjustReseller"
+                                                                   class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                                            <label for="adjustReseller" class="text-sm">
+                                                                <span class="font-medium text-gray-900" x-text="operation === 'credit' ? 'Also credit parent reseller' : 'Also debit parent reseller'"></span>
+                                                                <span class="block text-gray-500 mt-0.5">{{ $user->parent->name }} — same amount will be applied</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                @endif
+
                                                 {{-- Remarks --}}
                                                 <div class="form-group mb-6">
                                                     <label for="remarks" class="form-label">Remarks (Optional)</label>

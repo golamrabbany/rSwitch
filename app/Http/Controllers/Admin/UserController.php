@@ -177,11 +177,22 @@ class UserController extends Controller
             'amount' => ['required', 'numeric', 'gt:0', 'max:999999.99'],
             'source' => ['required', 'string', 'max:50'],
             'remarks' => ['nullable', 'string', 'max:1000'],
+            'adjust_reseller' => ['nullable', 'boolean'],
         ]);
 
         $amount = number_format((float) $validated['amount'], 4, '.', '');
         $source = $validated['source'];
         $remarks = $validated['remarks'] ?? '';
+        $adjustReseller = (bool) ($validated['adjust_reseller'] ?? false);
+
+        // Find parent reseller if checkbox was checked
+        $reseller = null;
+        if ($adjustReseller && $user->parent_id) {
+            $reseller = User::find($user->parent_id);
+            if (!$reseller || !$reseller->isReseller()) {
+                $reseller = null;
+            }
+        }
 
         try {
             if ($validated['operation'] === 'credit') {
@@ -196,6 +207,21 @@ class UserController extends Controller
                     remarks: $remarks,
                 );
 
+                // Also credit parent reseller
+                $resellerTxn = null;
+                if ($reseller) {
+                    $resellerTxn = $balanceService->credit(
+                        user: $reseller,
+                        amount: $amount,
+                        type: 'client_payment',
+                        referenceType: 'manual_admin',
+                        description: "Client topup ({$user->name}) by " . auth()->user()->name,
+                        createdBy: auth()->id(),
+                        source: $source,
+                        remarks: $remarks,
+                    );
+                }
+
                 Payment::create([
                     'user_id' => $user->id,
                     'amount' => $amount,
@@ -206,6 +232,7 @@ class UserController extends Controller
                     'status' => 'completed',
                     'completed_at' => now(),
                     'transaction_id' => $transaction->id,
+                    'reseller_transaction_id' => $resellerTxn?->id,
                 ]);
 
                 AuditService::logAction('balance.credit', $user, [
@@ -213,9 +240,14 @@ class UserController extends Controller
                     'source' => $source,
                     'remarks' => $remarks,
                     'transaction_id' => $transaction->id,
+                    'reseller_credited' => $reseller ? true : false,
                 ]);
 
-                return back()->with('success', "Credited \${$amount} to {$user->name}. New balance: \$" . number_format($user->fresh()->balance, 2));
+                $msg = "Credited \${$amount} to {$user->name}.";
+                if ($reseller) {
+                    $msg .= " Also credited to reseller {$reseller->name}.";
+                }
+                return back()->with('success', $msg . " New balance: \$" . number_format($user->fresh()->balance, 2));
             }
 
             $transaction = $balanceService->debit(
@@ -229,14 +261,33 @@ class UserController extends Controller
                 remarks: $remarks,
             );
 
+            // Also debit parent reseller
+            if ($reseller) {
+                $balanceService->debit(
+                    user: $reseller,
+                    amount: $amount,
+                    type: 'adjustment',
+                    referenceType: 'manual_admin',
+                    description: "Client debit ({$user->name}) by " . auth()->user()->name,
+                    createdBy: auth()->id(),
+                    source: $source,
+                    remarks: $remarks,
+                );
+            }
+
             AuditService::logAction('balance.debit', $user, [
                 'amount' => $amount,
                 'source' => $source,
                 'remarks' => $remarks,
                 'transaction_id' => $transaction->id,
+                'reseller_debited' => $reseller ? true : false,
             ]);
 
-            return back()->with('success', "Debited \${$amount} from {$user->name}. New balance: \$" . number_format($user->fresh()->balance, 2));
+            $msg = "Debited \${$amount} from {$user->name}.";
+            if ($reseller) {
+                $msg .= " Also debited from reseller {$reseller->name}.";
+            }
+            return back()->with('success', $msg . " New balance: \$" . number_format($user->fresh()->balance, 2));
 
         } catch (\App\Exceptions\Billing\InsufficientBalanceException $e) {
             return back()->with('error', "Insufficient balance. Available: \$" . number_format($e->available, 2));
