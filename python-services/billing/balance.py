@@ -247,19 +247,14 @@ class BalanceService:
             if not cdr:
                 raise ValueError(f"CallRecord {call_record_id} not found")
 
-            # ── Transit calls: no balance deduction (invoice-based) ──
-            if cdr.call_flow == "trunk_to_trunk":
+            # ── Non-billable call flows: no balance deduction ──
+            # Transit (trunk_to_trunk): invoice-based, no user balance
+            # Inbound (trunk_to_sip): free for receiver
+            # P2P (sip_to_sip): internal calls, no charge
+            if cdr.call_flow in ("trunk_to_trunk", "trunk_to_sip", "sip_to_sip"):
                 cdr.status = "charged"
                 session.commit()
-                logger.info(f"charge_call: transit — no balance deduction [cdr={call_record_id}]")
-                return {"client_charged": False, "reseller_charged": False}
-
-            # ── Inbound calls: no balance deduction (free for receiver) ──
-            # CDR is still rated (total_cost, trunk_cost tracked for reporting)
-            if cdr.call_flow == "trunk_to_sip":
-                cdr.status = "charged"
-                session.commit()
-                logger.info(f"charge_call: inbound — no balance deduction [cdr={call_record_id}]")
+                logger.info(f"charge_call: {cdr.call_flow} — no balance deduction [cdr={call_record_id}]")
                 return {"client_charged": False, "reseller_charged": False}
 
             # ── Idempotency: skip if already charged ──

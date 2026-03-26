@@ -436,6 +436,23 @@ class RatingService:
             if cdr.call_flow == "trunk_to_trunk":
                 return self._rate_transit_call(session, cdr, destination)
 
+            # ── P2P calls (sip_to_sip): internal, no billing ──
+            if cdr.call_flow == "sip_to_sip":
+                cdr.status = "rated"
+                cdr.total_cost = Decimal("0.0000")
+                cdr.reseller_cost = Decimal("0.0000")
+                cdr.trunk_cost = Decimal("0.0000")
+                cdr.rated_at = datetime.now()
+                session.commit()
+                return {
+                    "status": "rated",
+                    "call_record_id": cdr.id,
+                    "total_cost": "0.0000",
+                    "reseller_cost": "0.0000",
+                    "trunk_cost": "0.0000",
+                    "billable_duration": cdr.billsec,
+                }
+
             user = session.query(User).get(cdr.user_id)
 
             # No user or rate group → unbillable (same as PHP)
