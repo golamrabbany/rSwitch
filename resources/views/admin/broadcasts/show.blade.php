@@ -14,7 +14,12 @@
                 <div class="flex items-center gap-2 mt-1">
                     @switch($broadcast->status)
                         @case('draft') <span class="badge badge-gray">Draft</span> @break
-                        @case('scheduled') <span class="badge badge-blue">Scheduled</span> @break
+                        @case('scheduled')
+                            <span class="badge badge-blue">Scheduled</span>
+                            @if($broadcast->scheduled_at)
+                                <span class="text-xs text-gray-500">{{ $broadcast->scheduled_at->format('M d, Y g:i A') }}</span>
+                            @endif
+                            @break
                         @case('queued') <span class="badge badge-blue">Queued</span> @break
                         @case('running') <span class="badge badge-success">Running</span> @break
                         @case('paused') <span class="badge badge-warning">Paused</span> @break

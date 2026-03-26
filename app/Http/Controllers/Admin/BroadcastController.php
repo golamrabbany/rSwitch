@@ -44,7 +44,7 @@ class BroadcastController extends Controller
             'user_id' => ['required', 'exists:users,id'],
             'name' => ['required', 'string', 'max:150'],
             'sip_account_id' => ['required', 'exists:sip_accounts,id'],
-            'voice_file_id' => ['required', 'exists:voice_files,id'],
+            'voice_file_id' => ['nullable', 'exists:voice_files,id'],
             'type' => ['required', 'in:simple,survey'],
             'phone_list_type' => ['required', 'in:manual,csv'],
             'phone_numbers' => ['required_if:phone_list_type,manual', 'nullable', 'string'],
@@ -117,10 +117,22 @@ class BroadcastController extends Controller
             }
         }
 
+        // Handle scheduling
+        if ($request->input('schedule_type') === 'scheduled' && $request->filled('scheduled_date') && $request->filled('scheduled_time')) {
+            $scheduledAt = \Carbon\Carbon::parse($request->scheduled_date . ' ' . $request->scheduled_time);
+            abort_if($scheduledAt->isPast(), 422, 'Scheduled time must be in the future.');
+            $data['scheduled_at'] = $scheduledAt;
+            $data['status'] = 'scheduled';
+        }
+
         $broadcast = $service->create($data, auth()->user());
 
-        return redirect()->route('admin.broadcasts.show', $broadcast)
-            ->with('success', "Broadcast '{$broadcast->name}' created with {$broadcast->total_numbers} numbers.");
+        $msg = "Broadcast '{$broadcast->name}' created with {$broadcast->total_numbers} numbers.";
+        if ($broadcast->status === 'scheduled') {
+            $msg .= ' Scheduled for ' . $broadcast->scheduled_at->format('M d, Y g:i A') . '.';
+        }
+
+        return redirect()->route('admin.broadcasts.show', $broadcast)->with('success', $msg);
     }
 
     public function show(Broadcast $broadcast)
