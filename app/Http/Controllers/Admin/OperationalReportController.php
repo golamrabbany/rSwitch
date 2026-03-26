@@ -957,9 +957,10 @@ class OperationalReportController extends Controller
             ->get()
             ->keyBy('hour');
 
-        // Build complete 24-hour array (zero-fill)
+        // Build hour array — only up to current hour if viewing today
+        $maxHour = $dateFrom->isToday() ? now()->hour + 1 : 24;
         $rows = collect();
-        for ($h = 0; $h < 24; $h++) {
+        for ($h = 0; $h < $maxHour; $h++) {
             if ($rawRows->has($h)) {
                 $row = $rawRows[$h];
             } else {
