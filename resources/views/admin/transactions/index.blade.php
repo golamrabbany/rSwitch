@@ -18,38 +18,38 @@
     </div>
 
     {{-- Stats Cards --}}
-    <div class="txn-stats-grid">
-        <div class="txn-stat-card txn-stat-credit">
-            <div class="txn-stat-icon">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div class="stat-card">
+            <div class="stat-card-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
             </div>
-            <div class="txn-stat-content">
-                <span class="txn-stat-value">{{ format_currency($stats['total_credits'] ?? 0) }}</span>
-                <span class="txn-stat-label">Total Credits</span>
+            <div class="stat-card-content">
+                <span class="stat-card-value">{{ format_currency($stats['total_credits'] ?? 0) }}</span>
+                <span class="stat-card-label">Total Credits</span>
             </div>
         </div>
-        <div class="txn-stat-card txn-stat-debit">
-            <div class="txn-stat-icon">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="stat-card">
+            <div class="stat-card-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
                 </svg>
             </div>
-            <div class="txn-stat-content">
-                <span class="txn-stat-value">{{ format_currency($stats['total_debits'] ?? 0) }}</span>
-                <span class="txn-stat-label">Total Debits</span>
+            <div class="stat-card-content">
+                <span class="stat-card-value">{{ format_currency($stats['total_debits'] ?? 0) }}</span>
+                <span class="stat-card-label">Total Debits</span>
             </div>
         </div>
-        <div class="txn-stat-card txn-stat-count">
-            <div class="txn-stat-icon">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="stat-card">
+            <div class="stat-card-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                 </svg>
             </div>
-            <div class="txn-stat-content">
-                <span class="txn-stat-value">{{ number_format($stats['total_count'] ?? 0) }}</span>
-                <span class="txn-stat-label">Total Transactions</span>
+            <div class="stat-card-content">
+                <span class="stat-card-value">{{ number_format($stats['total_count'] ?? 0) }}</span>
+                <span class="stat-card-label">Total Transactions</span>
             </div>
         </div>
     </div>
@@ -66,16 +66,16 @@
 
             <select name="user_id" class="filter-select">
                 <option value="">All Users</option>
-                @foreach ($users as $user)
-                    <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
-                        {{ $user->name }}
+                @foreach ($users as $u)
+                    <option value="{{ $u->id }}" {{ request('user_id') == $u->id ? 'selected' : '' }}>
+                        {{ $u->name }}
                     </option>
                 @endforeach
             </select>
 
             <select name="type" class="filter-select">
                 <option value="">All Types</option>
-                @foreach (['topup', 'call_charge', 'did_charge', 'refund', 'adjustment', 'invoice_payment'] as $t)
+                @foreach (['topup', 'call_charge', 'reseller_call_charge', 'client_payment', 'did_charge', 'refund', 'adjustment', 'invoice_payment'] as $t)
                     <option value="{{ $t }}" {{ request('type') === $t ? 'selected' : '' }}>
                         {{ ucfirst(str_replace('_', ' ', $t)) }}
                     </option>
@@ -104,72 +104,68 @@
             <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
                 <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                    Transactions Total : {{ number_format($transactions->total()) }} &middot; Showing {{ $transactions->firstItem() }} to {{ $transactions->lastItem() }}
+                    Total : {{ number_format($transactions->total()) }} &middot; Showing {{ $transactions->firstItem() }}–{{ $transactions->lastItem() }}
                 </span>
             </div>
         @endif
-        <table class="w-full text-sm">
+        <table class="data-table">
             <thead>
-                <tr class="border-b border-gray-200">
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SL</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
-                    <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
-                    <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Balance After</th>
-                    <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                <tr>
+                    <th style="width:40px">SL</th>
+                    <th>Date</th>
+                    <th>User</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th class="text-right">Amount</th>
+                    <th class="text-right">Balance</th>
+                    <th class="text-center" style="width:50px">
+                        <svg class="w-4 h-4 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+                    </th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($transactions as $txn)
-                    <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
-                        <td class="px-3 py-2 text-gray-500 text-xs">{{ $transactions->firstItem() + $loop->index }}</td>
-                        <td class="px-3 py-2">
-                            <div class="txn-date">
-                                <span class="txn-date-main">{{ $txn->created_at->format('M d, Y') }}</span>
-                                <span class="txn-date-time">{{ $txn->created_at->format('H:i') }}</span>
-                            </div>
+                    <tr>
+                        <td class="text-gray-400 text-xs">{{ $transactions->firstItem() + $loop->index }}</td>
+                        <td>
+                            <span class="text-sm text-gray-900">{{ $txn->created_at->format('M d, Y') }}</span>
+                            <span class="block text-xs text-gray-400">{{ $txn->created_at->format('H:i:s') }}</span>
                         </td>
-                        <td class="px-3 py-2">
-                            <div>
-                                <a href="{{ route('admin.users.show', $txn->user_id) }}" class="text-indigo-600 hover:text-indigo-700 font-medium text-sm">
-                                    {{ $txn->user?->name ?? '—' }}
-                                </a>
-                                <div class="text-xs text-gray-400">{{ ucfirst($txn->user?->role ?? '') }}</div>
-                            </div>
+                        <td>
+                            <a href="{{ route('admin.users.show', $txn->user_id) }}" class="text-indigo-600 hover:text-indigo-700 font-medium text-sm">
+                                {{ $txn->user?->name ?? '—' }}
+                            </a>
+                            <span class="block text-xs text-gray-400">{{ ucfirst($txn->user?->role ?? '') }}</span>
                         </td>
-                        <td class="px-3 py-2">
-                            @if(in_array($txn->type, ['topup', 'refund']))
-                                <span class="badge badge-success">
-                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                    </svg>
-                                    {{ ucfirst(str_replace('_', ' ', $txn->type)) }}
-                                </span>
+                        <td>
+                            @php
+                                $isCredit = in_array($txn->type, ['topup', 'client_payment']);
+                                $typeColor = match($txn->type) {
+                                    'topup' => 'badge-success',
+                                    'client_payment' => 'badge-success',
+                                    'call_charge' => 'badge-danger',
+                                    'reseller_call_charge' => 'badge-danger',
+                                    'refund' => 'badge-warning',
+                                    'adjustment' => 'badge-warning',
+                                    default => 'badge-gray',
+                                };
+                            @endphp
+                            <span class="badge {{ $typeColor }}">{{ ucfirst(str_replace('_', ' ', $txn->type)) }}</span>
+                        </td>
+                        <td class="text-gray-600 text-sm">{{ Str::limit($txn->description, 45) }}</td>
+                        <td class="text-right">
+                            @if($txn->amount >= 0)
+                                <span class="text-sm font-semibold text-emerald-600">+{{ format_currency($txn->amount, 4) }}</span>
                             @else
-                                <span class="badge badge-danger">
-                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
-                                    </svg>
-                                    {{ ucfirst(str_replace('_', ' ', $txn->type)) }}
-                                </span>
+                                <span class="text-sm font-semibold text-red-600">{{ format_currency($txn->amount, 4) }}</span>
                             @endif
                         </td>
-                        <td class="px-3 py-2 text-gray-600">
-                            {{ Str::limit($txn->description, 40) }}
+                        <td class="text-right">
+                            <span class="text-sm font-medium text-gray-900">{{ format_currency($txn->balance_after, 4) }}</span>
                         </td>
-                        <td class="px-3 py-2 text-right">
-                            <span class="txn-amount {{ $txn->amount >= 0 ? 'txn-amount-credit' : 'txn-amount-debit' }}">
-                                {{ $txn->amount >= 0 ? '+' : '' }}{{ format_currency(abs($txn->amount), 4) }}
-                            </span>
-                        </td>
-                        <td class="px-3 py-2 text-right font-medium text-gray-900">
-                            {{ format_currency($txn->balance_after, 4) }}
-                        </td>
-                        <td class="px-3 py-2">
-                            <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                                <a href="{{ route('admin.transactions.show', $txn) }}" class="text-blue-600 hover:text-blue-700" title="View Details">
+                        <td>
+                            <div class="flex items-center justify-center">
+                                <a href="{{ route('admin.transactions.show', $txn) }}" class="text-indigo-500 hover:text-indigo-700" title="View">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
