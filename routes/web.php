@@ -194,9 +194,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::post('dnc/bulk-destroy', [Admin\DncController::class, 'bulkDestroy'])->name('dnc.bulk-destroy');
 
     // Voice Broadcast — Survey Templates
-    Route::resource('survey-templates', Admin\SurveyTemplateController::class)->except(['edit', 'update']);
+    Route::resource('survey-templates', Admin\SurveyTemplateController::class);
     Route::post('survey-templates/{survey_template}/approve', [Admin\SurveyTemplateController::class, 'approve'])->name('survey-templates.approve');
     Route::post('survey-templates/{survey_template}/reject', [Admin\SurveyTemplateController::class, 'reject'])->name('survey-templates.reject');
+    Route::post('survey-templates/{survey_template}/suspend', [Admin\SurveyTemplateController::class, 'suspend'])->name('survey-templates.suspend');
+    Route::post('survey-templates/{survey_template}/set-pending', [Admin\SurveyTemplateController::class, 'setPending'])->name('survey-templates.set-pending');
+    Route::post('survey-templates/upload-voice-file', [Admin\SurveyTemplateController::class, 'uploadVoiceFile'])->name('survey-templates.upload-voice-file');
 });
 
 // Recharge Admin routes (view-only access + balance operations)

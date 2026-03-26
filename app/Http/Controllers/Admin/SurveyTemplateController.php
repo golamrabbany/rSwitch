@@ -160,6 +160,117 @@ class SurveyTemplateController extends Controller
         return back()->with('success', 'Survey template rejected.');
     }
 
+    public function suspend(SurveyTemplate $surveyTemplate)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $surveyTemplate->update(['status' => 'suspended']);
+
+        return back()->with('success', 'Survey template suspended.');
+    }
+
+    public function setPending(SurveyTemplate $surveyTemplate)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $surveyTemplate->update([
+            'status' => 'pending',
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejection_reason' => null,
+        ]);
+
+        return back()->with('success', 'Survey template set to pending.');
+    }
+
+    public function edit(SurveyTemplate $surveyTemplate)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        return view('admin.survey-templates.edit', ['template' => $surveyTemplate]);
+    }
+
+    public function update(Request $request, SurveyTemplate $surveyTemplate)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $request->validate([
+            'name' => 'required|string|max:150',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        // Rebuild config from survey_questions
+        $questions = [];
+        $qNum = 0;
+
+        foreach ($request->input('survey_questions', []) as $idx => $sq) {
+            $type = $sq['type'] ?? 'question';
+            $key = $type === 'intro' ? 'intro' : 'q' . (++$qNum);
+
+            $q = [
+                'key' => $key,
+                'type' => $type,
+                'label' => $sq['label'] ?? '',
+            ];
+
+            if (!empty($sq['voice_file_id'])) {
+                $vf = VoiceFile::find($sq['voice_file_id']);
+                if ($vf) {
+                    $q['voice_file_id'] = $vf->id;
+                    $q['voice_file_path'] = $vf->file_path_asterisk;
+                }
+            }
+
+            if ($type === 'question') {
+                $q['max_digits'] = (int) ($sq['max_digits'] ?? 1);
+                $q['timeout'] = (int) ($sq['timeout'] ?? 10);
+                $q['max_retries'] = (int) ($sq['max_retries'] ?? 2);
+                $options = [];
+                foreach ($sq['options'] ?? [] as $opt) {
+                    if (!empty($opt['digit']) && !empty($opt['label'])) {
+                        $options[$opt['digit']] = $opt['label'];
+                    }
+                }
+                $q['options'] = $options;
+            }
+
+            $questions[] = $q;
+        }
+
+        $surveyTemplate->update([
+            'name' => $request->name,
+            'description' => $request->description,
+            'config' => ['version' => 2, 'questions' => $questions],
+        ]);
+
+        return redirect()->route('admin.survey-templates.show', $surveyTemplate)
+            ->with('success', 'Survey template updated.');
+    }
+
+    public function uploadVoiceFile(Request $request)
+    {
+        $request->validate([
+            'voice_file' => 'required|file|mimes:wav,mp3|max:10240',
+            'label' => 'nullable|string|max:200',
+        ]);
+
+        $voiceFileService = app(VoiceFileService::class);
+        $vf = $voiceFileService->upload($request->file('voice_file'), auth()->user(), $request->input('label', 'Survey Audio'));
+
+        if (auth()->user()->isSuperAdmin()) {
+            $voiceFileService->approve($vf, auth()->user());
+        }
+
+        return response()->json([
+            'id' => $vf->id,
+            'name' => $vf->name,
+            'duration' => $vf->duration,
+            'format' => $vf->format,
+            'status' => $vf->status,
+            'file_path_asterisk' => $vf->file_path_asterisk,
+        ]);
+    }
+
     public function destroy(SurveyTemplate $surveyTemplate)
     {
         abort_unless(
