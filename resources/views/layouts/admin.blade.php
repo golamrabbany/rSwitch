@@ -157,10 +157,10 @@
                         </svg>
                     </button>
                     <div x-show="open" x-collapse class="nav-children">
-                        <a href="{{ route('admin.voice-files.index') }}" class="nav-child {{ request()->routeIs('admin.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Files</a>
+                        <a href="{{ route('admin.voice-files.index') }}" class="nav-child {{ request()->routeIs('admin.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Template</a>
+                        <a href="{{ route('admin.survey-templates.index') }}" class="nav-child {{ request()->routeIs('admin.survey-templates.*') ? 'active' : 'text-gray-500' }}">Survey Templates</a>
                         <a href="{{ route('admin.broadcasts.index') }}" class="nav-child {{ request()->routeIs('admin.broadcasts.*') ? 'active' : 'text-gray-500' }}">Broadcasts</a>
                         <a href="{{ route('admin.dnc.index') }}" class="nav-child {{ request()->routeIs('admin.dnc.*') ? 'active' : 'text-gray-500' }}">DNC List</a>
-                        <a href="{{ route('admin.survey-templates.index') }}" class="nav-child {{ request()->routeIs('admin.survey-templates.*') ? 'active' : 'text-gray-500' }}">Survey Templates</a>
                     </div>
                 </div>
 

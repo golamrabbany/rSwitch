@@ -49,25 +49,36 @@ class VoiceFileController extends Controller
         $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'name' => ['required', 'string', 'max:100'],
-            'voice_file' => ['required', 'file', 'mimes:wav,mp3', 'max:10240'],
+            'voice_file' => ['nullable', 'file', 'mimes:wav,mp3', 'max:10240'],
+            'voice_file_id' => ['nullable', 'exists:voice_files,id'],
         ]);
 
         $client = User::findOrFail($request->user_id);
         abort_unless(auth()->user()->canManage($client), 403);
 
-        $voiceFile = $service->upload(
-            $request->file('voice_file'),
-            $client,
-            $request->name
-        );
-
-        // Super Admin upload = auto-approved
-        if (auth()->user()->isSuperAdmin()) {
-            $service->approve($voiceFile, auth()->user());
+        if ($request->filled('voice_file_id')) {
+            // Pre-uploaded via AJAX — just update ownership and name
+            $voiceFile = VoiceFile::findOrFail($request->voice_file_id);
+            $voiceFile->update([
+                'user_id' => $client->id,
+                'name' => $request->name,
+            ]);
+        } elseif ($request->hasFile('voice_file')) {
+            // Traditional file upload
+            $voiceFile = $service->upload(
+                $request->file('voice_file'),
+                $client,
+                $request->name
+            );
+            if (auth()->user()->isSuperAdmin()) {
+                $service->approve($voiceFile, auth()->user());
+            }
+        } else {
+            return back()->withErrors(['voice_file' => 'Please upload an audio file.'])->withInput();
         }
 
         return redirect()->route('admin.voice-files.show', $voiceFile)
-            ->with('success', 'Voice file uploaded' . (auth()->user()->isSuperAdmin() ? ' and auto-approved.' : '. Pending approval.'));
+            ->with('success', 'Voice template uploaded' . ($voiceFile->status === 'approved' ? ' and approved.' : '. Pending approval.'));
     }
 
     public function show(VoiceFile $voiceFile)
@@ -77,22 +88,38 @@ class VoiceFileController extends Controller
         return view('admin.voice-files.show', compact('voiceFile'));
     }
 
+    public function edit(VoiceFile $voiceFile)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+        return view('admin.voice-files.edit', compact('voiceFile'));
+    }
+
+    public function update(Request $request, VoiceFile $voiceFile)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+        ]);
+
+        $voiceFile->update(['name' => $request->name]);
+
+        return redirect()->route('admin.voice-files.show', $voiceFile)
+            ->with('success', 'Voice template updated.');
+    }
+
     public function approve(VoiceFile $voiceFile, VoiceFileService $service)
     {
-        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Only Super Admin can approve voice files.');
-
-        if (!$voiceFile->isPending()) {
-            return back()->with('warning', 'Only pending voice files can be approved.');
-        }
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
 
         $service->approve($voiceFile, auth()->user());
 
-        return back()->with('success', "Voice file '{$voiceFile->name}' approved.");
+        return back()->with('success', "Voice template '{$voiceFile->name}' approved.");
     }
 
     public function reject(Request $request, VoiceFile $voiceFile, VoiceFileService $service)
     {
-        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Only Super Admin can reject voice files.');
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
 
         $request->validate([
             'rejection_reason' => ['required', 'string', 'max:500'],
@@ -100,7 +127,30 @@ class VoiceFileController extends Controller
 
         $service->reject($voiceFile, auth()->user(), $request->rejection_reason);
 
-        return back()->with('success', "Voice file '{$voiceFile->name}' rejected.");
+        return back()->with('success', "Voice template '{$voiceFile->name}' rejected.");
+    }
+
+    public function suspend(VoiceFile $voiceFile)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $voiceFile->update(['status' => 'suspended']);
+
+        return back()->with('success', "Voice template '{$voiceFile->name}' suspended.");
+    }
+
+    public function setPending(VoiceFile $voiceFile)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $voiceFile->update([
+            'status' => 'pending',
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejection_reason' => null,
+        ]);
+
+        return back()->with('success', "Voice template '{$voiceFile->name}' set to pending.");
     }
 
     public function download(VoiceFile $voiceFile, VoiceFileService $service)

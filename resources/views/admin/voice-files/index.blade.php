@@ -1,54 +1,17 @@
 <x-admin-layout>
-    <x-slot name="header">Voice Files</x-slot>
+    <x-slot name="header">Voice Template</x-slot>
 
     {{-- Page Header --}}
     <div class="page-header-row">
         <div>
-            <h2 class="page-title">Voice Files</h2>
-            <p class="page-subtitle">Review and approve voice files for broadcasting</p>
+            <h2 class="page-title">Voice Template</h2>
+            <p class="page-subtitle">Manage and approve voice templates for broadcasting</p>
         </div>
         <div class="page-actions">
             <a href="{{ route('admin.voice-files.create') }}" class="btn-action-primary-admin">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                Upload Voice File
+                Upload Template
             </a>
-        </div>
-    </div>
-
-    {{-- Stat Cards --}}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="stat-card">
-            <div class="stat-icon bg-amber-100">
-                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </div>
-            <div class="stat-content">
-                <p class="stat-value">{{ $stats['pending'] ?? 0 }}</p>
-                <p class="stat-label">Pending Approval</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-emerald-100">
-                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </div>
-            <div class="stat-content">
-                <p class="stat-value">{{ $stats['approved'] ?? 0 }}</p>
-                <p class="stat-label">Approved</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-indigo-100">
-                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
-                </svg>
-            </div>
-            <div class="stat-content">
-                <p class="stat-value">{{ $stats['total'] ?? 0 }}</p>
-                <p class="stat-label">Total Files</p>
-            </div>
         </div>
     </div>
 
@@ -85,7 +48,7 @@
             <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
                 <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                    Voice Files Total : {{ number_format($voiceFiles->total()) }} &middot; Showing {{ $voiceFiles->firstItem() }} to {{ $voiceFiles->lastItem() }}
+                    Voice Templates Total : {{ number_format($voiceFiles->total()) }} &middot; Showing {{ $voiceFiles->firstItem() }} to {{ $voiceFiles->lastItem() }}
                 </span>
             </div>
         @endif
@@ -169,8 +132,8 @@
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
                                 </svg>
-                                <p class="empty-text">No voice files found</p>
-                                <p class="text-sm text-gray-400">Voice files uploaded by clients will appear here</p>
+                                <p class="empty-text">No voice templates found</p>
+                                <p class="text-sm text-gray-400">Voice templates uploaded by clients will appear here</p>
                             </div>
                         </td>
                     </tr>

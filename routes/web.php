@@ -170,8 +170,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('voice-files/{voiceFile}', [Admin\VoiceFileController::class, 'show'])->name('voice-files.show');
     Route::get('voice-files/{voiceFile}/play', [Admin\VoiceFileController::class, 'play'])->name('voice-files.play');
     Route::get('voice-files/{voiceFile}/download', [Admin\VoiceFileController::class, 'download'])->name('voice-files.download');
+    Route::get('voice-files/{voiceFile}/edit', [Admin\VoiceFileController::class, 'edit'])->name('voice-files.edit');
+    Route::put('voice-files/{voiceFile}', [Admin\VoiceFileController::class, 'update'])->name('voice-files.update');
     Route::post('voice-files/{voiceFile}/approve', [Admin\VoiceFileController::class, 'approve'])->name('voice-files.approve');
     Route::post('voice-files/{voiceFile}/reject', [Admin\VoiceFileController::class, 'reject'])->name('voice-files.reject');
+    Route::post('voice-files/{voiceFile}/suspend', [Admin\VoiceFileController::class, 'suspend'])->name('voice-files.suspend');
+    Route::post('voice-files/{voiceFile}/set-pending', [Admin\VoiceFileController::class, 'setPending'])->name('voice-files.set-pending');
 
     // Voice Broadcast — Broadcasts
     Route::get('broadcasts', [Admin\BroadcastController::class, 'index'])->name('broadcasts.index');

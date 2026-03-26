@@ -1,46 +1,101 @@
 <x-admin-layout>
-    <x-slot name="header">Voice File: {{ $voiceFile->name }}</x-slot>
+    <x-slot name="header">Voice Template: {{ $voiceFile->name }}</x-slot>
 
     {{-- Page Header --}}
     <div class="page-header-row">
-        <div class="flex items-center gap-4">
-            <div class="w-14 h-14 rounded-xl bg-indigo-100 flex items-center justify-center">
-                <svg class="w-7 h-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
-                </svg>
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center {{ $voiceFile->status === 'approved' ? 'bg-emerald-100' : ($voiceFile->status === 'pending' ? 'bg-amber-100' : ($voiceFile->status === 'rejected' ? 'bg-red-100' : 'bg-gray-100')) }}">
+                <svg class="w-5 h-5 {{ $voiceFile->status === 'approved' ? 'text-emerald-600' : ($voiceFile->status === 'pending' ? 'text-amber-600' : ($voiceFile->status === 'rejected' ? 'text-red-600' : 'text-gray-500')) }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
             </div>
             <div>
                 <h2 class="page-title">{{ $voiceFile->name }}</h2>
-                <div class="flex items-center gap-2 mt-1">
+                <div class="flex items-center gap-2 mt-0.5">
                     @switch($voiceFile->status)
-                        @case('approved')
-                            <span class="badge badge-success">Approved</span>
-                            @break
-                        @case('pending')
-                            <span class="badge badge-warning">Pending</span>
-                            @break
-                        @case('rejected')
-                            <span class="badge badge-danger">Rejected</span>
-                            @break
+                        @case('approved') <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Approved</span> @break
+                        @case('pending') <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pending</span> @break
+                        @case('rejected') <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Rejected</span> @break
+                        @case('suspended') <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Suspended</span> @break
                     @endswitch
+                    <span class="text-xs text-gray-400">&middot;</span>
+                    <span class="text-xs text-gray-500">{{ $voiceFile->user?->name }}</span>
                 </div>
             </div>
         </div>
         <div class="page-actions">
-            <a href="{{ route('admin.voice-files.index') }}" class="btn-action-secondary">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                </svg>
-                Back to List
-            </a>
-            <a href="{{ route('admin.voice-files.download', $voiceFile) }}" class="btn-action-primary-admin">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                </svg>
+            @if(auth()->user()->isSuperAdmin())
+                <a href="{{ route('admin.voice-files.edit', $voiceFile) }}" class="btn-action-secondary">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Edit
+                </a>
+                @if($voiceFile->status !== 'approved')
+                    <form method="POST" action="{{ route('admin.voice-files.approve', $voiceFile) }}" class="inline">@csrf
+                        <button type="submit" class="btn-action-primary-admin bg-emerald-600 hover:bg-emerald-700">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Approve
+                        </button>
+                    </form>
+                @endif
+                @if($voiceFile->status !== 'rejected')
+                    <button type="button" onclick="document.getElementById('rejectModal').classList.remove('hidden')" class="btn-action-secondary text-red-600 border-red-300 hover:bg-red-50">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        Reject
+                    </button>
+                @endif
+                @if($voiceFile->status === 'approved')
+                    <form method="POST" action="{{ route('admin.voice-files.suspend', $voiceFile) }}" class="inline">@csrf
+                        <button type="submit" class="btn-action-secondary text-amber-600 border-amber-300 hover:bg-amber-50">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Suspend
+                        </button>
+                    </form>
+                @endif
+                @if(in_array($voiceFile->status, ['rejected', 'suspended']))
+                    <form method="POST" action="{{ route('admin.voice-files.set-pending', $voiceFile) }}" class="inline">@csrf
+                        <button type="submit" class="btn-action-secondary">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Set Pending
+                        </button>
+                    </form>
+                @endif
+            @endif
+            <a href="{{ route('admin.voice-files.download', $voiceFile) }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 Download
+            </a>
+            <a href="{{ route('admin.voice-files.index') }}" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back
             </a>
         </div>
     </div>
+
+    {{-- Rejection Banner --}}
+    @if($voiceFile->rejection_reason)
+        <div class="flex items-start gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-lg mb-6">
+            <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div>
+                <p class="text-sm font-semibold text-red-700">Rejected</p>
+                <p class="text-sm text-red-600 mt-0.5">{{ $voiceFile->rejection_reason }}</p>
+            </div>
+        </div>
+    @endif
+
+    {{-- Reject Modal --}}
+    @if(auth()->user()->isSuperAdmin() && $voiceFile->status !== 'rejected')
+        <div id="rejectModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-xl p-6 w-full max-w-md">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Reject Voice Template</h3>
+                <form method="POST" action="{{ route('admin.voice-files.reject', $voiceFile) }}">
+                    @csrf
+                    <textarea name="rejection_reason" class="form-input w-full" rows="3" placeholder="Reason for rejection..." required></textarea>
+                    <div class="flex justify-end gap-3 mt-4">
+                        <button type="button" onclick="document.getElementById('rejectModal').classList.add('hidden')" class="btn-action-secondary">Cancel</button>
+                        <button type="submit" class="btn-action-primary-admin bg-red-600 hover:bg-red-700">Reject</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {{-- Main Content - Left Side --}}
@@ -139,106 +194,6 @@
                 </div>
             </div>
 
-            {{-- Approval Status Info --}}
-            @if($voiceFile->status === 'approved')
-                <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                    <div class="flex items-center gap-3">
-                        <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <div>
-                            <p class="text-sm font-medium text-emerald-800">Approved</p>
-                            <p class="text-xs text-emerald-600 mt-0.5">
-                                @if($voiceFile->approved_by_user)
-                                    Approved by {{ $voiceFile->approved_by_user->name }}
-                                @endif
-                                @if($voiceFile->approved_at)
-                                    on {{ $voiceFile->approved_at->format('M d, Y H:i') }}
-                                @endif
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            @elseif($voiceFile->status === 'rejected')
-                <div class="rounded-lg border border-red-200 bg-red-50 p-4">
-                    <div class="flex items-center gap-3">
-                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <div>
-                            <p class="text-sm font-medium text-red-800">Rejected</p>
-                            @if($voiceFile->rejection_reason)
-                                <p class="text-sm text-red-700 mt-1"><strong>Reason:</strong> {{ $voiceFile->rejection_reason }}</p>
-                            @endif
-                            <p class="text-xs text-red-600 mt-0.5">
-                                @if($voiceFile->rejected_by_user)
-                                    Rejected by {{ $voiceFile->rejected_by_user->name }}
-                                @endif
-                                @if($voiceFile->rejected_at)
-                                    on {{ $voiceFile->rejected_at->format('M d, Y H:i') }}
-                                @endif
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            @elseif($voiceFile->status === 'pending')
-                {{-- Approve / Reject Actions --}}
-                <div x-data="{ showReject: false }" class="space-y-4">
-                    <div class="flex items-center gap-3">
-                        <form method="POST" action="{{ route('admin.voice-files.approve', $voiceFile) }}">
-                            @csrf
-                            <button type="submit" class="btn-success">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                Approve
-                            </button>
-                        </form>
-                        <button type="button" @click="showReject = true" class="btn-danger">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                            Reject
-                        </button>
-                    </div>
-
-                    {{-- Rejection Modal --}}
-                    <div x-show="showReject" x-cloak class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                            {{-- Background overlay --}}
-                            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showReject = false"></div>
-
-                            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-
-                            <div class="relative inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-                                <div class="sm:flex sm:items-start">
-                                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                                        <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                        </svg>
-                                    </div>
-                                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Reject Voice File</h3>
-                                        <div class="mt-2">
-                                            <p class="text-sm text-gray-500">Please provide a reason for rejecting this voice file. The client will see this reason.</p>
-                                        </div>
-                                        <form method="POST" action="{{ route('admin.voice-files.reject', $voiceFile) }}" class="mt-4">
-                                            @csrf
-                                            <textarea name="rejection_reason" rows="3" required
-                                                class="form-input w-full"
-                                                placeholder="Reason for rejection..."></textarea>
-                                            <div class="mt-4 flex justify-end gap-3">
-                                                <button type="button" @click="showReject = false" class="btn-secondary">Cancel</button>
-                                                <button type="submit" class="btn-danger">Confirm Rejection</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endif
         </div>
 
         {{-- Sidebar - Right Side --}}
