@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\User;
+use App\Services\AuditService;
+use App\Services\BalanceService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
@@ -49,8 +52,89 @@ class PaymentController extends Controller
 
     public function show(Payment $payment)
     {
-        $payment->load('user', 'rechargedBy', 'transaction', 'invoice');
+        $payment->load('user', 'user.parent', 'rechargedBy', 'transaction', 'resellerTransaction', 'invoice');
 
         return view('admin.payments.show', compact('payment'));
+    }
+
+    /**
+     * Refund a completed online payment.
+     * Super Admin only. Optionally reverses reseller credit too.
+     */
+    public function refund(Request $request, Payment $payment, BalanceService $balanceService)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        // Only completed online payments can be refunded
+        if ($payment->status !== 'completed') {
+            return back()->with('error', 'Only completed payments can be refunded.');
+        }
+
+        if (!str_starts_with($payment->payment_method, 'online_')) {
+            return back()->with('error', 'Only online payments can be refunded.');
+        }
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'gt:0', 'max:' . $payment->amount],
+            'refund_reseller' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $amount = number_format((float) $validated['amount'], 4, '.', '');
+        $refundReseller = (bool) ($validated['refund_reseller'] ?? false);
+        $user = $payment->user;
+
+        if (!$user) {
+            return back()->with('error', 'User not found.');
+        }
+
+        DB::transaction(function () use ($user, $payment, $balanceService, $amount, $refundReseller, $validated) {
+            // Step 1: Debit client
+            $clientTxn = $balanceService->debit(
+                user: $user,
+                amount: $amount,
+                type: 'refund',
+                referenceType: 'payment',
+                referenceId: $payment->id,
+                description: "Refund: Payment #{$payment->id}",
+                createdBy: auth()->id(),
+            );
+
+            // Step 2: Debit reseller (if checked and reseller exists)
+            $resellerTxn = null;
+            if ($refundReseller && $user->parent_id) {
+                $reseller = User::find($user->parent_id);
+                if ($reseller && $reseller->isReseller()) {
+                    $resellerTxn = $balanceService->debit(
+                        user: $reseller,
+                        amount: $amount,
+                        type: 'refund',
+                        referenceType: 'payment',
+                        referenceId: $payment->id,
+                        description: "Refund: Client payment #{$payment->id} ({$user->name})",
+                        createdBy: auth()->id(),
+                    );
+                }
+            }
+
+            // Update payment status
+            $payment->update([
+                'status' => 'refunded',
+                'notes' => trim(($payment->notes ? $payment->notes . "\n" : '') .
+                    'Refunded $' . $amount . ' by ' . auth()->user()->name .
+                    ($resellerTxn ? ' (reseller also refunded)' : '') .
+                    ($validated['notes'] ? ': ' . $validated['notes'] : '')),
+            ]);
+
+            AuditService::logAction('payment.refunded', $payment, [
+                'amount' => $amount,
+                'refund_reseller' => $refundReseller,
+                'client_transaction_id' => $clientTxn->id,
+                'reseller_transaction_id' => $resellerTxn?->id,
+                'refunded_by' => auth()->id(),
+            ]);
+        });
+
+        return back()->with('success', "Refunded \${$amount}" . ($refundReseller ? ' (client + reseller)' : ' (client only)') . '.');
     }
 }

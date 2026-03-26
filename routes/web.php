@@ -162,6 +162,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::get('payments', [Admin\PaymentController::class, 'index'])->name('payments.index');
     Route::get('payments/{payment}', [Admin\PaymentController::class, 'show'])->name('payments.show');
+    Route::post('payments/{payment}/refund', [Admin\PaymentController::class, 'refund'])->name('payments.refund');
 
     // Voice Broadcast — Voice Files
     Route::get('voice-files', [Admin\VoiceFileController::class, 'index'])->name('voice-files.index');

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\AuditService;
 use App\Services\BalanceService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class StripeWebhookController extends Controller
@@ -57,39 +58,64 @@ class StripeWebhookController extends Controller
             return response('User not found', 200);
         }
 
-        // Credit balance
         $balanceService = app(BalanceService::class);
-        $transaction = $balanceService->credit(
-            user: $user,
-            amount: (string) $payment->amount,
-            type: 'topup',
-            referenceType: 'payment',
-            referenceId: $payment->id,
-            description: "Stripe top-up: \${$payment->amount}",
-        );
 
-        // Update payment record
-        $payment->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'transaction_id' => $transaction->id,
-            'gateway_response' => json_encode([
-                'payment_intent' => $session->payment_intent,
-                'payment_status' => $session->payment_status,
-                'customer_email' => $session->customer_details?->email,
-            ]),
-        ]);
+        // Atomic dual credit: client + reseller in one DB transaction
+        DB::transaction(function () use ($user, $payment, $balanceService, $session) {
+            $amount = (string) $payment->amount;
 
-        AuditService::logAction('payment.stripe.completed', $payment, [
-            'user_id' => $user->id,
-            'amount' => $payment->amount,
-            'session_id' => $session->id,
-        ]);
+            // Step 1: Credit the client
+            $clientTxn = $balanceService->credit(
+                user: $user,
+                amount: $amount,
+                type: 'topup',
+                referenceType: 'payment',
+                referenceId: $payment->id,
+                description: "Stripe top-up: \${$amount}",
+            );
+
+            // Step 2: Credit the reseller (if client has a reseller parent)
+            $resellerTxn = null;
+            if ($user->parent_id) {
+                $parent = User::find($user->parent_id);
+                if ($parent && $parent->isReseller()) {
+                    $resellerTxn = $balanceService->credit(
+                        user: $parent,
+                        amount: $amount,
+                        type: 'client_payment',
+                        referenceType: 'payment',
+                        referenceId: $payment->id,
+                        description: "Client payment ({$user->name}): \${$amount}",
+                    );
+                }
+            }
+
+            // Update payment record with both transaction IDs
+            $payment->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'transaction_id' => $clientTxn->id,
+                'reseller_transaction_id' => $resellerTxn?->id,
+                'gateway_response' => json_encode([
+                    'payment_intent' => $session->payment_intent,
+                    'payment_status' => $session->payment_status,
+                    'customer_email' => $session->customer_details?->email,
+                ]),
+            ]);
+
+            AuditService::logAction('payment.stripe.completed', $payment, [
+                'user_id' => $user->id,
+                'amount' => $payment->amount,
+                'reseller_credited' => $resellerTxn ? true : false,
+                'session_id' => $session->id,
+            ]);
+        });
 
         Log::info('Stripe payment completed', [
             'payment_id' => $payment->id,
             'user_id' => $user->id,
             'amount' => $payment->amount,
+            'reseller_credited' => $payment->reseller_transaction_id ? true : false,
         ]);
 
         return response('OK');

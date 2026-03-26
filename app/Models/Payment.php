@@ -14,7 +14,7 @@ class Payment extends Model
         'user_id', 'amount', 'currency', 'payment_method',
         'gateway_transaction_id', 'gateway_response',
         'recharged_by', 'notes', 'status', 'completed_at',
-        'transaction_id', 'invoice_id',
+        'transaction_id', 'reseller_transaction_id', 'invoice_id',
     ];
 
     protected function casts(): array
@@ -39,6 +39,11 @@ class Payment extends Model
     public function transaction(): BelongsTo
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    public function resellerTransaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class, 'reseller_transaction_id');
     }
 
     public function invoice(): BelongsTo

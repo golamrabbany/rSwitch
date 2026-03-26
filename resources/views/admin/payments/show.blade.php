@@ -244,12 +244,48 @@
                 </div>
             </div>
 
+            {{-- Reseller Credit Info (if applicable) --}}
+            @if($payment->resellerTransaction)
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Reseller Credit</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-semibold">
+                                {{ strtoupper(substr($payment->user->parent->name ?? '?', 0, 1)) }}
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-gray-900">{{ $payment->user->parent->name ?? 'Unknown' }}</p>
+                                <span class="badge badge-success">Reseller</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-sm border-t border-gray-100 pt-3">
+                            <span class="text-gray-500">Amount Credited</span>
+                            <span class="font-semibold text-emerald-600">+{{ format_currency($payment->resellerTransaction->amount, 4) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm mt-1">
+                            <span class="text-gray-500">Transaction</span>
+                            <a href="{{ route('admin.transactions.show', $payment->resellerTransaction) }}" class="text-indigo-600 hover:text-indigo-700 font-mono text-xs">#{{ $payment->resellerTransaction->id }}</a>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             {{-- Quick Actions --}}
             <div class="detail-card">
                 <div class="detail-card-header">
                     <h3 class="detail-card-title">Quick Actions</h3>
                 </div>
                 <div class="detail-card-body space-y-2">
+                    @if(auth()->user()->isSuperAdmin() && $payment->status === 'completed' && str_starts_with($payment->payment_method, 'online_'))
+                        <button onclick="document.getElementById('refundModal').classList.remove('hidden')" class="quick-action-link w-full text-left text-red-600 hover:text-red-700 hover:bg-red-50">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Refund Payment
+                        </button>
+                    @endif
                     @if($payment->user)
                         <a href="{{ route('admin.users.show', $payment->user) }}" class="quick-action-link">
                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -322,4 +358,63 @@
             </div>
         </div>
     </div>
+    {{-- Refund Modal --}}
+    @if(auth()->user()->isSuperAdmin() && $payment->status === 'completed' && str_starts_with($payment->payment_method, 'online_'))
+        <div id="refundModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen px-4">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="document.getElementById('refundModal').classList.add('hidden')"></div>
+                <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6 z-10">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">Refund Payment</h3>
+                            <p class="text-sm text-gray-500">Payment #{{ $payment->id }} — {{ format_currency($payment->amount, 4) }}</p>
+                        </div>
+                    </div>
+
+                    <form action="{{ route('admin.payments.refund', $payment) }}" method="POST">
+                        @csrf
+                        <div class="space-y-4">
+                            <div class="form-group">
+                                <label class="form-label">Refund Amount</label>
+                                <input type="number" name="amount" step="0.01" min="0.01" max="{{ $payment->amount }}"
+                                       value="{{ $payment->amount }}" class="form-input" required>
+                                <p class="text-xs text-gray-500 mt-1">Max: {{ format_currency($payment->amount, 4) }}</p>
+                            </div>
+
+                            @if($payment->user && $payment->user->parent_id && $payment->user->parent && $payment->user->parent->isReseller())
+                                <div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                    <input type="checkbox" name="refund_reseller" value="1" id="refundReseller"
+                                           class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                    <label for="refundReseller" class="text-sm">
+                                        <span class="font-medium text-gray-900">Also refund parent reseller</span>
+                                        <span class="block text-gray-500 mt-0.5">
+                                            {{ $payment->user->parent->name }} — will be debited the same amount
+                                        </span>
+                                    </label>
+                                </div>
+                            @endif
+
+                            <div class="form-group">
+                                <label class="form-label">Notes (optional)</label>
+                                <textarea name="notes" rows="2" class="form-input" placeholder="Reason for refund..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+                            <button type="button" onclick="document.getElementById('refundModal').classList.add('hidden')"
+                                    class="btn-action-secondary">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
+                                Process Refund
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 </x-admin-layout>
