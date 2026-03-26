@@ -37,6 +37,21 @@ class BroadcastService
         $cleanNumbers = DncNumber::filterNumbers($numbers);
         $dncCount = count($numbers) - count($cleanNumbers);
 
+        // Resolve voice file paths for survey v2 questions
+        if (!empty($data['survey_config']) && ($data['survey_config']['version'] ?? 1) >= 2) {
+            $questions = $data['survey_config']['questions'] ?? [];
+            foreach ($questions as &$q) {
+                if (!empty($q['voice_file_id'])) {
+                    $vf = \App\Models\VoiceFile::find($q['voice_file_id']);
+                    if ($vf && $vf->status === 'approved') {
+                        $q['voice_file_path'] = $vf->file_path_asterisk;
+                    }
+                }
+            }
+            unset($q);
+            $data['survey_config']['questions'] = $questions;
+        }
+
         $broadcast = Broadcast::create([
             'user_id' => $data['user_id'],
             'sip_account_id' => $data['sip_account_id'],

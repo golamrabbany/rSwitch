@@ -89,6 +89,21 @@ class Broadcast extends Model
         return $this->type === 'survey';
     }
 
+    public function isMultiQuestion(): bool
+    {
+        $config = $this->survey_config;
+        return is_array($config) && ($config['version'] ?? 1) >= 2;
+    }
+
+    public function getSurveyQuestions(): \Illuminate\Support\Collection
+    {
+        $config = $this->survey_config;
+        if (!is_array($config) || ($config['version'] ?? 1) < 2) {
+            return collect();
+        }
+        return collect($config['questions'] ?? [])->where('type', 'question')->values();
+    }
+
     public function scopeOwnedBy($query, User $user)
     {
         if ($user->isSuperAdmin()) {

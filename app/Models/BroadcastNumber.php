@@ -19,6 +19,7 @@ class BroadcastNumber extends Model
             'last_attempt_at' => 'datetime',
             'answered_at' => 'datetime',
             'cost' => 'decimal:4',
+            'survey_response' => 'array',
         ];
     }
 
@@ -45,5 +46,11 @@ class BroadcastNumber extends Model
     public function isPending(): bool
     {
         return $this->status === 'pending';
+    }
+
+    public function getSurveyAnswer(string $key): ?string
+    {
+        $response = $this->survey_response;
+        return is_array($response) ? ($response[$key] ?? null) : null;
     }
 }

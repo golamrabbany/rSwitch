@@ -67,6 +67,42 @@ class BroadcastController extends Controller
             $data['survey_config'] = json_decode($validated['survey_config'], true);
         }
 
+        // Build survey_config v2 from form questions
+        if ($request->type === 'survey' && $request->has('survey_questions')) {
+            $questions = [];
+            $qNum = 0;
+            foreach ($request->input('survey_questions', []) as $sq) {
+                $type = $sq['type'] ?? 'question';
+                $key = $type === 'intro' ? 'intro' : 'q' . (++$qNum);
+                $q = [
+                    'key' => $key,
+                    'type' => $type,
+                    'voice_file_id' => (int) ($sq['voice_file_id'] ?? 0),
+                    'label' => $sq['label'] ?? '',
+                ];
+                if ($type === 'question') {
+                    $q['max_digits'] = (int) ($sq['max_digits'] ?? 1);
+                    $q['timeout'] = (int) ($sq['timeout'] ?? 10);
+                    $q['max_retries'] = (int) ($sq['max_retries'] ?? 2);
+                    $options = [];
+                    foreach ($sq['options'] ?? [] as $opt) {
+                        if (!empty($opt['digit']) && !empty($opt['label'])) {
+                            $options[$opt['digit']] = $opt['label'];
+                        }
+                    }
+                    $q['options'] = $options;
+                }
+                $questions[] = $q;
+            }
+            $data['survey_config'] = ['version' => 2, 'questions' => $questions];
+
+            // Set voice_file_id to first voice file in questions
+            $firstVfId = collect($questions)->pluck('voice_file_id')->filter()->first();
+            if ($firstVfId) {
+                $data['voice_file_id'] = $firstVfId;
+            }
+        }
+
         $broadcast = $service->create($data, auth()->user());
 
         return redirect()->route('admin.broadcasts.show', $broadcast)
@@ -129,24 +165,76 @@ class BroadcastController extends Controller
         // Survey breakdown
         $surveyBreakdown = [];
         if ($broadcast->isSurvey()) {
-            $surveyResponses = $broadcast->numbers()
-                ->whereNotNull('survey_response')
-                ->selectRaw('survey_response, COUNT(*) as count')
-                ->groupBy('survey_response')
-                ->orderBy('survey_response')
-                ->get();
+            $config = $broadcast->survey_config;
 
-            $totalResponses = $surveyResponses->sum('count');
-            $config = is_array($broadcast->survey_config) ? $broadcast->survey_config : json_decode($broadcast->survey_config ?? '[]', true);
-            $labels = collect($config)->pluck('label', 'digit')->toArray();
+            if ($broadcast->isMultiQuestion()) {
+                // Multi-question v2
+                $allResponses = $broadcast->numbers()
+                    ->whereNotNull('survey_response')
+                    ->pluck('survey_response');
 
-            foreach ($surveyResponses as $resp) {
-                $surveyBreakdown[] = [
-                    'digit' => $resp->survey_response,
-                    'label' => $labels[$resp->survey_response] ?? "Option {$resp->survey_response}",
-                    'count' => $resp->count,
-                    'percentage' => $totalResponses > 0 ? round(($resp->count / $totalResponses) * 100, 1) : 0,
-                ];
+                foreach ($broadcast->getSurveyQuestions() as $q) {
+                    $key = $q['key'];
+                    $options = $q['options'] ?? [];
+                    $counts = [];
+                    $total = 0;
+
+                    foreach ($allResponses as $respJson) {
+                        $resp = is_string($respJson) ? json_decode($respJson, true) : $respJson;
+                        if (is_array($resp) && !empty($resp[$key])) {
+                            $digit = $resp[$key];
+                            $counts[$digit] = ($counts[$digit] ?? 0) + 1;
+                            $total++;
+                        }
+                    }
+
+                    $breakdown = [];
+                    foreach ($counts as $digit => $count) {
+                        $breakdown[] = [
+                            'digit' => $digit,
+                            'label' => $options[$digit] ?? "Option {$digit}",
+                            'count' => $count,
+                            'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0,
+                        ];
+                    }
+
+                    $surveyBreakdown[] = [
+                        'key' => $key,
+                        'label' => $q['label'] ?? $key,
+                        'total_responses' => $total,
+                        'breakdown' => $breakdown,
+                    ];
+                }
+            } else {
+                // Legacy single-question
+                $surveyResponses = $broadcast->numbers()
+                    ->whereNotNull('survey_response')
+                    ->get()
+                    ->map(function ($n) {
+                        $resp = is_string($n->survey_response) ? json_decode($n->survey_response, true) : $n->survey_response;
+                        return is_array($resp) ? ($resp['q1'] ?? null) : $n->getRawOriginal('survey_response');
+                    })
+                    ->filter()
+                    ->countBy()
+                    ->sortKeys();
+
+                $totalResponses = $surveyResponses->sum();
+                $config = is_array($config) ? $config : json_decode($config ?? '[]', true);
+                $labels = [];
+                if (!empty($config['options'])) {
+                    $labels = $config['options'];
+                } elseif (is_array($config)) {
+                    $labels = collect($config)->pluck('label', 'digit')->toArray();
+                }
+
+                foreach ($surveyResponses as $digit => $count) {
+                    $surveyBreakdown[] = [
+                        'digit' => $digit,
+                        'label' => $labels[$digit] ?? "Option {$digit}",
+                        'count' => $count,
+                        'percentage' => $totalResponses > 0 ? round(($count / $totalResponses) * 100, 1) : 0,
+                    ];
+                }
             }
         }
 
@@ -181,16 +269,34 @@ class BroadcastController extends Controller
 
         return response()->stream(function () use ($numbers, $broadcast) {
             $out = fopen('php://output', 'w');
+
+            $config = $broadcast->survey_config;
+            $isMultiQ = $broadcast->isMultiQuestion();
+            $questions = $isMultiQ ? $broadcast->getSurveyQuestions() : collect();
+
             $cols = ['Phone Number', 'Status', 'Attempts', 'Duration (s)', 'Cost'];
             if ($broadcast->isSurvey()) {
-                $cols[] = 'Survey Response';
+                if ($isMultiQ) {
+                    foreach ($questions as $q) {
+                        $cols[] = $q['label'] ?? $q['key'];
+                    }
+                } else {
+                    $cols[] = 'Survey Response';
+                }
             }
             fputcsv($out, $cols);
 
             foreach ($numbers as $n) {
                 $row = [$n->phone_number, $n->status, $n->attempts, $n->duration ?? 0, $n->cost ?? 0];
                 if ($broadcast->isSurvey()) {
-                    $row[] = $n->survey_response ?? '';
+                    $resp = is_string($n->survey_response) ? json_decode($n->survey_response, true) : $n->survey_response;
+                    if ($isMultiQ) {
+                        foreach ($questions as $q) {
+                            $row[] = is_array($resp) ? ($resp[$q['key']] ?? '') : '';
+                        }
+                    } else {
+                        $row[] = is_array($resp) ? ($resp['q1'] ?? '') : ($n->getRawOriginal('survey_response') ?? '');
+                    }
                 }
                 fputcsv($out, $row);
             }

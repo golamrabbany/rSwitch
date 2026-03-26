@@ -30,7 +30,8 @@
           x-data="{
               type: '{{ old('type', 'simple') }}',
               phoneListType: '{{ old('phone_list_type', 'manual') }}',
-              surveyOptions: {{ json_encode(old('survey_options', [['digit' => '1', 'label' => '']])) }},
+              surveyQuestions: [{ type: 'question', voice_file_id: '', label: '', max_digits: 1, timeout: 10, max_retries: 2, options: [{digit: '1', label: ''}] }],
+              hasIntro: false,
               clientOpen: false,
               clientSearch: '{{ old('client_id_name', '') }}',
               clientId: '{{ old('client_id', '') }}',
@@ -39,12 +40,28 @@
               clientDebounce: null,
               sipAccounts: [],
               voiceFiles: [],
-              addSurveyOption() {
-                  this.surveyOptions.push({ digit: '', label: '' });
+              addQuestion() {
+                  this.surveyQuestions.push({ type: 'question', voice_file_id: '', label: '', max_digits: 1, timeout: 10, max_retries: 2, options: [{digit: '', label: ''}] });
               },
-              removeSurveyOption(index) {
-                  if (this.surveyOptions.length > 1) {
-                      this.surveyOptions.splice(index, 1);
+              removeQuestion(idx) {
+                  if (this.surveyQuestions.filter(q => q.type === 'question').length > 1 || this.surveyQuestions[idx].type === 'intro') {
+                      this.surveyQuestions.splice(idx, 1);
+                      if (this.surveyQuestions[0]?.type !== 'intro') this.hasIntro = false;
+                  }
+              },
+              toggleIntro() {
+                  if (this.hasIntro) {
+                      this.surveyQuestions.unshift({ type: 'intro', voice_file_id: '', label: 'Welcome message', options: [] });
+                  } else {
+                      if (this.surveyQuestions[0]?.type === 'intro') this.surveyQuestions.shift();
+                  }
+              },
+              addOption(qIdx) {
+                  this.surveyQuestions[qIdx].options.push({ digit: '', label: '' });
+              },
+              removeOption(qIdx, oIdx) {
+                  if (this.surveyQuestions[qIdx].options.length > 1) {
+                      this.surveyQuestions[qIdx].options.splice(oIdx, 1);
                   }
               },
               searchClients() {
@@ -190,45 +207,72 @@
                                 <x-input-error :messages="$errors->get('type')" class="mt-2" />
                             </div>
 
-                            {{-- Survey Config --}}
+                            {{-- Survey Questions Builder --}}
                             <div x-show="type === 'survey'" x-transition class="space-y-4">
-                                <div class="form-group">
-                                    <label for="max_digits" class="form-label">Max Digits</label>
-                                    <input type="number" id="max_digits" name="max_digits" value="{{ old('max_digits', 1) }}" min="1" max="10" class="form-input" style="max-width: 120px;">
-                                    <p class="form-hint">Maximum number of digits the caller can press.</p>
-                                    <x-input-error :messages="$errors->get('max_digits')" class="mt-2" />
+                                <div class="flex items-center gap-3">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" x-model="hasIntro" @change="toggleIntro()" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                        <span class="text-sm font-medium text-gray-700">Add Welcome/Intro File</span>
+                                    </label>
+                                    <span class="text-xs text-gray-400">(plays before questions, no DTMF)</span>
                                 </div>
 
-                                <div class="form-group">
-                                    <label for="survey_timeout" class="form-label">Response Timeout (seconds)</label>
-                                    <input type="number" id="survey_timeout" name="survey_timeout" value="{{ old('survey_timeout', 10) }}" min="3" max="60" class="form-input" style="max-width: 120px;">
-                                    <p class="form-hint">How long to wait for a response before moving on.</p>
-                                    <x-input-error :messages="$errors->get('survey_timeout')" class="mt-2" />
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">Survey Options</label>
-                                    <div class="space-y-2">
-                                        <template x-for="(option, index) in surveyOptions" :key="index">
-                                            <div class="flex items-center gap-2">
-                                                <input type="text" :name="'survey_options[' + index + '][digit]'" x-model="option.digit" class="form-input" style="max-width: 80px;" placeholder="Digit">
-                                                <input type="text" :name="'survey_options[' + index + '][label]'" x-model="option.label" class="form-input" placeholder="e.g. Press 1 for Yes">
-                                                <button type="button" @click="removeSurveyOption(index)" class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors" x-show="surveyOptions.length > 1">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                    </svg>
-                                                </button>
+                                <template x-for="(q, qIdx) in surveyQuestions" :key="qIdx">
+                                    <div class="border border-gray-200 rounded-lg p-4 space-y-3" :class="q.type === 'intro' ? 'bg-blue-50/50 border-blue-200' : 'bg-white'">
+                                        <input type="hidden" :name="'survey_questions[' + qIdx + '][type]'" :value="q.type">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="text-sm font-semibold text-gray-800">
+                                                <span x-show="q.type === 'intro'" class="text-blue-600">Welcome / Intro</span>
+                                                <span x-show="q.type === 'question'">Question <span x-text="surveyQuestions.filter((s, i) => s.type === 'question' && i <= qIdx).length"></span></span>
+                                            </h4>
+                                            <button type="button" @click="removeQuestion(qIdx)" class="p-1 text-red-400 hover:text-red-600 rounded" x-show="q.type === 'intro' || surveyQuestions.filter(s => s.type === 'question').length > 1">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label text-xs">Voice File</label>
+                                            <select :name="'survey_questions[' + qIdx + '][voice_file_id]'" x-model="q.voice_file_id" class="form-select text-sm" required>
+                                                <option value="">Select voice file...</option>
+                                                <template x-for="vf in voiceFiles" :key="vf.id"><option :value="vf.id" x-text="vf.name + ' (' + (vf.duration || '?') + 's)'"></option></template>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label text-xs" x-text="q.type === 'intro' ? 'Description' : 'Question Label'"></label>
+                                            <input type="text" :name="'survey_questions[' + qIdx + '][label]'" x-model="q.label" class="form-input text-sm" :placeholder="q.type === 'intro' ? 'e.g. Welcome to our survey' : 'e.g. How satisfied are you?'">
+                                        </div>
+                                        <template x-if="q.type === 'question'">
+                                            <div class="space-y-3">
+                                                <div class="flex gap-3">
+                                                    <div class="form-group" style="flex:0 0 100px;"><label class="form-label text-xs">Max Digits</label><input type="number" :name="'survey_questions[' + qIdx + '][max_digits]'" x-model="q.max_digits" min="1" max="10" class="form-input text-sm"></div>
+                                                    <div class="form-group" style="flex:0 0 100px;"><label class="form-label text-xs">Timeout (s)</label><input type="number" :name="'survey_questions[' + qIdx + '][timeout]'" x-model="q.timeout" min="3" max="60" class="form-input text-sm"></div>
+                                                    <div class="form-group" style="flex:0 0 100px;"><label class="form-label text-xs">Retries</label><input type="number" :name="'survey_questions[' + qIdx + '][max_retries]'" x-model="q.max_retries" min="0" max="5" class="form-input text-sm"></div>
+                                                </div>
+                                                <div>
+                                                    <label class="form-label text-xs">Response Options</label>
+                                                    <div class="space-y-1.5">
+                                                        <template x-for="(opt, oIdx) in q.options" :key="oIdx">
+                                                            <div class="flex items-center gap-2">
+                                                                <input type="text" :name="'survey_questions[' + qIdx + '][options][' + oIdx + '][digit]'" x-model="opt.digit" class="form-input text-sm" style="max-width:60px;" placeholder="#">
+                                                                <input type="text" :name="'survey_questions[' + qIdx + '][options][' + oIdx + '][label]'" x-model="opt.label" class="form-input text-sm" placeholder="Label">
+                                                                <button type="button" @click="removeOption(qIdx, oIdx)" class="p-1 text-red-400 hover:text-red-600 rounded" x-show="q.options.length > 1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                    <button type="button" @click="addOption(qIdx)" class="mt-1.5 text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                                        Add Option
+                                                    </button>
+                                                </div>
                                             </div>
                                         </template>
                                     </div>
-                                    <button type="button" @click="addSurveyOption()" class="mt-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                        </svg>
-                                        Add Option
-                                    </button>
-                                    <x-input-error :messages="$errors->get('survey_options')" class="mt-2" />
-                                </div>
+                                </template>
+
+                                <button type="button" @click="addQuestion()" class="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-500 hover:border-emerald-400 hover:text-emerald-600 transition-colors flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                    Add Question
+                                </button>
+                                <x-input-error :messages="$errors->get('survey_questions')" class="mt-2" />
                             </div>
                         </div>
                     </div>

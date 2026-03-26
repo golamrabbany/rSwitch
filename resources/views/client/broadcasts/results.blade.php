@@ -102,41 +102,84 @@
 
     {{-- Survey Response Breakdown --}}
     @if($broadcast->type === 'survey' && !empty($surveyBreakdown))
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div class="lg:col-span-2 detail-card">
-                <div class="detail-card-header">
-                    <h3 class="detail-card-title">Survey Response Breakdown</h3>
-                </div>
-                <div class="detail-card-body">
-                    <div class="space-y-3">
-                        @foreach($surveyBreakdown as $option)
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                                        <span class="text-sm font-bold text-indigo-600">{{ $option['digit'] }}</span>
+        @if($broadcast->isMultiQuestion())
+            {{-- Multi-question breakdown --}}
+            @foreach($surveyBreakdown as $qIndex => $question)
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="lg:col-span-2 detail-card">
+                        <div class="detail-card-header">
+                            <h3 class="detail-card-title">{{ $question['label'] }}</h3>
+                            <span class="text-sm text-gray-500">{{ $question['total_responses'] }} responses</span>
+                        </div>
+                        <div class="detail-card-body">
+                            <div class="space-y-3">
+                                @foreach($question['breakdown'] as $option)
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                                <span class="text-sm font-bold text-indigo-600">{{ $option['digit'] }}</span>
+                                            </div>
+                                            <span class="text-sm text-gray-700">{{ $option['label'] }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                                <div class="bg-indigo-500 h-2 rounded-full" style="width: {{ $option['percentage'] }}%"></div>
+                                            </div>
+                                            <span class="text-sm font-medium text-gray-700 w-16 text-right">{{ $option['count'] }} ({{ $option['percentage'] }}%)</span>
+                                        </div>
                                     </div>
-                                    <span class="text-sm text-gray-700">{{ $option['label'] }}</span>
-                                </div>
-                                <div class="flex items-center gap-3">
-                                    <div class="w-32 bg-gray-200 rounded-full h-2">
-                                        <div class="bg-indigo-500 h-2 rounded-full" style="width: {{ $option['percentage'] }}%"></div>
-                                    </div>
-                                    <span class="text-sm font-medium text-gray-700 w-16 text-right">{{ $option['count'] }} ({{ $option['percentage'] }}%)</span>
-                                </div>
+                                @endforeach
                             </div>
-                        @endforeach
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-header">
+                            <h3 class="detail-card-title">Distribution</h3>
+                        </div>
+                        <div class="detail-card-body flex items-center justify-center">
+                            <canvas id="surveyChart{{ $qIndex }}" style="max-height: 200px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        @else
+            {{-- Legacy single-question breakdown --}}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="lg:col-span-2 detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Survey Response Breakdown</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="space-y-3">
+                            @foreach($surveyBreakdown as $option)
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                            <span class="text-sm font-bold text-indigo-600">{{ $option['digit'] }}</span>
+                                        </div>
+                                        <span class="text-sm text-gray-700">{{ $option['label'] }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-32 bg-gray-200 rounded-full h-2">
+                                            <div class="bg-indigo-500 h-2 rounded-full" style="width: {{ $option['percentage'] }}%"></div>
+                                        </div>
+                                        <span class="text-sm font-medium text-gray-700 w-16 text-right">{{ $option['count'] }} ({{ $option['percentage'] }}%)</span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Response Distribution</h3>
+                    </div>
+                    <div class="detail-card-body flex items-center justify-center">
+                        <canvas id="surveyChart" style="max-height: 220px;"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="detail-card">
-                <div class="detail-card-header">
-                    <h3 class="detail-card-title">Response Distribution</h3>
-                </div>
-                <div class="detail-card-body flex items-center justify-center">
-                    <canvas id="surveyChart" style="max-height: 220px;"></canvas>
-                </div>
-            </div>
-        </div>
+        @endif
     @endif
 
     {{-- Results Table --}}
@@ -157,7 +200,13 @@
                     <th style="text-align: right">Duration</th>
                     <th style="text-align: right">Cost</th>
                     @if($broadcast->type === 'survey')
-                        <th>Survey Response</th>
+                        @if($broadcast->isMultiQuestion())
+                            @foreach($broadcast->getSurveyQuestions() as $q)
+                                <th>{{ Str::limit($q['label'], 15) }}</th>
+                            @endforeach
+                        @else
+                            <th>Survey Response</th>
+                        @endif
                     @endif
                 </tr>
             </thead>
@@ -198,18 +247,32 @@
                             {{ format_currency($result->cost ?? 0) }}
                         </td>
                         @if($broadcast->type === 'survey')
-                            <td class="text-sm text-gray-700">
-                                @if($result->survey_response)
-                                    <span class="badge badge-purple">{{ $result->survey_response }}</span>
-                                @else
-                                    <span class="text-gray-400">--</span>
-                                @endif
-                            </td>
+                            @if($broadcast->isMultiQuestion())
+                                @foreach($broadcast->getSurveyQuestions() as $q)
+                                    <td class="text-sm text-gray-700">
+                                        @php $ans = is_array($result->survey_response) ? ($result->survey_response[$q['key']] ?? null) : null; @endphp
+                                        @if($ans)
+                                            <span class="badge badge-purple">{{ $ans }}</span>
+                                        @else
+                                            <span class="text-gray-400">--</span>
+                                        @endif
+                                    </td>
+                                @endforeach
+                            @else
+                                <td class="text-sm text-gray-700">
+                                    @php $sr = is_array($result->survey_response) ? ($result->survey_response['q1'] ?? null) : $result->survey_response; @endphp
+                                    @if($sr)
+                                        <span class="badge badge-purple">{{ $sr }}</span>
+                                    @else
+                                        <span class="text-gray-400">--</span>
+                                    @endif
+                                </td>
+                            @endif
                         @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $broadcast->type === 'survey' ? 6 : 5 }}" class="text-center py-12">
+                        <td colspan="{{ $broadcast->type === 'survey' ? ($broadcast->isMultiQuestion() ? 5 + count($broadcast->getSurveyQuestions()) : 6) : 5 }}" class="text-center py-12">
                             <div class="empty-state">
                                 <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -233,25 +296,36 @@
         @push('scripts')
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
         <script>
-            new Chart(document.getElementById('surveyChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: {!! json_encode(array_column($surveyBreakdown, 'label')) !!},
-                    datasets: [{
-                        data: {!! json_encode(array_column($surveyBreakdown, 'count')) !!},
-                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#14b8a6'],
-                        borderWidth: 2,
-                        borderColor: '#fff',
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyleWidth: 8 } }
-                    }
-                }
-            });
+            var chartColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#14b8a6'];
+            @if($broadcast->isMultiQuestion())
+                @foreach($surveyBreakdown as $qIndex => $question)
+                    new Chart(document.getElementById('surveyChart{{ $qIndex }}'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: {!! json_encode(array_column($question['breakdown'], 'label')) !!},
+                            datasets: [{
+                                data: {!! json_encode(array_column($question['breakdown'], 'count')) !!},
+                                backgroundColor: chartColors,
+                                borderWidth: 2, borderColor: '#fff',
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { padding: 10, usePointStyle: true, pointStyleWidth: 8 } } } }
+                    });
+                @endforeach
+            @else
+                new Chart(document.getElementById('surveyChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: {!! json_encode(array_column($surveyBreakdown, 'label')) !!},
+                        datasets: [{
+                            data: {!! json_encode(array_column($surveyBreakdown, 'count')) !!},
+                            backgroundColor: chartColors,
+                            borderWidth: 2, borderColor: '#fff',
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyleWidth: 8 } } } }
+                });
+            @endif
         </script>
         @endpush
     @endif

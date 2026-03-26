@@ -48,16 +48,56 @@ class BroadcastCallHandler:
                 elif broadcast_type == "survey":
                     raw_config = await agi.get_variable("SURVEY_CONFIG") or "{}"
                     survey_config = json.loads(raw_config)
-                    max_digits = survey_config.get("max_digits", 1)
-                    timeout_ms = survey_config.get("timeout", 5) * 1000
-                    max_retries = survey_config.get("max_retries", 2)
-                    options = survey_config.get("options", {})
 
-                    for attempt in range(max_retries + 1):
-                        result = await agi.get_data(voice_file, timeout_ms, max_digits)
-                        if result and str(result) in options:
-                            survey_response = str(result)
-                            break
+                    if survey_config.get("version") == 2:
+                        # Multi-question flow
+                        questions = survey_config.get("questions", [])
+                        responses = {}
+
+                        for q in questions:
+                            q_type = q.get("type", "question")
+                            voice_path = q.get("voice_file_path", voice_file)
+                            # Remove .wav extension if present (Asterisk adds it)
+                            if voice_path and voice_path.endswith(".wav"):
+                                voice_path = voice_path[:-4]
+
+                            if q_type == "intro":
+                                # Play intro without DTMF collection
+                                await agi.stream_file(voice_path)
+                                continue
+
+                            # type == "question"
+                            key = q.get("key", "q1")
+                            max_digits = q.get("max_digits", 1)
+                            timeout_ms = q.get("timeout", 10) * 1000
+                            max_retries = q.get("max_retries", 2)
+                            options = q.get("options", {})
+
+                            for attempt in range(max_retries + 1):
+                                result = await agi.get_data(voice_path, timeout_ms, max_digits)
+                                if result and str(result) in options:
+                                    responses[key] = str(result)
+                                    break
+
+                            # If no valid response, record null
+                            if key not in responses:
+                                responses[key] = None
+
+                        survey_response = json.dumps(responses) if responses else None
+
+                    else:
+                        # Legacy single-question (backward compat)
+                        max_digits = survey_config.get("max_digits", 1)
+                        timeout_ms = survey_config.get("timeout", 5) * 1000
+                        max_retries = survey_config.get("max_retries", 2)
+                        options = survey_config.get("options", {})
+
+                        survey_response = None
+                        for attempt in range(max_retries + 1):
+                            result = await agi.get_data(voice_file, timeout_ms, max_digits)
+                            if result and str(result) in options:
+                                survey_response = json.dumps({"q1": str(result)})
+                                break
             except Exception as e:
                 logger.debug(f"Broadcast playback interrupted (callee hangup): {e}")
 
