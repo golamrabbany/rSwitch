@@ -40,7 +40,8 @@ class AggregateCdr extends Command
                 COALESCE(SUM(duration), 0) AS total_duration,
                 COALESCE(SUM(billable_duration), 0) AS total_billable,
                 COALESCE(SUM(total_cost), 0) AS total_cost,
-                COALESCE(SUM(reseller_cost), 0) AS total_reseller_cost
+                COALESCE(SUM(reseller_cost), 0) AS total_reseller_cost,
+                COALESCE(SUM(trunk_cost), 0) AS total_trunk_cost
             FROM call_records
             WHERE call_start BETWEEN ? AND ?
               AND user_id IS NOT NULL
@@ -58,9 +59,9 @@ class AggregateCdr extends Command
             DB::statement("
                 INSERT INTO cdr_summary_daily
                     (user_id, reseller_id, `date`, total_calls, answered_calls,
-                     total_duration, total_billable, total_cost, total_reseller_cost,
+                     total_duration, total_billable, total_cost, total_reseller_cost, total_trunk_cost,
                      asr, acd, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ON DUPLICATE KEY UPDATE
                     reseller_id = VALUES(reseller_id),
                     total_calls = VALUES(total_calls),
@@ -69,6 +70,7 @@ class AggregateCdr extends Command
                     total_billable = VALUES(total_billable),
                     total_cost = VALUES(total_cost),
                     total_reseller_cost = VALUES(total_reseller_cost),
+                    total_trunk_cost = VALUES(total_trunk_cost),
                     asr = VALUES(asr),
                     acd = VALUES(acd),
                     updated_at = NOW()
@@ -76,7 +78,7 @@ class AggregateCdr extends Command
                 $row->user_id, $row->reseller_id, $date,
                 $totalCalls, $answeredCalls,
                 $row->total_duration, $row->total_billable,
-                $row->total_cost, $row->total_reseller_cost,
+                $row->total_cost, $row->total_reseller_cost, $row->total_trunk_cost,
                 $asr, $acd,
             ]);
 
@@ -99,7 +101,8 @@ class AggregateCdr extends Command
                 COALESCE(SUM(duration), 0) AS total_duration,
                 COALESCE(SUM(billable_duration), 0) AS total_billable,
                 COALESCE(SUM(total_cost), 0) AS total_cost,
-                COALESCE(SUM(reseller_cost), 0) AS total_reseller_cost
+                COALESCE(SUM(reseller_cost), 0) AS total_reseller_cost,
+                COALESCE(SUM(trunk_cost), 0) AS total_trunk_cost
             FROM call_records
             WHERE call_start BETWEEN ? AND ?
               AND user_id IS NOT NULL
@@ -117,9 +120,9 @@ class AggregateCdr extends Command
             DB::statement("
                 INSERT INTO cdr_summary_hourly
                     (user_id, reseller_id, hour_start, total_calls, answered_calls, failed_calls,
-                     total_duration, total_billable, total_cost, total_reseller_cost,
+                     total_duration, total_billable, total_cost, total_reseller_cost, total_trunk_cost,
                      asr, acd, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ON DUPLICATE KEY UPDATE
                     reseller_id = VALUES(reseller_id),
                     total_calls = VALUES(total_calls),
@@ -129,6 +132,7 @@ class AggregateCdr extends Command
                     total_billable = VALUES(total_billable),
                     total_cost = VALUES(total_cost),
                     total_reseller_cost = VALUES(total_reseller_cost),
+                    total_trunk_cost = VALUES(total_trunk_cost),
                     asr = VALUES(asr),
                     acd = VALUES(acd),
                     updated_at = NOW()
@@ -136,7 +140,7 @@ class AggregateCdr extends Command
                 $row->user_id, $row->reseller_id, $row->hour_start,
                 $totalCalls, $answeredCalls, $row->failed_calls,
                 $row->total_duration, $row->total_billable,
-                $row->total_cost, $row->total_reseller_cost,
+                $row->total_cost, $row->total_reseller_cost, $row->total_trunk_cost,
                 $asr, $acd,
             ]);
 

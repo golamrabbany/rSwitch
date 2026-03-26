@@ -466,6 +466,35 @@ install_mysql() {
     mysql -u root -p"${MYSQL_ROOT_PASS}" -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
     mysql -u root -p"${MYSQL_ROOT_PASS}" -e "FLUSH PRIVILEGES;"
 
+    # MySQL tuning for high-volume billing
+    log_info "Applying MySQL performance tuning..."
+    TOTAL_RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
+    BUFFER_POOL_MB=$((TOTAL_RAM_MB * 65 / 100))
+    BUFFER_POOL_SIZE="${BUFFER_POOL_MB}M"
+
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        MYSQL_CONF_DIR="/etc/my.cnf.d"
+    else
+        MYSQL_CONF_DIR="/etc/mysql/mysql.conf.d"
+    fi
+
+    sed "s/__BUFFER_POOL_SIZE__/${BUFFER_POOL_SIZE}/" \
+        "${SCRIPT_DIR}/templates/mysql-tuning.cnf.template" \
+        > "${MYSQL_CONF_DIR}/rswitch-tuning.cnf"
+
+    systemctl restart mysql 2>/dev/null || systemctl restart mysqld 2>/dev/null
+    log_info "innodb_buffer_pool_size set to ${BUFFER_POOL_SIZE} (65% of ${TOTAL_RAM_MB}MB RAM)"
+
+    # Create CDR archive directory
+    mkdir -p /var/backups/rswitch/cdr
+    chown www-data:www-data /var/backups/rswitch/cdr 2>/dev/null || chown nginx:nginx /var/backups/rswitch/cdr 2>/dev/null
+
+    # Disk space warning
+    DISK_GB=$(df -BG / | awk 'NR==2{print $2}' | tr -d 'G')
+    if [[ "$DISK_GB" -lt 400 ]]; then
+        log_warning "Disk space: ${DISK_GB}GB detected. Recommended 400GB+ for high-volume (10M calls/day)."
+    fi
+
     log_success "MySQL installed and configured"
 }
 

@@ -21,8 +21,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from call_control.agi_protocol import AgiConnection
+from call_control.transit_handler import TransitCallHandler
 
 logger = logging.getLogger(__name__)
+
+_transit = TransitCallHandler()
 
 
 class InboundCallHandler:
@@ -77,7 +80,13 @@ class InboundCallHandler:
                 break
 
         if not did:
-            await agi.verbose(f"rSwitch: DID {extension} not found")
+            # No DID match — try transit routing (trunk-to-trunk)
+            if trunk_id:
+                routed = await _transit.handle(agi, session, trunk_id, caller_id, extension)
+                if routed:
+                    return  # Transit call routed successfully
+
+            await agi.verbose(f"rSwitch: DID {extension} not found, no transit route")
             await agi.set_variable("ROUTE_ACTION", "REJECT")
             await agi.set_variable("ROUTE_REJECT_REASON", "no_did")
             return

@@ -23,167 +23,129 @@
         </div>
     </div>
 
-    {{-- Stats Grid --}}
-    <div class="cdr-stats-grid">
-        <div class="cdr-stat-card cdr-stat-total">
-            <div class="cdr-stat-icon">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                </svg>
-            </div>
-            <div class="cdr-stat-content">
-                <span class="cdr-stat-value">{{ number_format($stats['total_calls']) }}</span>
-                <span class="cdr-stat-label">Total Calls</span>
-            </div>
-        </div>
-
-        <div class="cdr-stat-card cdr-stat-answered">
-            <div class="cdr-stat-icon">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"/>
-                </svg>
-            </div>
-            <div class="cdr-stat-content">
-                <span class="cdr-stat-value">{{ number_format($stats['answered_calls']) }}</span>
-                <span class="cdr-stat-label">Answered ({{ number_format($asr, 1) }}% ASR)</span>
-            </div>
-        </div>
-
-        <div class="cdr-stat-card cdr-stat-duration">
-            <div class="cdr-stat-icon">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </div>
-            <div class="cdr-stat-content">
-                <span class="cdr-stat-value">{{ sprintf('%d:%02d:%02d', intdiv($totalDur, 3600), intdiv($totalDur % 3600, 60), $totalDur % 60) }}</span>
-                <span class="cdr-stat-label">Total Duration</span>
-            </div>
-        </div>
-
-        <div class="cdr-stat-card cdr-stat-billable">
-            <div class="cdr-stat-icon">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                </svg>
-            </div>
-            <div class="cdr-stat-content">
-                <span class="cdr-stat-value">{{ sprintf('%d:%02d:%02d', intdiv($totalBill, 3600), intdiv($totalBill % 3600, 60), $totalBill % 60) }}</span>
-                <span class="cdr-stat-label">Billable Duration</span>
-            </div>
-        </div>
-
-        <div class="cdr-stat-card cdr-stat-cost">
-            <div class="cdr-stat-icon">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </div>
-            <div class="cdr-stat-content">
-                <span class="cdr-stat-value">{{ format_currency($stats['total_cost']) }}</span>
-                <span class="cdr-stat-label">Total Cost</span>
-            </div>
-        </div>
-    </div>
-
     {{-- Filter Card --}}
     <div class="filter-card mb-3">
         <form method="GET" action="{{ route('admin.cdr.index') }}">
-            <div class="cdr-filter-grid">
-                <div class="cdr-filter-item">
-                    <label for="date_from" class="cdr-filter-label">Date From</label>
-                    <input type="date" id="date_from" name="date_from" value="{{ $dateFrom->format('Y-m-d') }}" required class="filter-date">
+            <div class="filter-row flex-wrap">
+                <input type="date" name="date_from" value="{{ $dateFrom->format('Y-m-d') }}" required class="filter-select" title="Date From">
+                <input type="date" name="date_to" value="{{ $dateTo->format('Y-m-d') }}" required class="filter-select" title="Date To">
+
+                {{-- User auto-suggest --}}
+                <div class="relative" x-data="{
+                    open: false,
+                    search: '{{ $users->firstWhere('id', request('user_id'))?->name ?? '' }}',
+                    selectedId: '{{ request('user_id') }}',
+                    users: {{ $users->toJson() }},
+                    get filtered() {
+                        if (!this.search) return this.users.slice(0, 20);
+                        const s = this.search.toLowerCase();
+                        return this.users.filter(u => u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s)).slice(0, 20);
+                    },
+                    select(u) { this.search = u.name; this.selectedId = u.id; this.open = false; },
+                    clear() { this.search = ''; this.selectedId = ''; }
+                }" @click.outside="open = false" @keydown.escape="open = false">
+                    <input type="hidden" name="user_id" :value="selectedId">
+                    <div class="relative">
+                        <input type="text" x-model="search"
+                               @focus="open = true"
+                               @input="open = true; selectedId = ''"
+                               placeholder="Filter by user..."
+                               class="filter-input pr-9"
+                               :class="selectedId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
+                               autocomplete="off">
+                        <button type="button" x-show="search" @click="clear()"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition-colors">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div x-show="open && filtered.length > 0" x-transition x-cloak
+                         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto" style="min-width: 280px;">
+                        <template x-for="u in filtered" :key="u.id">
+                            <button type="button" @click="select(u)"
+                                    class="w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3">
+                                <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
+                                     :class="u.role === 'reseller' ? 'bg-emerald-100 text-emerald-600' : 'bg-sky-100 text-sky-600'"
+                                     x-text="u.name.charAt(0).toUpperCase()"></div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-medium text-gray-900 truncate" x-text="u.name"></div>
+                                    <div class="text-xs text-gray-500 truncate" x-text="u.email"></div>
+                                </div>
+                                <span class="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                                      :class="u.role === 'reseller' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'"
+                                      x-text="u.role.charAt(0).toUpperCase() + u.role.slice(1)"></span>
+                            </button>
+                        </template>
+                    </div>
                 </div>
-                <div class="cdr-filter-item">
-                    <label for="date_to" class="cdr-filter-label">Date To</label>
-                    <input type="date" id="date_to" name="date_to" value="{{ $dateTo->format('Y-m-d') }}" required class="filter-date">
+
+                <select name="disposition" class="filter-select">
+                    <option value="">All Dispositions</option>
+                    @foreach (['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CANCEL'] as $d)
+                        <option value="{{ $d }}" {{ request('disposition') === $d ? 'selected' : '' }}>{{ $d }}</option>
+                    @endforeach
+                </select>
+
+                <select name="call_flow" class="filter-select">
+                    <option value="">All Flows</option>
+                    @foreach (['sip_to_trunk' => 'Outbound', 'trunk_to_sip' => 'Inbound', 'sip_to_sip' => 'P2P', 'trunk_to_trunk' => 'Transit'] as $val => $label)
+                        <option value="{{ $val }}" {{ request('call_flow') === $val ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
+                </select>
+
+                <select name="status" class="filter-select">
+                    <option value="">All Status</option>
+                    @foreach (['rated', 'charged', 'in_progress', 'failed', 'unbillable'] as $s)
+                        <option value="{{ $s }}" {{ request('status') === $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_', ' ', $s)) }}</option>
+                    @endforeach
+                </select>
+
+                <select name="trunk_id" class="filter-select">
+                    <option value="">All Trunks</option>
+                    @foreach ($trunks as $trunk)
+                        <option value="{{ $trunk->id }}" {{ request('trunk_id') == $trunk->id ? 'selected' : '' }}>{{ $trunk->name }}</option>
+                    @endforeach
+                </select>
+
+                <div class="filter-search-box">
+                    <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Caller / Callee..." class="filter-input">
                 </div>
-                <div class="cdr-filter-item">
-                    <label for="user_id" class="cdr-filter-label">User</label>
-                    <select id="user_id" name="user_id" class="filter-select">
-                        <option value="">All Users</option>
-                        @foreach ($users as $user)
-                            <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
-                                {{ $user->name }} ({{ ucfirst($user->role) }})
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="disposition" class="cdr-filter-label">Disposition</label>
-                    <select id="disposition" name="disposition" class="filter-select">
-                        <option value="">All</option>
-                        @foreach (['ANSWERED', 'NO ANSWER', 'BUSY', 'FAILED', 'CANCEL'] as $d)
-                            <option value="{{ $d }}" {{ request('disposition') === $d ? 'selected' : '' }}>{{ $d }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="call_flow" class="cdr-filter-label">Call Flow</label>
-                    <select id="call_flow" name="call_flow" class="filter-select">
-                        <option value="">All Flows</option>
-                        @foreach (['sip_to_trunk' => 'SIP → Trunk', 'sip_to_sip' => 'SIP → SIP', 'trunk_to_sip' => 'Trunk → SIP', 'trunk_to_trunk' => 'Trunk → Trunk'] as $val => $label)
-                            <option value="{{ $val }}" {{ request('call_flow') === $val ? 'selected' : '' }}>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="call_type" class="cdr-filter-label">Call Type</label>
-                    <select id="call_type" name="call_type" class="filter-select">
-                        <option value="">All Types</option>
-                        <option value="regular" {{ request('call_type') === 'regular' ? 'selected' : '' }}>Regular</option>
-                        <option value="broadcast" {{ request('call_type') === 'broadcast' ? 'selected' : '' }}>Broadcast</option>
-                    </select>
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="status" class="cdr-filter-label">Status</label>
-                    <select id="status" name="status" class="filter-select">
-                        <option value="">All</option>
-                        @foreach (['rated', 'in_progress', 'failed', 'unbillable'] as $s)
-                            <option value="{{ $s }}" {{ request('status') === $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_', ' ', $s)) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="trunk_id" class="cdr-filter-label">Trunk</label>
-                    <select id="trunk_id" name="trunk_id" class="filter-select">
-                        <option value="">All Trunks</option>
-                        @foreach ($trunks as $trunk)
-                            <option value="{{ $trunk->id }}" {{ request('trunk_id') == $trunk->id ? 'selected' : '' }}>
-                                {{ $trunk->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="cdr-filter-item">
-                    <label for="search" class="cdr-filter-label">Caller / Callee</label>
-                    <input type="text" id="search" name="search" value="{{ request('search') }}" placeholder="Number prefix..." class="filter-input">
-                </div>
-            </div>
-            <div class="flex items-center gap-3 mt-4">
+
                 <button type="submit" class="btn-search-admin">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    Filter
+                    Search
                 </button>
-                @if(request()->hasAny(['disposition', 'call_flow', 'call_type', 'status', 'trunk_id', 'user_id', 'search']))
-                    <a href="{{ route('admin.cdr.index') }}" class="btn-clear">Clear Filters</a>
+
+                @if(request()->hasAny(['disposition', 'call_flow', 'status', 'trunk_id', 'user_id', 'search']))
+                    <a href="{{ route('admin.cdr.index') }}" class="btn-clear">Clear</a>
                 @endif
             </div>
         </form>
     </div>
 
+    <x-cdr-archive-banner />
+
     {{-- Data Table --}}
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {{-- Summary Bar --}}
-        @if ($records->hasPages())
-            <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                <span class="text-sm text-gray-600">
-                    Showing <span class="font-semibold">{{ $records->firstItem() }}-{{ $records->lastItem() }}</span> of <span class="font-semibold">{{ number_format($records->total()) }}</span> records
+        @if($records->total() > 0)
+            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                    Total : {{ number_format($records->total()) }} &middot; Showing {{ $records->firstItem() }}–{{ $records->lastItem() }}
+                    &middot; Answered: {{ number_format($stats['answered_calls']) }} ({{ number_format($asr, 1) }}% ASR)
+                    &middot; Duration: {{ sprintf('%d:%02d:%02d', intdiv($totalDur, 3600), intdiv($totalDur % 3600, 60), $totalDur % 60) }}
+                    &middot; Cost: {{ format_currency($stats['total_cost']) }}
                 </span>
             </div>
         @endif
+
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-gray-200">
@@ -195,7 +157,6 @@
                     <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Billsec</th>
                     <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Cost</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Disposition</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -205,78 +166,68 @@
                     <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
                         <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $records->firstItem() + $loop->index }}</td>
                         <td class="px-3 py-2">
-                            <div class="cdr-date">
-                                <span class="cdr-date-main">{{ $record->call_start?->format('M d, Y') }}</span>
-                                <span class="cdr-date-time">{{ $record->call_start?->format('H:i:s') }}</span>
-                            </div>
+                            <span class="text-gray-800">{{ $record->call_start?->format('M d, Y') }}</span>
+                            <span class="block text-xs text-gray-400">{{ $record->call_start?->format('H:i:s') }}</span>
                         </td>
                         <td class="px-3 py-2">
-                            <div class="cdr-party">
-                                <span class="cdr-party-number">{{ $record->caller }}</span>
-                                @if ($record->user)
-                                    <a href="{{ route('admin.users.show', $record->user) }}" class="cdr-party-name">{{ $record->user->name }}</a>
-                                @endif
-                            </div>
+                            <span class="font-medium text-gray-900 tabular-nums">{{ $record->caller }}</span>
+                            @if ($record->user)
+                                <a href="{{ route('admin.users.show', $record->user) }}" class="block text-xs text-indigo-600 hover:text-indigo-700">{{ $record->user->name }}</a>
+                            @endif
                         </td>
                         <td class="px-3 py-2">
-                            <span class="cdr-party-number">{{ $record->callee }}</span>
+                            <span class="tabular-nums text-gray-900">{{ $record->callee }}</span>
                         </td>
-                        <td class="px-3 py-2 text-right tabular-nums">
+                        <td class="px-3 py-2 text-right tabular-nums text-gray-700">
                             {{ sprintf('%d:%02d', intdiv($record->duration, 60), $record->duration % 60) }}
                         </td>
-                        <td class="px-3 py-2 text-right tabular-nums">
+                        <td class="px-3 py-2 text-right tabular-nums text-gray-700">
                             {{ sprintf('%d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }}
                         </td>
-                        <td class="px-3 py-2 text-right tabular-nums font-medium">
+                        <td class="px-3 py-2 text-right tabular-nums font-bold text-gray-900">
                             {{ format_currency($record->total_cost, 4) }}
                         </td>
                         <td class="px-3 py-2">
                             @switch($record->disposition)
                                 @case('ANSWERED')
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>
                                     @break
                                 @case('NO ANSWER')
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>No Answer</span>
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>No Answer</span>
                                     @break
                                 @case('BUSY')
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Busy</span>
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Busy</span>
                                     @break
                                 @case('FAILED')
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span>
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span>
                                     @break
                                 @case('CANCEL')
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Cancel</span>
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Cancel</span>
                                     @break
                                 @default
                                     <span class="text-gray-400">—</span>
                             @endswitch
                         </td>
                         <td class="px-3 py-2">
-                            @if($record->call_type === 'broadcast')
-                                <span class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>Broadcast</span>
-                            @else
-                                <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Regular</span>
-                            @endif
-                        </td>
-                        <td class="px-3 py-2">
                             @switch($record->status)
                                 @case('rated')
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Rated</span>
+                                @case('charged')
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{{ ucfirst($record->status) }}</span>
                                     @break
                                 @case('in_progress')
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>In Progress</span>
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>In Progress</span>
                                     @break
                                 @case('failed')
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span>
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span>
                                     @break
                                 @case('unbillable')
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Unbillable</span>
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Unbillable</span>
                                     @break
                             @endswitch
                         </td>
-                        <td class="px-3 py-2 text-center whitespace-nowrap">
+                        <td class="px-3 py-2 text-center">
                             <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                                <a href="{{ route('admin.cdr.show', ['uuid' => $record->uuid, 'date' => $record->call_start?->format('Y-m-d')]) }}" class="p-1 rounded text-blue-500 hover:text-blue-700 hover:bg-blue-50" title="View Details">
+                                <a href="{{ route('admin.cdr.show', ['uuid' => $record->uuid, 'date' => $record->call_start?->format('Y-m-d')]) }}" class="p-1.5 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors" title="View">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -287,13 +238,11 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="11" class="text-center py-12">
-                            <div class="empty-state">
-                                <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                </svg>
-                                <p class="empty-text">No call records found for this date range</p>
-                            </div>
+                        <td colspan="10" class="px-4 py-12 text-center">
+                            <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                            <p class="text-sm text-gray-400">No call records found for this date range</p>
                         </td>
                     </tr>
                 @endforelse
@@ -301,9 +250,9 @@
         </table>
     </div>
 
-    @if ($records->hasPages())
-        <div class="mt-6">
-            {{ $records->withQueryString()->links() }}
+    @if($records->hasPages())
+        <div class="mt-4 flex justify-end">
+            {{ $records->withQueryString()->onEachSide(1)->links('pagination::simple-tailwind') }}
         </div>
     @endif
 </x-admin-layout>

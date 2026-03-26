@@ -19,7 +19,7 @@
 
     {{-- Section 2: Filter Card --}}
     <div class="filter-card mb-3">
-        <form method="GET" action="{{ route('admin.transactions.index') }}" class="filter-row flex-wrap">
+        <form method="GET" action="{{ route('admin.transactions.index') }}" class="filter-row">
             <div class="filter-search-box">
                 <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -27,26 +27,67 @@
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Search description..." class="filter-input">
             </div>
 
-            <select name="user_id" class="filter-select">
-                <option value="">All Users</option>
-                @foreach ($users as $u)
-                    <option value="{{ $u->id }}" {{ request('user_id') == $u->id ? 'selected' : '' }}>
-                        {{ $u->name }}
-                    </option>
-                @endforeach
-            </select>
+            {{-- User auto-suggest --}}
+            <div class="relative" x-data="{
+                open: false,
+                search: '{{ $users->firstWhere('id', request('user_id'))?->name ?? '' }}',
+                selectedId: '{{ request('user_id') }}',
+                users: {{ $users->toJson() }},
+                get filtered() {
+                    if (!this.search) return this.users.slice(0, 20);
+                    const s = this.search.toLowerCase();
+                    return this.users.filter(u => u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s)).slice(0, 20);
+                },
+                select(u) { this.search = u.name; this.selectedId = u.id; this.open = false; },
+                clear() { this.search = ''; this.selectedId = ''; }
+            }" @click.outside="open = false" @keydown.escape="open = false">
+                <input type="hidden" name="user_id" :value="selectedId">
+                <div class="relative">
+                    <input type="text" x-model="search"
+                           @focus="open = true"
+                           @input="open = true; selectedId = ''"
+                           placeholder="Filter by user..."
+                           class="filter-input pr-9"
+                           :class="selectedId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
+                           autocomplete="off">
+                    <button type="button" x-show="search" @click="clear()"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition-colors">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div x-show="open && filtered.length > 0" x-transition x-cloak
+                     class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto" style="min-width: 280px;">
+                    <template x-for="u in filtered" :key="u.id">
+                        <button type="button" @click="select(u)"
+                                class="w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3">
+                            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
+                                 :class="u.role === 'reseller' ? 'bg-emerald-100 text-emerald-600' : 'bg-sky-100 text-sky-600'"
+                                 x-text="u.name.charAt(0).toUpperCase()"></div>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm font-medium text-gray-900 truncate" x-text="u.name"></div>
+                                <div class="text-xs text-gray-500 truncate" x-text="u.email"></div>
+                            </div>
+                            <span class="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                                  :class="u.role === 'reseller' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'"
+                                  x-text="u.role.charAt(0).toUpperCase() + u.role.slice(1)"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
 
             <select name="type" class="filter-select">
                 <option value="">All Types</option>
-                @foreach (['topup', 'call_charge', 'reseller_call_charge', 'client_payment', 'did_charge', 'refund', 'adjustment', 'invoice_payment'] as $t)
+                @foreach (['topup', 'daily_call_charge', 'daily_reseller_charge', 'client_payment', 'did_charge', 'refund', 'adjustment', 'invoice_payment'] as $t)
                     <option value="{{ $t }}" {{ request('type') === $t ? 'selected' : '' }}>
                         {{ ucfirst(str_replace('_', ' ', $t)) }}
                     </option>
                 @endforeach
             </select>
 
-            <input type="date" name="date_from" value="{{ request('date_from') }}" class="filter-date" placeholder="From">
-            <input type="date" name="date_to" value="{{ request('date_to') }}" class="filter-date" placeholder="To">
+            <input type="date" name="date_from" value="{{ request('date_from') }}" class="filter-select" title="From Date">
+            <input type="date" name="date_to" value="{{ request('date_to') }}" class="filter-select" title="To Date">
 
             <button type="submit" class="btn-search-admin">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,6 +148,7 @@
                             @php
                                 $typeColor = match($txn->type) {
                                     'topup', 'client_payment' => 'badge-success',
+                                    'daily_call_charge', 'daily_reseller_charge' => 'badge-danger',
                                     'call_charge', 'reseller_call_charge' => 'badge-danger',
                                     'refund' => 'badge-warning',
                                     'adjustment' => 'badge-info',

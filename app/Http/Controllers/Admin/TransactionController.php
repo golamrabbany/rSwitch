@@ -36,7 +36,7 @@ class TransactionController extends Controller
 
         $transactions = $query->orderBy('created_at', 'desc')->paginate(30);
 
-        $users = User::orderBy('name')->get(['id', 'name', 'email']);
+        $users = User::whereIn('role', ['reseller', 'client'])->orderBy('name')->get(['id', 'name', 'email', 'role']);
 
         // Calculate stats
         $stats = [

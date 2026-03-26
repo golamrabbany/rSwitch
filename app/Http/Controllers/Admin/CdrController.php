@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ExportCdrJob;
 use App\Models\CallRecord;
 use App\Models\Trunk;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Storage;
 
 class CdrController extends Controller
 {
@@ -28,7 +32,7 @@ class CdrController extends Controller
 
         $stats = $this->getStats($request, $dateFrom, $dateTo);
 
-        $users = User::select('id', 'name', 'role')->orderBy('name')->get();
+        $users = User::whereIn('role', ['reseller', 'client'])->select('id', 'name', 'email', 'role')->orderBy('name')->get();
         $trunks = Trunk::select('id', 'name', 'direction')->orderBy('name')->get();
 
         return view('admin.cdr.index', compact(
@@ -145,7 +149,7 @@ class CdrController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 
-    private function resolveDateRange(Request $request, int $maxDays = 31): array
+    private function resolveDateRange(Request $request, int $maxDays = 7): array
     {
         $dateFrom = $request->filled('date_from')
             ? Carbon::parse($request->date_from)->startOfDay()
@@ -255,5 +259,142 @@ class CdrController extends Controller
             'total_billable' => $row->total_billable ?? 0,
             'total_cost' => $row->total_cost ?? 0,
         ];
+    }
+
+    /**
+     * Queue a monthly CDR export as a background job.
+     */
+    public function exportMonthly(Request $request)
+    {
+        $validated = $request->validate([
+            'month' => ['required', 'date_format:Y-m'],
+            'user_id' => ['nullable', 'exists:users,id'],
+            'reseller_id' => ['nullable', 'exists:users,id'],
+        ]);
+
+        ExportCdrJob::dispatch(
+            requestedBy: auth()->id(),
+            month: $validated['month'],
+            userId: $validated['user_id'] ?? null,
+            resellerId: $validated['reseller_id'] ?? null,
+        );
+
+        return back()->with('success', "CDR export for {$validated['month']} queued. You'll find the file in storage/exports/ when ready.");
+    }
+
+    /**
+     * List available CDR export files for download.
+     */
+    public function exportFiles()
+    {
+        $files = collect(Storage::files('exports'))
+            ->filter(fn($f) => str_ends_with($f, '.csv.gz'))
+            ->map(fn($f) => [
+                'name' => basename($f),
+                'path' => $f,
+                'size' => round(Storage::size($f) / 1024 / 1024, 2),
+                'date' => Carbon::createFromTimestamp(Storage::lastModified($f)),
+            ])
+            ->sortByDesc('date')
+            ->values();
+
+        return view('admin.cdr.exports', compact('files'));
+    }
+
+    /**
+     * Download an export file.
+     */
+    public function downloadExport(string $filename)
+    {
+        $path = 'exports/' . basename($filename);
+
+        if (!Storage::exists($path)) {
+            return back()->with('error', 'Export file not found.');
+        }
+
+        return Storage::download($path, basename($filename), [
+            'Content-Type' => 'application/gzip',
+        ]);
+    }
+
+    /**
+     * Trigger restore of archived CDR month via Python Celery task.
+     */
+    public function restoreArchive(Request $request)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $validated = $request->validate([
+            'month' => ['required', 'date_format:Y-m'],
+        ]);
+
+        [$year, $month] = explode('-', $validated['month']);
+
+        // Check if already restoring/restored
+        $key = "rswitch:restored_archive:{$validated['month']}";
+        if (Redis::exists($key)) {
+            return back()->with('info', "Archive for {$validated['month']} is already restored (available for 24h).");
+        }
+
+        // Check if archive files exist
+        $archiveDir = '/var/backups/rswitch/cdr';
+        $pattern = "cdr-{$validated['month']}-*.csv.gz";
+        $files = glob("{$archiveDir}/{$pattern}");
+
+        if (empty($files)) {
+            return back()->with('error', "No archive files found for {$validated['month']}.");
+        }
+
+        // Trigger Celery task via Python API
+        try {
+            $pythonApiUrl = config('services.python_api.url', 'http://127.0.0.1:8001');
+            Http::post("{$pythonApiUrl}/tasks/restore-cdr-archive", [
+                'year' => (int) $year,
+                'month' => (int) $month,
+            ]);
+        } catch (\Exception $e) {
+            // Fallback: dispatch via Redis directly
+            Redis::rpush('celery', json_encode([
+                'id' => \Str::uuid()->toString(),
+                'task' => 'billing.tasks.restore_cdr_archive',
+                'args' => [(int) $year, (int) $month],
+                'kwargs' => [],
+            ]));
+        }
+
+        return back()->with('success', "Restoring CDR archive for {$validated['month']}. This may take 5-10 minutes. Data will be available for 24 hours.");
+    }
+
+    /**
+     * Check available archive months for restore.
+     */
+    public function availableArchives()
+    {
+        $archiveDir = '/var/backups/rswitch/cdr';
+        $months = [];
+
+        if (is_dir($archiveDir)) {
+            $files = glob("{$archiveDir}/cdr-*.csv.gz");
+            foreach ($files as $file) {
+                // Extract month from filename: cdr-2025-07-15.csv.gz → 2025-07
+                if (preg_match('/cdr-(\d{4}-\d{2})-\d{2}\.csv\.gz/', basename($file), $m)) {
+                    $months[$m[1]] = ($months[$m[1]] ?? 0) + 1;
+                }
+            }
+        }
+
+        ksort($months);
+
+        // Check which are currently restored
+        $restored = [];
+        foreach ($months as $month => $dayCount) {
+            $key = "rswitch:restored_archive:{$month}";
+            $restored[$month] = Redis::exists($key) ? true : false;
+        }
+
+        return response()->json([
+            'months' => $months,
+            'restored' => $restored,
+        ]);
     }
 }

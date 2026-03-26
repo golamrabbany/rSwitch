@@ -237,6 +237,8 @@
                 </div>
             </div>
 
+            <x-cdr-archive-banner />
+
             {{-- Table --}}
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">

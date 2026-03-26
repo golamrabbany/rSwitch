@@ -185,4 +185,126 @@
             </div>
         </div>
     @endif
+
+    {{-- Transit P&L Section --}}
+    @if(isset($transitData) && $transitData->count() > 0)
+        <div class="mt-8">
+            <div class="page-header-row mb-4">
+                <div>
+                    <h2 class="page-title">Transit P&L (Trunk-to-Trunk)</h2>
+                    <p class="page-subtitle">Revenue and cost by trunk pair</p>
+                </div>
+            </div>
+
+            {{-- Transit Stats --}}
+            <div class="mb-5" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:1rem;">
+                <div class="stat-card">
+                    <div class="stat-icon bg-indigo-100">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <p class="stat-value">{{ number_format($transitTotalCalls) }}</p>
+                        <p class="stat-label">Transit Calls</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-indigo-100">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <p class="stat-value">{{ number_format($transitTotalMinutes, 0) }}</p>
+                        <p class="stat-label">Minutes</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-emerald-100">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <p class="stat-value text-emerald-600">{{ format_currency($transitTotalRevenue) }}</p>
+                        <p class="stat-label">Revenue</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-red-100">
+                        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <p class="stat-value text-red-600">{{ format_currency($transitTotalCost) }}</p>
+                        <p class="stat-label">Trunk Cost</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon {{ $transitTotalProfit >= 0 ? 'bg-emerald-100' : 'bg-red-100' }}">
+                        <svg class="w-5 h-5 {{ $transitTotalProfit >= 0 ? 'text-emerald-600' : 'text-red-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <p class="stat-value {{ $transitTotalProfit >= 0 ? 'text-emerald-600' : 'text-red-600' }}">{{ format_currency($transitTotalProfit) }}</p>
+                        <p class="stat-label">Profit</p>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Transit Table --}}
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                        {{ $transitData->count() }} trunk pairs
+                    </span>
+                </div>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Incoming Trunk</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Outgoing Trunk</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Calls</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Minutes</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Revenue</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Cost</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Profit</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Margin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($transitData as $row)
+                            <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100">
+                                <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $loop->iteration }}</td>
+                                <td class="px-3 py-2 font-medium text-gray-900">{{ $row->incoming_trunk_name }}</td>
+                                <td class="px-3 py-2 font-medium text-gray-900">{{ $row->outgoing_trunk_name }}</td>
+                                <td class="px-3 py-2 text-right tabular-nums text-gray-700">{{ number_format($row->total_calls) }}</td>
+                                <td class="px-3 py-2 text-right tabular-nums text-gray-700">{{ number_format($row->minutes, 0) }}</td>
+                                <td class="px-3 py-2 text-right tabular-nums font-bold text-emerald-600">{{ format_currency($row->revenue) }}</td>
+                                <td class="px-3 py-2 text-right tabular-nums font-bold text-red-600">{{ format_currency($row->cost) }}</td>
+                                <td class="px-3 py-2 text-right tabular-nums font-bold {{ $row->profit >= 0 ? 'text-emerald-600' : 'text-red-600' }}">{{ format_currency($row->profit) }}</td>
+                                <td class="px-3 py-2 text-right tabular-nums {{ $row->margin_pct >= 0 ? 'text-emerald-600' : 'text-red-600' }}">{{ $row->margin_pct }}%</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-gray-100 font-semibold border-t-2 border-gray-300">
+                            <td class="px-3 py-2" colspan="3">Total</td>
+                            <td class="px-3 py-2 text-right tabular-nums">{{ number_format($transitTotalCalls) }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums">{{ number_format($transitTotalMinutes, 0) }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums text-emerald-600">{{ format_currency($transitTotalRevenue) }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums text-red-600">{{ format_currency($transitTotalCost) }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums {{ $transitTotalProfit >= 0 ? 'text-emerald-600' : 'text-red-600' }}">{{ format_currency($transitTotalProfit) }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums">{{ $transitTotalRevenue > 0 ? round(($transitTotalProfit / $transitTotalRevenue) * 100, 1) : 0 }}%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    @endif
 </x-admin-layout>

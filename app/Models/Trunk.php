@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Trunk extends Model
@@ -12,7 +13,7 @@ class Trunk extends Model
 
     protected $fillable = [
         'name', 'provider', 'direction', 'host', 'port', 'username', 'password',
-        'register', 'register_string', 'transport', 'codec_allow', 'max_channels',
+        'register', 'register_string', 'transport', 'codec_allow', 'max_channels', 'rate_group_id',
         'outgoing_priority',
         'dial_pattern_match', 'dial_pattern_replace', 'dial_prefix', 'dial_strip_digits', 'tech_prefix',
         'cli_mode', 'cli_override_number', 'cli_prefix_strip', 'cli_prefix_add',
@@ -33,6 +34,11 @@ class Trunk extends Model
             'health_last_checked_at' => 'datetime',
             'health_last_up_at' => 'datetime',
         ];
+    }
+
+    public function rateGroup(): BelongsTo
+    {
+        return $this->belongsTo(RateGroup::class);
     }
 
     public function routes(): HasMany

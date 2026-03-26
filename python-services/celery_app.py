@@ -37,6 +37,11 @@ app.conf.update(
         "billing.tasks.rate_and_charge": {"queue": "billing"},
         "billing.tasks.rate_batch": {"queue": "billing"},
         "billing.credit_control.check_balances": {"queue": "billing"},
+        "billing.tasks.daily_call_summary": {"queue": "billing"},
+        "billing.tasks.hangup_reseller_calls": {"queue": "billing"},
+        "billing.tasks.partition_maintenance": {"queue": "billing"},
+        "billing.tasks.restore_cdr_archive": {"queue": "billing"},
+        "billing.tasks.cleanup_restored_partitions": {"queue": "billing"},
         "broadcast.tasks.*": {"queue": "broadcast"},
         "monitoring.tasks.*": {"queue": "monitoring"},
     },
@@ -62,6 +67,21 @@ app.conf.update(
         "cleanup-stuck-broadcast-numbers": {
             "task": "broadcast.tasks.cleanup_stuck_broadcast_numbers",
             "schedule": 120.0,
+        },
+        # Daily call charge aggregation at 00:05 UTC
+        "daily-call-summary": {
+            "task": "billing.tasks.daily_call_summary",
+            "schedule": crontab(hour=0, minute=5),
+        },
+        # Partition maintenance at 00:10 UTC (create future, archive+drop old)
+        "partition-maintenance": {
+            "task": "billing.tasks.partition_maintenance",
+            "schedule": crontab(hour=0, minute=10),
+        },
+        # Cleanup restored archive partitions (hourly check)
+        "cleanup-restored-partitions": {
+            "task": "billing.tasks.cleanup_restored_partitions",
+            "schedule": 3600.0,  # every hour
         },
     },
 )

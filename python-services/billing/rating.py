@@ -40,9 +40,10 @@ class CostResult:
 
 @dataclass
 class ResolvedRates:
-    """Sell rate (user's group) and optional cost rate (parent group)."""
+    """Sell rate (user's group), optional cost rate (reseller), optional trunk rate (provider)."""
     sell: Rate
     cost: Optional[Rate]
+    trunk: Optional[Rate] = None
 
 
 class RatingService:
@@ -206,15 +207,16 @@ class RatingService:
         destination: str,
         rate_group_id: int,
         reseller_id: Optional[int] = None,
+        trunk_id: Optional[int] = None,
         at_time: Optional[date] = None,
         session: Optional[Session] = None,
     ) -> ResolvedRates:
         """
-        Resolve both sell rate (user's group) and cost rate (reseller's group).
-        Raises RateNotFoundException if no sell rate found.
+        Resolve sell rate (user's group), cost rate (reseller's group),
+        and trunk rate (provider's group).
 
-        Cost rate uses reseller_id from CDR (captured at call time) — NOT
-        the current user.parent_id, which could change if client was moved.
+        Cost rate uses reseller_id from CDR (captured at call time).
+        Trunk rate uses outgoing_trunk_id from CDR.
         """
         at_time = at_time or date.today()
 
@@ -223,20 +225,23 @@ class RatingService:
             raise RateNotFoundException(destination, rate_group_id)
 
         cost_rate = None
+        trunk_rate = None
 
-        if reseller_id:
-            if session is None:
-                from shared.database import get_session
-                with get_session() as s:
-                    cost_rate = self._find_cost_rate(
-                        s, destination, reseller_id, at_time
-                    )
-            else:
-                cost_rate = self._find_cost_rate(
-                    session, destination, reseller_id, at_time
-                )
+        def _resolve(sess):
+            nonlocal cost_rate, trunk_rate
+            if reseller_id:
+                cost_rate = self._find_cost_rate(sess, destination, reseller_id, at_time)
+            if trunk_id:
+                trunk_rate = self._find_trunk_rate(sess, destination, trunk_id, at_time)
 
-        return ResolvedRates(sell=sell_rate, cost=cost_rate)
+        if session is None:
+            from shared.database import get_session
+            with get_session() as s:
+                _resolve(s)
+        else:
+            _resolve(session)
+
+        return ResolvedRates(sell=sell_rate, cost=cost_rate, trunk=trunk_rate)
 
     def _find_cost_rate(
         self,
@@ -259,6 +264,96 @@ class RatingService:
         if reseller.role == 'reseller' and reseller.rate_group_id:
             return self.find_rate(destination, reseller.rate_group_id, at_time, session)
         return None
+
+    def _find_trunk_rate(
+        self,
+        session: Session,
+        destination: str,
+        trunk_id: int,
+        at_time: date,
+    ) -> Optional[Rate]:
+        """
+        Find trunk rate from the outgoing trunk's rate group (provider's rate card).
+        Used to calculate platform's actual cost per call.
+        """
+        from sqlalchemy import text as sa_text
+        row = session.execute(
+            sa_text("SELECT rate_group_id FROM trunks WHERE id = :tid"),
+            {"tid": trunk_id},
+        ).first()
+        if row and row.rate_group_id:
+            return self.find_rate(destination, row.rate_group_id, at_time, session)
+        return None
+
+    def _rate_transit_call(self, session: Session, cdr, destination: str) -> dict:
+        """
+        Rate a trunk-to-trunk transit call.
+
+        Revenue = incoming trunk's rate group (what provider pays platform)
+        Cost = outgoing trunk's rate group (what platform pays provider)
+        No user balance involved — transit is invoice-based.
+        """
+        at_time = cdr.call_start.date() if cdr.call_start else date.today()
+        call_record_id = cdr.id
+
+        # Find incoming trunk rate (revenue)
+        incoming_rate = None
+        if cdr.incoming_trunk_id:
+            incoming_rate = self._find_trunk_rate(session, destination, cdr.incoming_trunk_id, at_time)
+
+        # Find outgoing trunk rate (cost)
+        outgoing_rate = None
+        if cdr.outgoing_trunk_id:
+            outgoing_rate = self._find_trunk_rate(session, destination, cdr.outgoing_trunk_id, at_time)
+
+        if not incoming_rate and not outgoing_rate:
+            logger.info(f"rate_call: transit no rates [cdr={call_record_id}]")
+            cdr.status = "unbillable"
+            cdr.rated_at = datetime.now()
+            session.commit()
+            return {"status": "unbillable", "reason": "no_trunk_rate", "call_flow": "trunk_to_trunk"}
+
+        # Calculate revenue (incoming trunk rate)
+        if incoming_rate:
+            revenue = self.calculate_cost(cdr.billsec, incoming_rate)
+            cdr.total_cost = revenue.total_cost
+            cdr.matched_prefix = incoming_rate.prefix
+            cdr.rate_per_minute = incoming_rate.rate_per_minute
+            cdr.connection_fee = incoming_rate.connection_fee
+            cdr.billable_duration = revenue.billable_duration
+        else:
+            cdr.total_cost = Decimal("0.0000")
+            cdr.billable_duration = cdr.billsec
+
+        # Calculate cost (outgoing trunk rate)
+        if outgoing_rate:
+            cost = self.calculate_cost(cdr.billsec, outgoing_rate)
+            cdr.trunk_cost = cost.total_cost
+        else:
+            cdr.trunk_cost = Decimal("0.0000")
+
+        # No reseller involved in transit
+        cdr.reseller_cost = Decimal("0.0000")
+
+        cdr.status = "rated"
+        cdr.rated_at = datetime.now()
+        session.commit()
+
+        logger.info(
+            f"rate_call: transit rated [cdr={call_record_id}, "
+            f"revenue={cdr.total_cost}, trunk_cost={cdr.trunk_cost}]"
+        )
+
+        return {
+            "status": "rated",
+            "call_record_id": call_record_id,
+            "call_flow": "trunk_to_trunk",
+            "matched_prefix": cdr.matched_prefix or "",
+            "total_cost": str(cdr.total_cost),
+            "reseller_cost": "0.0000",
+            "trunk_cost": str(cdr.trunk_cost),
+            "billable_duration": cdr.billable_duration,
+        }
 
     # ─────────────────────────────────────────────────────
     # calculate_cost — Decimal precision (matches PHP bcmath)
@@ -329,12 +424,18 @@ class RatingService:
                     "matched_prefix": cdr.matched_prefix,
                     "total_cost": str(cdr.total_cost),
                     "reseller_cost": str(cdr.reseller_cost),
+                    "trunk_cost": str(cdr.trunk_cost),
                     "billable_duration": cdr.billable_duration,
                 }
 
             # Use destination if it looks like a phone number, otherwise use callee
             raw_dest = cdr.destination or ""
             destination = raw_dest if any(c.isdigit() for c in raw_dest) else cdr.callee
+
+            # ── Transit calls (trunk_to_trunk): no user, use trunk rates ──
+            if cdr.call_flow == "trunk_to_trunk":
+                return self._rate_transit_call(session, cdr, destination)
+
             user = session.query(User).get(cdr.user_id)
 
             # No user or rate group → unbillable (same as PHP)
@@ -348,13 +449,17 @@ class RatingService:
                 session.commit()
                 return {"status": "unbillable", "reason": "no_rate_group"}
 
-            # Find sell + cost rates
-            # Uses cdr.reseller_id (captured at call time) for cost rate lookup
+            # Find sell + cost + trunk rates
+            # Uses cdr.reseller_id and cdr.outgoing_trunk_id (captured at call time)
+            # Use outgoing_trunk_id for outbound, incoming_trunk_id for inbound
+            trunk_id_for_cost = cdr.outgoing_trunk_id or cdr.incoming_trunk_id
+
             try:
                 rates = self.resolve_rates(
                     destination,
                     user.rate_group_id,
                     reseller_id=cdr.reseller_id,
+                    trunk_id=trunk_id_for_cost,
                     at_time=cdr.call_start.date() if cdr.call_start else date.today(),
                     session=session,
                 )
@@ -376,7 +481,7 @@ class RatingService:
             # Calculate sell cost
             sell = self.calculate_cost(cdr.billsec, rates.sell)
 
-            # Calculate cost (admin/reseller cost) if parent rate group exists
+            # Calculate reseller cost (what reseller pays platform)
             cost = (
                 self.calculate_cost(cdr.billsec, rates.cost)
                 if rates.cost
@@ -386,7 +491,17 @@ class RatingService:
                 )
             )
 
-            # Update CDR — same fields as PHP rateCall()
+            # Calculate trunk cost (what platform pays trunk provider)
+            trunk_cost = (
+                self.calculate_cost(cdr.billsec, rates.trunk)
+                if rates.trunk
+                else CostResult(
+                    billable_duration=sell.billable_duration,
+                    total_cost=Decimal("0.0000"),
+                )
+            )
+
+            # Update CDR
             cdr.matched_prefix = rates.sell.prefix
             cdr.rate_per_minute = rates.sell.rate_per_minute
             cdr.connection_fee = rates.sell.connection_fee
@@ -394,13 +509,15 @@ class RatingService:
             cdr.billable_duration = sell.billable_duration
             cdr.total_cost = sell.total_cost
             cdr.reseller_cost = cost.total_cost
+            cdr.trunk_cost = trunk_cost.total_cost
             cdr.status = "rated"
             cdr.rated_at = datetime.now()
             session.commit()
 
             logger.info(
                 f"rate_call: rated [cdr={call_record_id}, "
-                f"prefix={rates.sell.prefix}, cost={sell.total_cost}]"
+                f"prefix={rates.sell.prefix}, sell={sell.total_cost}, "
+                f"reseller={cost.total_cost}, trunk={trunk_cost.total_cost}]"
             )
 
             return {
@@ -409,6 +526,7 @@ class RatingService:
                 "matched_prefix": rates.sell.prefix,
                 "total_cost": str(sell.total_cost),
                 "reseller_cost": str(cost.total_cost),
+                "trunk_cost": str(trunk_cost.total_cost),
                 "billable_duration": sell.billable_duration,
             }
 

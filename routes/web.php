@@ -126,6 +126,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::get('cdr', [Admin\CdrController::class, 'index'])->name('cdr.index');
     Route::get('cdr/export', [Admin\CdrController::class, 'export'])->name('cdr.export');
+    Route::post('cdr/export-monthly', [Admin\CdrController::class, 'exportMonthly'])->name('cdr.export-monthly');
+    Route::get('cdr/exports', [Admin\CdrController::class, 'exportFiles'])->name('cdr.exports');
+    Route::get('cdr/exports/{filename}', [Admin\CdrController::class, 'downloadExport'])->name('cdr.download-export');
+    Route::post('cdr/restore-archive', [Admin\CdrController::class, 'restoreArchive'])->name('cdr.restore-archive');
+    Route::get('cdr/available-archives', [Admin\CdrController::class, 'availableArchives'])->name('cdr.available-archives');
     Route::get('cdr/{uuid}', [Admin\CdrController::class, 'show'])->name('cdr.show');
     Route::get('cdr/{uuid}/recording', [Admin\RecordingController::class, 'play'])->name('cdr.recording');
 
@@ -136,6 +141,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('operational-reports/inbound/export', [Admin\OperationalReportController::class, 'exportInboundCalls'])->name('operational-reports.inbound.export');
     Route::get('operational-reports/outbound', [Admin\OperationalReportController::class, 'outboundCalls'])->name('operational-reports.outbound');
     Route::get('operational-reports/outbound/export', [Admin\OperationalReportController::class, 'exportOutboundCalls'])->name('operational-reports.outbound.export');
+    Route::get('operational-reports/transit', [Admin\OperationalReportController::class, 'transitCalls'])->name('operational-reports.transit');
     Route::get('operational-reports/p2p', [Admin\OperationalReportController::class, 'p2pCalls'])->name('operational-reports.p2p');
     Route::get('operational-reports/summary', [Admin\OperationalReportController::class, 'summaryCalls'])->name('operational-reports.summary');
     Route::get('operational-reports/daily', [Admin\OperationalReportController::class, 'dailySummary'])->name('operational-reports.daily');

@@ -138,6 +138,30 @@ update_application() {
     sudo -u www-data php artisan route:cache
     sudo -u www-data php artisan view:cache
 
+    # Update MySQL tuning if template exists
+    if [[ -f "$INSTALL_DIR/installer/templates/mysql-tuning.cnf.template" ]]; then
+        TOTAL_RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
+        BUFFER_POOL_MB=$((TOTAL_RAM_MB * 65 / 100))
+        BUFFER_POOL_SIZE="${BUFFER_POOL_MB}M"
+
+        if [[ -d "/etc/mysql/mysql.conf.d" ]]; then
+            MYSQL_CONF_DIR="/etc/mysql/mysql.conf.d"
+        else
+            MYSQL_CONF_DIR="/etc/my.cnf.d"
+        fi
+
+        sed "s/__BUFFER_POOL_SIZE__/${BUFFER_POOL_SIZE}/" \
+            "$INSTALL_DIR/installer/templates/mysql-tuning.cnf.template" \
+            > "${MYSQL_CONF_DIR}/rswitch-tuning.cnf"
+
+        systemctl restart mysql 2>/dev/null || systemctl restart mysqld 2>/dev/null
+        log_info "MySQL tuning updated (buffer_pool=${BUFFER_POOL_SIZE})"
+    fi
+
+    # Ensure CDR archive directory exists
+    mkdir -p /var/backups/rswitch/cdr
+    chown www-data:www-data /var/backups/rswitch/cdr 2>/dev/null || true
+
     # Update Asterisk configs from templates
     log_info "Updating Asterisk configuration..."
     if [[ -d "$INSTALL_DIR/installer/templates/asterisk" ]]; then

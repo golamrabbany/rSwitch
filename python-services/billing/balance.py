@@ -52,10 +52,13 @@ class BalanceService:
         created_by: Optional[int] = None,
         source: Optional[str] = None,
         remarks: Optional[str] = None,
-    ) -> Transaction:
+        create_transaction: bool = True,
+    ) -> Optional[Transaction]:
         """
         Debit a user's balance atomically with row-level locking.
         Raises InsufficientBalanceException for prepaid users with low balance.
+
+        Set create_transaction=False for call charges (aggregated daily).
         """
         if amount <= Decimal("0"):
             raise ValueError("Debit amount must be positive")
@@ -86,6 +89,15 @@ class BalanceService:
 
         # Update user balance
         locked_user.balance = new_balance
+
+        # Skip transaction record for call charges (aggregated daily at midnight)
+        if not create_transaction:
+            session.flush()
+            logger.info(
+                f"debit (no txn): user={user_id}, amount={amount}, "
+                f"new_balance={new_balance}, type={type}"
+            )
+            return None
 
         # Create transaction record
         transaction = Transaction()
@@ -221,16 +233,12 @@ class BalanceService:
         """
         Charge a client (and optionally their reseller) for a rated call.
 
-        Both deductions happen in a SINGLE database transaction when possible.
-        If reseller debit fails (insufficient balance), the client charge
-        still commits — because the call already happened, we must not
-        lose revenue from the client.
+        Balance is deducted in real-time but NO Transaction records are created.
+        Transactions are aggregated daily at midnight by the daily_call_summary task.
+        CDR status is set to 'charged' for idempotency (prevents double charge on retry).
 
-        The InsufficientBalanceException in debit() is raised BEFORE any
-        DB writes (it's a Python-level check), so the session stays clean
-        and the client's pending changes can still commit safely.
-
-        Returns dict with charge results.
+        Both deductions happen in a SINGLE database transaction.
+        If reseller debit fails, client charge still commits.
         """
         from shared.database import get_session
 
@@ -239,31 +247,32 @@ class BalanceService:
             if not cdr:
                 raise ValueError(f"CallRecord {call_record_id} not found")
 
-            # ── Idempotency check: prevent double charge on Celery retry ──
-            existing_txn = (
-                session.query(Transaction)
-                .filter(
-                    Transaction.reference_type == "call_record",
-                    Transaction.reference_id == cdr.id,
-                    Transaction.type == "call_charge",
-                )
-                .first()
-            )
-            if existing_txn:
+            # ── Transit calls: no balance deduction (invoice-based) ──
+            if cdr.call_flow == "trunk_to_trunk":
+                cdr.status = "charged"
+                session.commit()
+                logger.info(f"charge_call: transit — no balance deduction [cdr={call_record_id}]")
+                return {"client_charged": False, "reseller_charged": False}
+
+            # ── Inbound calls: no balance deduction (free for receiver) ──
+            # CDR is still rated (total_cost, trunk_cost tracked for reporting)
+            if cdr.call_flow == "trunk_to_sip":
+                cdr.status = "charged"
+                session.commit()
+                logger.info(f"charge_call: inbound — no balance deduction [cdr={call_record_id}]")
+                return {"client_charged": False, "reseller_charged": False}
+
+            # ── Idempotency: skip if already charged ──
+            if cdr.status == "charged":
                 logger.info(
-                    f"charge_call: SKIPPED — already charged "
-                    f"[cdr={call_record_id}, txn={existing_txn.id}]"
+                    f"charge_call: SKIPPED — already charged [cdr={call_record_id}]"
                 )
                 return {
-                    "client_transaction": existing_txn,
-                    "reseller_transaction": None,
                     "client_charged": True,
-                    "reseller_charged": True,  # Assume reseller was handled
+                    "reseller_charged": True,
                 }
 
             result = {
-                "client_transaction": None,
-                "reseller_transaction": None,
                 "client_charged": False,
                 "reseller_charged": False,
             }
@@ -271,72 +280,32 @@ class BalanceService:
             client_amount = Decimal(str(cdr.total_cost or 0))
             reseller_amount = Decimal(str(cdr.reseller_cost or 0))
 
-            # ── Step 1: Charge the client ──
+            # ── Step 1: Debit client balance (no Transaction record) ──
             if client_amount > Decimal("0"):
-                client_txn = self.debit(
+                self.debit(
                     session=session,
                     user_id=cdr.user_id,
                     amount=client_amount,
                     type="call_charge",
-                    reference_type="call_record",
-                    reference_id=cdr.id,
-                    description=(
-                        f"Call to {cdr.callee} "
-                        f"({cdr.billable_duration}s @ {cdr.rate_per_minute}/min)"
-                    ),
+                    create_transaction=False,
                 )
-                result["client_transaction"] = client_txn
                 result["client_charged"] = True
-            else:
-                # Zero-cost call — log a zero transaction
-                locked_user = (
-                    session.query(User)
-                    .filter(User.id == cdr.user_id)
-                    .with_for_update()
-                    .first()
-                )
-                if locked_user:
-                    transaction = Transaction()
-                    transaction.user_id = locked_user.id
-                    transaction.type = "call_charge"
-                    transaction.amount = Decimal("0.0000")
-                    transaction.balance_after = Decimal(str(locked_user.balance))
-                    transaction.reference_type = "call_record"
-                    transaction.reference_id = cdr.id
-                    transaction.description = (
-                        f"Call to {cdr.callee} ({cdr.billable_duration}s) - zero cost"
-                    )
-                    transaction.created_at = datetime.now()
-                    session.add(transaction)
-                    session.flush()
-                    result["client_transaction"] = transaction
-                    result["client_charged"] = True
 
-            # ── Step 2: Charge the reseller (same transaction) ──
-            # Uses cdr.reseller_id (captured at call time) — NOT user.parent_id
-            # (which could change if client moved between resellers after call).
-            # If reseller debit fails, client charge still commits.
+            # ── Step 2: Debit reseller balance (no Transaction record) ──
+            # Uses cdr.reseller_id (captured at call time)
             if reseller_amount > Decimal("0") and cdr.reseller_id:
                 parent = session.query(User).get(cdr.reseller_id)
                 if parent and parent.role != 'super_admin':
                     try:
-                        reseller_txn = self.debit(
+                        self.debit(
                             session=session,
                             user_id=parent.id,
                             amount=reseller_amount,
                             type="reseller_call_charge",
-                            reference_type="call_record",
-                            reference_id=cdr.id,
-                            description=(
-                                f"Reseller cost: call to {cdr.callee} "
-                                f"({cdr.billable_duration}s)"
-                            ),
+                            create_transaction=False,
                         )
-                        result["reseller_transaction"] = reseller_txn
                         result["reseller_charged"] = True
                     except InsufficientBalanceException as e:
-                        # Reseller can't pay — but call already happened.
-                        # Client charge must still commit. Reseller owes a debt.
                         logger.warning(
                             f"charge_call: reseller insufficient balance "
                             f"[cdr={call_record_id}, reseller={e.user_id}, "
@@ -344,11 +313,12 @@ class BalanceService:
                             f"— client still charged, blocking reseller"
                         )
                         result["reseller_charged"] = False
-
-                        # Block reseller + hangup active calls
                         self._block_reseller(parent.id)
 
-            # ── Commit: client always charged, reseller if possible ──
+            # ── Mark CDR as charged (idempotency marker) ──
+            cdr.status = "charged"
+
+            # ── Single commit: balance deductions + CDR status ──
             session.commit()
 
             logger.info(

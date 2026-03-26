@@ -176,7 +176,7 @@
                 </a>
 
                 <!-- Operational Reports -->
-                @php $operationalActive = request()->routeIs('admin.operational-reports.*'); @endphp
+                @php $operationalActive = request()->routeIs('admin.operational-reports.*') && !request()->routeIs('admin.operational-reports.profit-loss*'); @endphp
                 <div x-data="{ open: {{ $operationalActive ? 'true' : 'false' }} }" class="mb-1">
                     <button @click="open = !open" class="nav-parent {{ $operationalActive ? 'has-active' : 'text-gray-600' }}">
                         <div class="flex items-center">
@@ -195,6 +195,7 @@
                         <a href="{{ route('admin.operational-reports.inbound') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.inbound') ? 'active' : 'text-gray-500' }}">Inbound Calls</a>
                         <a href="{{ route('admin.operational-reports.outbound') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.outbound') ? 'active' : 'text-gray-500' }}">Outbound Calls</a>
                         <a href="{{ route('admin.operational-reports.p2p') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.p2p') ? 'active' : 'text-gray-500' }}">P2P Calls</a>
+                        <a href="{{ route('admin.operational-reports.transit') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.transit') ? 'active' : 'text-gray-500' }}">Transit Calls</a>
                         <a href="{{ route('admin.operational-reports.summary') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.summary') ? 'active' : 'text-gray-500' }}">Call Summary</a>
                         <a href="{{ route('admin.operational-reports.hourly') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.hourly') ? 'active' : 'text-gray-500' }}">Hourly Summary</a>
                         <a href="{{ route('admin.operational-reports.daily') }}" class="nav-child {{ request()->routeIs('admin.operational-reports.daily') ? 'active' : 'text-gray-500' }}">Daily Summary</a>

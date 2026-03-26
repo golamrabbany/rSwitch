@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\RateGroup;
 use App\Models\Trunk;
 use App\Services\AuditService;
 use App\Services\TrunkProvisioningService;
@@ -43,7 +44,9 @@ class TrunkController extends Controller
 
     public function create()
     {
-        return view('admin.trunks.create');
+        $rateGroups = RateGroup::where('type', 'admin')->orderBy('name')->get();
+
+        return view('admin.trunks.create', compact('rateGroups'));
     }
 
     public function store(Request $request)
@@ -75,7 +78,9 @@ class TrunkController extends Controller
 
     public function edit(Trunk $trunk)
     {
-        return view('admin.trunks.edit', compact('trunk'));
+        $rateGroups = RateGroup::where('type', 'admin')->orderBy('name')->get();
+
+        return view('admin.trunks.edit', compact('trunk', 'rateGroups'));
     }
 
     public function update(Request $request, Trunk $trunk)
@@ -138,6 +143,7 @@ class TrunkController extends Controller
             'transport'         => ['required', Rule::in(['udp', 'tcp', 'tls'])],
             'codec_allow'       => ['required', 'string', 'max:100'],
             'max_channels'      => ['required', 'integer', 'min:1', 'max:9999'],
+            'rate_group_id'     => ['nullable', 'exists:rate_groups,id'],
 
             // Authentication
             'username'          => ['nullable', 'string', 'max:100'],

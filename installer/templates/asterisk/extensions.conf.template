@@ -53,6 +53,7 @@ exten => _X.,1,NoOp(Outbound call from ${CALLERID(all)} to ${EXTEN})
  same => n,Hangup()
 
 ; --- Context: Incoming calls from trunks ---
+; Handles both inbound (Trunk → SIP) and transit (Trunk → Trunk)
 [from-trunk]
 exten => _X.,1,NoOp(Inbound call from ${CALLERID(all)} to DID ${EXTEN})
  same => n,Set(CHANNEL(language)=en)
@@ -61,7 +62,17 @@ exten => _X.,1,NoOp(Inbound call from ${CALLERID(all)} to DID ${EXTEN})
  same => n,AGI(agi://${AGI_HOST}:${AGI_PORT}/route_inbound)
  same => n,GotoIf($["${AGISTATUS}" != "SUCCESS"]?error)
  same => n,GotoIf($["${ROUTE_ACTION}" = "REJECT"]?reject)
+ ; Set CLI if transit handler provided it (inbound-to-SIP preserves original CLI)
+ same => n,ExecIf($["${ROUTE_CLI_NUM}" != ""]?Set(CALLERID(num)=${ROUTE_CLI_NUM}))
+ ; Set max duration for transit calls (credit control)
+ same => n,ExecIf($["${RSWITCH_MAX_DURATION}" != ""]?Set(CHANNEL(ABSOLUTE_TIMEOUT)=${RSWITCH_MAX_DURATION}))
+ ; Primary dial
  same => n,Dial(${ROUTE_DIAL_STRING},${ROUTE_DIAL_TIMEOUT},gT)
+ ; Failover trunk (transit calls set ROUTE_FAILOVER)
+ same => n,GotoIf($["${DIALSTATUS}" = "ANSWER"]?done)
+ same => n,GotoIf($["${ROUTE_FAILOVER}" = ""]?done)
+ same => n,NoOp(Primary failed: ${DIALSTATUS} — trying failover)
+ same => n,Dial(${ROUTE_FAILOVER},${ROUTE_DIAL_TIMEOUT},gT)
  same => n,Goto(done)
 
  same => n(reject),Answer()
@@ -73,7 +84,7 @@ exten => _X.,1,NoOp(Inbound call from ${CALLERID(all)} to DID ${EXTEN})
  same => n,Playback(an-error-has-occurred)
  same => n,Hangup()
 
- same => n(done),NoOp(Inbound call completed: ${DIALSTATUS})
+ same => n(done),NoOp(Inbound/Transit call completed: ${DIALSTATUS})
  same => n,Hangup()
 
 ; --- Context: Hangup handler for CDR finalization ---

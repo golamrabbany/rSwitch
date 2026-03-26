@@ -128,7 +128,7 @@ class CdrController extends Controller
         }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
-    private function resolveDateRange(Request $request, int $maxDays = 31): array
+    private function resolveDateRange(Request $request, int $maxDays = 7): array
     {
         $dateFrom = $request->filled('date_from')
             ? Carbon::parse($request->date_from)->startOfDay()

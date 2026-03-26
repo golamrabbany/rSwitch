@@ -543,6 +543,72 @@ class OperationalReportController extends Controller
     }
 
     /**
+     * Transit Calls List (Trunk-to-Trunk)
+     */
+    public function transitCalls(Request $request)
+    {
+        $query = CallRecord::with(['incomingTrunk', 'outgoingTrunk'])
+            ->where('call_flow', 'trunk_to_trunk');
+
+        // Date range filter
+        if ($request->filled('date_from')) {
+            $query->where('call_start', '>=', $request->date_from);
+        } else {
+            $query->where('call_start', '>=', now()->startOfDay());
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('call_start', '<=', $request->date_to . ' 23:59:59');
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('caller', 'like', $search . '%')
+                  ->orWhere('callee', 'like', $search . '%');
+            });
+        }
+
+        if ($request->filled('disposition')) {
+            $query->where('disposition', $request->disposition);
+        }
+
+        if ($request->filled('incoming_trunk_id')) {
+            $query->where('incoming_trunk_id', $request->incoming_trunk_id);
+        }
+
+        if ($request->filled('outgoing_trunk_id')) {
+            $query->where('outgoing_trunk_id', $request->outgoing_trunk_id);
+        }
+
+        $calls = $query->orderBy('call_start', 'desc')->paginate(50);
+
+        // Stats
+        $statsQuery = CallRecord::where('call_flow', 'trunk_to_trunk');
+        if ($request->filled('date_from')) {
+            $statsQuery->where('call_start', '>=', $request->date_from);
+        } else {
+            $statsQuery->where('call_start', '>=', now()->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $statsQuery->where('call_start', '<=', $request->date_to . ' 23:59:59');
+        }
+
+        $totalCalls = (clone $statsQuery)->count();
+        $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
+        $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
+        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
+
+        $incomingTrunks = Trunk::whereIn('direction', ['incoming', 'both'])->orderBy('name')->get();
+        $outgoingTrunks = Trunk::whereIn('direction', ['outgoing', 'both'])->orderBy('name')->get();
+
+        return view('admin.operational-reports.transit', compact(
+            'calls', 'totalCalls', 'answeredCalls', 'asr', 'totalMinutes',
+            'incomingTrunks', 'outgoingTrunks'
+        ));
+    }
+
+    /**
      * P2P Calls List (SIP-to-SIP internal calls)
      */
     public function p2pCalls(Request $request)
@@ -757,30 +823,55 @@ class OperationalReportController extends Controller
             $dateFrom = $dateTo->copy()->subDays(365)->startOfDay();
         }
 
-        // Build base query with partition-aware WHERE
-        $query = CallRecord::query()
-            ->whereBetween('call_start', [$dateFrom, $dateTo]);
+        // Use cdr_summary_daily (fast) unless trunk filter is applied (needs raw CDR)
+        $useSummary = !$request->filled('trunk_id');
 
-        // Multi-tenant scoping
-        if (!$authUser->isSuperAdmin()) {
-            $query->whereIn('user_id', $authUser->descendantIds());
+        if ($useSummary) {
+            $query = DB::table('cdr_summary_daily')
+                ->whereBetween('date', [$dateFrom->toDateString(), $dateTo->toDateString()]);
+
+            if (!$authUser->isSuperAdmin()) {
+                $query->whereIn('user_id', $authUser->descendantIds());
+            }
+            if ($request->filled('reseller_id')) {
+                $query->where('reseller_id', $request->reseller_id);
+            }
+            if ($request->filled('client_id')) {
+                $query->where('user_id', $request->client_id);
+            }
+
+            $rows = $query->selectRaw('
+                    date,
+                    SUM(total_calls) as total_calls,
+                    SUM(answered_calls) as answered_calls,
+                    SUM(total_calls) - SUM(answered_calls) as failed_calls,
+                    SUM(total_duration) as total_billsec
+                ')
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get();
+        } else {
+            // Trunk filter — must use call_records
+            $query = CallRecord::query()
+                ->whereBetween('call_start', [$dateFrom, $dateTo]);
+
+            if (!$authUser->isSuperAdmin()) {
+                $query->whereIn('user_id', $authUser->descendantIds());
+            }
+            $this->applyFilters($query, $request, $authUser);
+
+            $rows = (clone $query)
+                ->selectRaw('
+                    DATE(call_start) as date,
+                    COUNT(*) as total_calls,
+                    SUM(disposition = "ANSWERED") as answered_calls,
+                    SUM(disposition != "ANSWERED") as failed_calls,
+                    COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+                ')
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get();
         }
-
-        // Filters
-        $this->applyFilters($query, $request, $authUser);
-
-        // Group by date
-        $rows = (clone $query)
-            ->selectRaw('
-                DATE(call_start) as date,
-                COUNT(*) as total_calls,
-                SUM(disposition = "ANSWERED") as answered_calls,
-                SUM(disposition != "ANSWERED") as failed_calls,
-                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
-            ')
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get();
 
         // Compute ASR and ACD per row
         $rows->transform(function ($row) {
@@ -836,31 +927,56 @@ class OperationalReportController extends Controller
             $dateFrom = $dateTo->copy()->startOfMonth();
         }
 
-        // Build query
-        $query = CallRecord::query()
-            ->whereBetween('call_start', [$dateFrom, $dateTo]);
+        // Use cdr_summary_daily (fast) unless trunk filter is applied
+        $useSummary = !$request->filled('trunk_id');
 
-        // Multi-tenant scoping
-        if (!$authUser->isSuperAdmin()) {
-            $query->whereIn('user_id', $authUser->descendantIds());
+        if ($useSummary) {
+            $query = DB::table('cdr_summary_daily')
+                ->whereBetween('date', [$dateFrom->toDateString(), $dateTo->toDateString()]);
+
+            if (!$authUser->isSuperAdmin()) {
+                $query->whereIn('user_id', $authUser->descendantIds());
+            }
+            if ($request->filled('reseller_id')) {
+                $query->where('reseller_id', $request->reseller_id);
+            }
+            if ($request->filled('client_id')) {
+                $query->where('user_id', $request->client_id);
+            }
+
+            $rows = $query->selectRaw('
+                    YEAR(date) as year,
+                    MONTH(date) as month,
+                    SUM(total_calls) as total_calls,
+                    SUM(answered_calls) as answered_calls,
+                    SUM(total_calls) - SUM(answered_calls) as failed_calls,
+                    SUM(total_duration) as total_billsec
+                ')
+                ->groupByRaw('YEAR(date), MONTH(date)')
+                ->orderByRaw('YEAR(date), MONTH(date)')
+                ->get();
+        } else {
+            $query = CallRecord::query()
+                ->whereBetween('call_start', [$dateFrom, $dateTo]);
+
+            if (!$authUser->isSuperAdmin()) {
+                $query->whereIn('user_id', $authUser->descendantIds());
+            }
+            $this->applyFilters($query, $request, $authUser);
+
+            $rows = (clone $query)
+                ->selectRaw('
+                    YEAR(call_start) as year,
+                    MONTH(call_start) as month,
+                    COUNT(*) as total_calls,
+                    SUM(disposition = "ANSWERED") as answered_calls,
+                    SUM(disposition != "ANSWERED") as failed_calls,
+                    COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+                ')
+                ->groupByRaw('YEAR(call_start), MONTH(call_start)')
+                ->orderByRaw('YEAR(call_start), MONTH(call_start)')
+                ->get();
         }
-
-        // Filters
-        $this->applyFilters($query, $request, $authUser);
-
-        // Group by month
-        $rows = (clone $query)
-            ->selectRaw('
-                YEAR(call_start) as year,
-                MONTH(call_start) as month,
-                COUNT(*) as total_calls,
-                SUM(disposition = "ANSWERED") as answered_calls,
-                SUM(disposition != "ANSWERED") as failed_calls,
-                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
-            ')
-            ->groupByRaw('YEAR(call_start), MONTH(call_start)')
-            ->orderByRaw('YEAR(call_start), MONTH(call_start)')
-            ->get();
 
         // Compute ASR, ACD + month-over-month change
         $prevTotal = null;
@@ -931,31 +1047,56 @@ class OperationalReportController extends Controller
             $dateTo = $dateFrom->copy()->addDays(31)->endOfDay();
         }
 
-        // Build query
-        $query = CallRecord::query()
-            ->whereBetween('call_start', [$dateFrom, $dateTo]);
+        // Use cdr_summary_hourly (fast) unless trunk filter is applied
+        $useSummary = !$request->filled('trunk_id');
 
-        // Multi-tenant scoping
-        if (!$authUser->isSuperAdmin()) {
-            $query->whereIn('user_id', $authUser->descendantIds());
+        if ($useSummary) {
+            $query = DB::table('cdr_summary_hourly')
+                ->whereBetween('hour_start', [$dateFrom, $dateTo]);
+
+            if (!$authUser->isSuperAdmin()) {
+                $query->whereIn('user_id', $authUser->descendantIds());
+            }
+            if ($request->filled('reseller_id')) {
+                $query->where('reseller_id', $request->reseller_id);
+            }
+            if ($request->filled('client_id')) {
+                $query->where('user_id', $request->client_id);
+            }
+
+            $rawRows = $query->selectRaw('
+                    HOUR(hour_start) as hour,
+                    SUM(total_calls) as total_calls,
+                    SUM(answered_calls) as answered_calls,
+                    SUM(failed_calls) as failed_calls,
+                    SUM(total_duration) as total_billsec
+                ')
+                ->groupByRaw('HOUR(hour_start)')
+                ->orderByRaw('HOUR(hour_start)')
+                ->get()
+                ->keyBy('hour');
+        } else {
+            $query = CallRecord::query()
+                ->whereBetween('call_start', [$dateFrom, $dateTo]);
+
+            if (!$authUser->isSuperAdmin()) {
+                $query->whereIn('user_id', $authUser->descendantIds());
+            }
+            $this->applyFilters($query, $request, $authUser);
+
+            $rawRows = (clone $query)
+                ->selectRaw('
+                    HOUR(call_start) as hour,
+                    COUNT(*) as total_calls,
+                    SUM(disposition = "ANSWERED") as answered_calls,
+                    SUM(disposition != "ANSWERED") as failed_calls,
+                    COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+                ')
+                ->groupByRaw('HOUR(call_start)')
+                ->orderByRaw('HOUR(call_start)')
+                ->get()
+                ->keyBy('hour');
         }
-
-        // Filters
-        $this->applyFilters($query, $request, $authUser);
-
-        // Group by hour
-        $rawRows = (clone $query)
-            ->selectRaw('
-                HOUR(call_start) as hour,
-                COUNT(*) as total_calls,
-                SUM(disposition = "ANSWERED") as answered_calls,
-                SUM(disposition != "ANSWERED") as failed_calls,
-                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
-            ')
-            ->groupByRaw('HOUR(call_start)')
-            ->orderByRaw('HOUR(call_start)')
-            ->get()
-            ->keyBy('hour');
 
         // Build hour array — only up to current hour if viewing today
         $maxHour = $dateFrom->isToday() ? now()->hour + 1 : 24;
@@ -1365,19 +1506,21 @@ class OperationalReportController extends Controller
             $dateTo = $dateFrom->copy()->addDays(365)->endOfDay();
         }
 
-        $data = CallRecord::query()
-            ->whereBetween('call_start', [$dateFrom, $dateTo])
-            ->whereNotNull('reseller_id')
-            ->join('users', 'users.id', '=', 'call_records.reseller_id')
-            ->groupBy('call_records.reseller_id', 'users.name')
+        // Use cdr_summary_daily for fast P&L aggregation
+        $data = DB::table('cdr_summary_daily')
+            ->whereBetween('cdr_summary_daily.date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->whereNotNull('cdr_summary_daily.reseller_id')
+            ->join('users', 'users.id', '=', 'cdr_summary_daily.reseller_id')
+            ->groupBy('cdr_summary_daily.reseller_id', 'users.name')
             ->selectRaw('
-                call_records.reseller_id,
+                cdr_summary_daily.reseller_id,
                 users.name as reseller_name,
-                COUNT(*) as total_calls,
-                SUM(call_records.disposition = "ANSWERED") as answered_calls,
-                COALESCE(SUM(CASE WHEN call_records.disposition = "ANSWERED" THEN call_records.billable_duration ELSE 0 END), 0) as total_billable,
-                COALESCE(SUM(call_records.total_cost), 0) as client_revenue,
-                COALESCE(SUM(call_records.reseller_cost), 0) as reseller_cost
+                SUM(cdr_summary_daily.total_calls) as total_calls,
+                SUM(cdr_summary_daily.answered_calls) as answered_calls,
+                SUM(cdr_summary_daily.total_billable) as total_billable,
+                SUM(cdr_summary_daily.total_cost) as client_revenue,
+                SUM(cdr_summary_daily.total_reseller_cost) as reseller_cost,
+                SUM(cdr_summary_daily.total_trunk_cost) as trunk_cost
             ')
             ->orderByDesc('client_revenue')
             ->get();
@@ -1385,7 +1528,12 @@ class OperationalReportController extends Controller
         // Compute per-row derived fields
         $data->transform(function ($row) {
             $row->minutes = round($row->total_billable / 60, 2);
-            $row->profit = $row->client_revenue - $row->reseller_cost;
+            // Reseller profit = client revenue - reseller cost
+            $row->reseller_profit = $row->client_revenue - $row->reseller_cost;
+            // Platform profit = reseller cost - trunk cost (what platform keeps)
+            $row->platform_profit = $row->reseller_cost - $row->trunk_cost;
+            // Total profit = client revenue - trunk cost
+            $row->profit = $row->client_revenue - $row->trunk_cost;
             $row->margin_pct = $row->client_revenue > 0
                 ? round(($row->profit / $row->client_revenue) * 100, 1)
                 : 0;
@@ -1398,16 +1546,54 @@ class OperationalReportController extends Controller
         // Totals
         $totalRevenue = $data->sum('client_revenue');
         $totalResellerCost = $data->sum('reseller_cost');
-        $totalProfit = $totalRevenue - $totalResellerCost;
+        $totalTrunkCost = $data->sum('trunk_cost');
+        $totalPlatformProfit = $totalResellerCost - $totalTrunkCost;
+        $totalProfit = $totalRevenue - $totalTrunkCost;
         $avgMargin = $totalRevenue > 0 ? round(($totalProfit / $totalRevenue) * 100, 1) : 0;
         $totalCalls = $data->sum('total_calls');
         $totalAnswered = $data->sum('answered_calls');
         $totalMinutes = $data->sum('minutes');
 
-        // Chart data: top 10 resellers by profit
-        $chartItems = $data->sortByDesc('profit')->take(10);
+        // Chart data: top 10 resellers by platform profit
+        $chartItems = $data->sortByDesc('platform_profit')->take(10);
         $chartLabels = $chartItems->pluck('reseller_name')->values();
-        $chartData = $chartItems->pluck('profit')->values();
+        $chartData = $chartItems->pluck('platform_profit')->values();
+
+        // Transit P&L — trunk-to-trunk calls grouped by trunk pair
+        $transitData = DB::table('call_records')
+            ->where('call_flow', 'trunk_to_trunk')
+            ->whereBetween('call_start', [$dateFrom, $dateTo])
+            ->whereNotNull('incoming_trunk_id')
+            ->whereNotNull('outgoing_trunk_id')
+            ->join('trunks as t_in', 't_in.id', '=', 'call_records.incoming_trunk_id')
+            ->join('trunks as t_out', 't_out.id', '=', 'call_records.outgoing_trunk_id')
+            ->groupBy('call_records.incoming_trunk_id', 'call_records.outgoing_trunk_id', 't_in.name', 't_out.name')
+            ->selectRaw('
+                call_records.incoming_trunk_id,
+                call_records.outgoing_trunk_id,
+                t_in.name as incoming_trunk_name,
+                t_out.name as outgoing_trunk_name,
+                COUNT(*) as total_calls,
+                SUM(call_records.disposition = "ANSWERED") as answered_calls,
+                SUM(call_records.billable_duration) as total_billable,
+                SUM(call_records.total_cost) as revenue,
+                SUM(call_records.trunk_cost) as cost
+            ')
+            ->orderByDesc('revenue')
+            ->get();
+
+        $transitData->transform(function ($row) {
+            $row->minutes = round(($row->total_billable ?? 0) / 60, 2);
+            $row->profit = $row->revenue - $row->cost;
+            $row->margin_pct = $row->revenue > 0 ? round(($row->profit / $row->revenue) * 100, 1) : 0;
+            return $row;
+        });
+
+        $transitTotalRevenue = $transitData->sum('revenue');
+        $transitTotalCost = $transitData->sum('cost');
+        $transitTotalProfit = $transitTotalRevenue - $transitTotalCost;
+        $transitTotalCalls = $transitData->sum('total_calls');
+        $transitTotalMinutes = $transitData->sum('minutes');
 
         return view('admin.operational-reports.profit-loss', compact(
             'data',
@@ -1415,13 +1601,21 @@ class OperationalReportController extends Controller
             'dateTo',
             'totalRevenue',
             'totalResellerCost',
+            'totalTrunkCost',
+            'totalPlatformProfit',
             'totalProfit',
             'avgMargin',
             'totalCalls',
             'totalAnswered',
             'totalMinutes',
             'chartLabels',
-            'chartData'
+            'chartData',
+            'transitData',
+            'transitTotalRevenue',
+            'transitTotalCost',
+            'transitTotalProfit',
+            'transitTotalCalls',
+            'transitTotalMinutes'
         ));
     }
 
@@ -1446,19 +1640,20 @@ class OperationalReportController extends Controller
             $dateTo = $dateFrom->copy()->addDays(365)->endOfDay();
         }
 
-        $data = CallRecord::query()
-            ->whereBetween('call_start', [$dateFrom, $dateTo])
-            ->whereNotNull('reseller_id')
-            ->join('users', 'users.id', '=', 'call_records.reseller_id')
-            ->groupBy('call_records.reseller_id', 'users.name')
+        // Use cdr_summary_daily for fast P&L export
+        $data = DB::table('cdr_summary_daily')
+            ->whereBetween('cdr_summary_daily.date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->whereNotNull('cdr_summary_daily.reseller_id')
+            ->join('users', 'users.id', '=', 'cdr_summary_daily.reseller_id')
+            ->groupBy('cdr_summary_daily.reseller_id', 'users.name')
             ->selectRaw('
-                call_records.reseller_id,
+                cdr_summary_daily.reseller_id,
                 users.name as reseller_name,
-                COUNT(*) as total_calls,
-                SUM(call_records.disposition = "ANSWERED") as answered_calls,
-                COALESCE(SUM(CASE WHEN call_records.disposition = "ANSWERED" THEN call_records.billable_duration ELSE 0 END), 0) as total_billable,
-                COALESCE(SUM(call_records.total_cost), 0) as client_revenue,
-                COALESCE(SUM(call_records.reseller_cost), 0) as reseller_cost
+                SUM(cdr_summary_daily.total_calls) as total_calls,
+                SUM(cdr_summary_daily.answered_calls) as answered_calls,
+                SUM(cdr_summary_daily.total_billable) as total_billable,
+                SUM(cdr_summary_daily.total_cost) as client_revenue,
+                SUM(cdr_summary_daily.total_reseller_cost) as reseller_cost
             ')
             ->orderByDesc('client_revenue')
             ->get();

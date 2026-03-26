@@ -113,6 +113,18 @@
                                 <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                             </div>
 
+                            <div class="form-group">
+                                <label for="rate_group_id" class="form-label">Provider Rate Group</label>
+                                <select id="rate_group_id" name="rate_group_id" class="form-input">
+                                    <option value="">— No Rate Group —</option>
+                                    @foreach ($rateGroups as $rg)
+                                        <option value="{{ $rg->id }}" {{ old('rate_group_id', $trunk->rate_group_id) == $rg->id ? 'selected' : '' }}>{{ $rg->name }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="form-hint">Provider's rate card — used to calculate trunk cost for P&L</p>
+                                <x-input-error :messages="$errors->get('rate_group_id')" class="mt-2" />
+                            </div>
+
                             <div class="form-group md:col-span-2">
                                 <label for="codec_allow" class="form-label">Codecs</label>
                                 <input type="text" id="codec_allow" name="codec_allow" value="{{ old('codec_allow', $trunk->codec_allow) }}" required class="form-input font-mono">

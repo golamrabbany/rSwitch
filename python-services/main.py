@@ -206,6 +206,18 @@ async def clear_cache(request: CacheClearRequest):
     return {"status": "cleared", "rate_group_id": request.rate_group_id}
 
 
+@app.post("/tasks/restore-cdr-archive")
+async def trigger_restore_archive(request: dict):
+    """Trigger CDR archive restore via Celery task."""
+    from billing.tasks import restore_cdr_archive
+    year = request.get("year")
+    month = request.get("month")
+    if not year or not month:
+        return {"error": "year and month required"}, 400
+    task = restore_cdr_archive.delay(int(year), int(month))
+    return {"status": "queued", "task_id": task.id, "year": year, "month": month}
+
+
 # ─────────────────────────────────────────────────────
 # Monitoring endpoints
 # ─────────────────────────────────────────────────────
