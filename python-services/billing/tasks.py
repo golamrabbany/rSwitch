@@ -70,18 +70,10 @@ def rate_and_charge(self, call_record_id: int) -> dict:
             return result
 
         # Step 2: Charge client + reseller in ONE atomic transaction
-        try:
-            charge_result = balance_service.charge_call(call_record_id)
-            result["charged"] = charge_result["client_charged"]
-            result["reseller_charged"] = charge_result["reseller_charged"]
-        except InsufficientBalanceException as e:
-            logger.warning(
-                f"rate_and_charge: insufficient balance "
-                f"[cdr={call_record_id}, user={e.user_id}, "
-                f"amount={e.amount}, available={e.available}]"
-            )
-            result["charged"] = False
-            result["charge_error"] = "insufficient_balance"
+        # All exceptions handled inside charge_call — CDR always marked 'charged'
+        charge_result = balance_service.charge_call(call_record_id)
+        result["charged"] = charge_result["client_charged"]
+        result["reseller_charged"] = charge_result["reseller_charged"]
 
         return result
 
@@ -114,7 +106,10 @@ def rate_batch() -> dict:
 
     orphaned = 0
 
+    uncharged = 0
+
     with get_session() as session:
+        # Find CDRs that need rating (in_progress → rate + charge)
         unrated = (
             session.query(CallRecord.id)
             .filter(
@@ -128,9 +123,21 @@ def rate_batch() -> dict:
             .all()
         )
 
+        # Find CDRs stuck at 'rated' — were rated but charge_call failed/never ran
+        # This catches CDRs where Celery exhausted retries after rating
+        stuck_rated = (
+            session.query(CallRecord.id)
+            .filter(
+                CallRecord.status == "rated",
+                CallRecord.call_start >= cutoff,
+            )
+            .order_by(CallRecord.call_start)
+            .limit(200)
+            .all()
+        )
+
         # Orphan cleanup: CDRs stuck in "in_progress" for > 4 hours
         # with no disposition (call_end_handler crashed before updating).
-        # Mark as unbillable so they don't pile up forever.
         stale_cutoff = datetime.now() - timedelta(hours=4)
         stale_cdrs = (
             session.query(CallRecord)
@@ -147,7 +154,7 @@ def rate_batch() -> dict:
             cdr.status = "unbillable"
             cdr.disposition = "FAILED"
             cdr.hangup_cause = "ORPHANED_CDR"
-            cdr.call_end = cdr.call_start  # Mark as zero-duration
+            cdr.call_end = cdr.call_start
             cdr.rated_at = datetime.now()
             orphaned += 1
 
@@ -155,7 +162,18 @@ def rate_batch() -> dict:
             session.commit()
             logger.warning(f"rate_batch: cleaned up {orphaned} orphaned CDRs")
 
-    if not unrated and orphaned == 0:
+    # Charge stuck 'rated' CDRs (already rated, just need balance deduction)
+    for (cdr_id,) in stuck_rated:
+        try:
+            balance_service.charge_call(cdr_id)
+            uncharged += 1
+        except Exception as e:
+            logger.error(f"rate_batch: charge failed for rated cdr={cdr_id}: {e}")
+
+    if uncharged > 0:
+        logger.info(f"rate_batch: charged {uncharged} stuck 'rated' CDRs")
+
+    if not unrated and orphaned == 0 and uncharged == 0:
         return {"status": "no_unrated", "checked": True}
 
     logger.info(f"rate_batch: found {len(unrated)} unrated CDRs")
@@ -191,6 +209,7 @@ def rate_batch() -> dict:
         "failed": failed,
         "charge_failures": charge_failures,
         "orphaned": orphaned,
+        "uncharged": uncharged,
         "total_processed": rated + unbillable + failed,
     }
 

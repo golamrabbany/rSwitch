@@ -281,15 +281,26 @@ class BalanceService:
             reseller_amount = Decimal(str(cdr.reseller_cost or 0))
 
             # ── Step 1: Debit client balance (no Transaction record) ──
+            # Call already happened — mark CDR as 'charged' regardless of balance.
+            # If client can't pay, log it but don't leave CDR stuck at 'rated'.
             if client_amount > Decimal("0"):
-                self.debit(
-                    session=session,
-                    user_id=cdr.user_id,
-                    amount=client_amount,
-                    type="call_charge",
-                    create_transaction=False,
-                )
-                result["client_charged"] = True
+                try:
+                    self.debit(
+                        session=session,
+                        user_id=cdr.user_id,
+                        amount=client_amount,
+                        type="call_charge",
+                        create_transaction=False,
+                    )
+                    result["client_charged"] = True
+                except InsufficientBalanceException as e:
+                    logger.warning(
+                        f"charge_call: client insufficient balance "
+                        f"[cdr={call_record_id}, user={e.user_id}, "
+                        f"amount={e.amount}, available={e.available}] "
+                        f"— CDR still marked charged (call already happened)"
+                    )
+                    result["client_charged"] = False
 
             # ── Step 2: Debit reseller balance (no Transaction record) ──
             # Uses cdr.reseller_id (captured at call time)
