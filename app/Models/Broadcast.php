@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Broadcast extends Model
 {
     protected $fillable = [
-        'user_id', 'sip_account_id', 'voice_file_id', 'type', 'name', 'description',
+        'user_id', 'sip_account_id', 'voice_file_id', 'survey_template_id', 'type', 'name', 'description',
         'status', 'caller_id_name', 'caller_id_number', 'max_concurrent',
         'retry_attempts', 'retry_delay', 'ring_timeout', 'survey_config',
         'phone_list_type', 'scheduled_at', 'started_at', 'completed_at',
@@ -41,6 +41,11 @@ class Broadcast extends Model
     public function voiceFile(): BelongsTo
     {
         return $this->belongsTo(VoiceFile::class);
+    }
+
+    public function surveyTemplate(): BelongsTo
+    {
+        return $this->belongsTo(SurveyTemplate::class);
     }
 
     public function creator(): BelongsTo

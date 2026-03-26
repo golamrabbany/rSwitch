@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Broadcast;
 use App\Models\SipAccount;
 use App\Models\User;
+use App\Models\SurveyTemplate;
 use App\Models\VoiceFile;
 use App\Services\BroadcastService;
 use Illuminate\Http\Request;
@@ -63,12 +64,25 @@ class BroadcastController extends Controller
             'csv_file' => $request->file('csv_file'),
         ]);
 
+        // If a survey template is selected, use its config
+        if ($request->filled('survey_template_id')) {
+            $template = SurveyTemplate::findOrFail($request->survey_template_id);
+            abort_unless($template->isApproved(), 422, 'Template must be approved.');
+            $data['survey_config'] = $template->config;
+            $data['survey_template_id'] = $template->id;
+            // Set voice_file_id from first question
+            $firstVfId = collect($template->config['questions'] ?? [])->pluck('voice_file_id')->filter()->first();
+            if ($firstVfId) {
+                $data['voice_file_id'] = $firstVfId;
+            }
+        }
+
         if ($validated['type'] === 'survey' && !empty($validated['survey_config'])) {
             $data['survey_config'] = json_decode($validated['survey_config'], true);
         }
 
         // Build survey_config v2 from form questions
-        if ($request->type === 'survey' && $request->has('survey_questions')) {
+        if ($request->type === 'survey' && !$request->filled('survey_template_id') && $request->has('survey_questions')) {
             $questions = [];
             $qNum = 0;
             foreach ($request->input('survey_questions', []) as $sq) {
@@ -313,6 +327,21 @@ class BroadcastController extends Controller
         $sipAccounts = SipAccount::where('user_id', $clientId)->where('status', 'active')->get(['id', 'username']);
         $voiceFiles = VoiceFile::where('user_id', $clientId)->approved()->get(['id', 'name', 'duration']);
 
-        return response()->json(['sip_accounts' => $sipAccounts, 'voice_files' => $voiceFiles]);
+        $templates = SurveyTemplate::where('client_id', $clientId)
+            ->where('status', 'approved')
+            ->get(['id', 'name', 'config'])
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'question_count' => $t->getQuestionCount(),
+                ];
+            });
+
+        return response()->json([
+            'sip_accounts' => $sipAccounts,
+            'voice_files' => $voiceFiles,
+            'survey_templates' => $templates,
+        ]);
     }
 }

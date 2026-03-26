@@ -38,6 +38,9 @@
               clientDebounce: null,
               sipAccounts: [],
               voiceFiles: [],
+              surveyTemplateId: '',
+              surveyTemplates: [],
+              useTemplate: false,
               addQuestion() {
                   this.surveyQuestions.push({ type: 'question', voice_file_id: '', label: '', max_digits: 1, timeout: 10, max_retries: 2, options: [{digit: '', label: ''}] });
               },
@@ -90,6 +93,9 @@
                   this.clientResults = [];
                   this.sipAccounts = [];
                   this.voiceFiles = [];
+                  this.surveyTemplates = [];
+                  this.surveyTemplateId = '';
+                  this.useTemplate = false;
                   this.$refs.clientInput.focus();
               },
               loadClientData(clientId) {
@@ -100,6 +106,9 @@
                   .then(data => {
                       this.sipAccounts = data.sip_accounts || [];
                       this.voiceFiles = data.voice_files || [];
+                      this.surveyTemplates = data.survey_templates || [];
+                      this.surveyTemplateId = '';
+                      this.useTemplate = false;
                   });
               }
           }">
@@ -211,8 +220,20 @@
                                 <x-input-error :messages="$errors->get('type')" class="mt-2" />
                             </div>
 
+                            {{-- Survey Template Selection --}}
+                            <div x-show="type === 'survey'" x-transition class="form-group">
+                                <label class="form-label">Survey Template</label>
+                                <select name="survey_template_id" class="form-input" x-model="surveyTemplateId" @change="if(surveyTemplateId) useTemplate = true; else useTemplate = false;">
+                                    <option value="">-- Build manually --</option>
+                                    <template x-for="tpl in surveyTemplates" :key="tpl.id">
+                                        <option :value="tpl.id" x-text="tpl.name + ' (' + tpl.question_count + ' questions)'"></option>
+                                    </template>
+                                </select>
+                                <p class="form-hint">Select an approved template or build questions manually below.</p>
+                            </div>
+
                             {{-- Survey Questions Builder --}}
-                            <div x-show="type === 'survey'" x-transition class="space-y-4">
+                            <div x-show="type === 'survey' && !useTemplate" x-transition class="space-y-4">
                                 {{-- Intro Toggle --}}
                                 <div class="flex items-center gap-3">
                                     <label class="flex items-center gap-2 cursor-pointer">
