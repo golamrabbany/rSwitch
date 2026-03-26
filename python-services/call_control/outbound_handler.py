@@ -260,11 +260,11 @@ class OutboundCallHandler:
                     text("""
                         INSERT INTO call_records
                         (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                         caller, callee, destination_sip_account_id,
+                         caller, callee,
                          call_start, disposition, status, created_at)
                         VALUES
                         (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
-                         :caller, :callee, :dest_sip_id,
+                         :caller, :callee,
                          NOW(), 'ANSWERED', 'in_progress', NOW())
                     """),
                     {
@@ -274,7 +274,6 @@ class OutboundCallHandler:
                         "reseller_id": row.parent_id,
                         "caller": caller_id,
                         "callee": extension,
-                        "dest_sip_id": internal_target.id,
                     },
                 )
                 session.commit()
@@ -293,12 +292,12 @@ class OutboundCallHandler:
                     text("""
                         INSERT INTO call_records
                         (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                         caller, callee, destination_sip_account_id,
+                         caller, callee,
                          call_start, call_end, duration, billsec,
                          disposition, hangup_cause, status, created_at)
                         VALUES
                         (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
-                         :caller, :callee, :dest_sip_id,
+                         :caller, :callee,
                          NOW(), NOW(), 0, 0,
                          'FAILED', 'CALLEE_NOT_REGISTERED', 'unbillable', NOW())
                     """),
@@ -309,7 +308,6 @@ class OutboundCallHandler:
                         "reseller_id": row.parent_id,
                         "caller": caller_id,
                         "callee": extension,
-                        "dest_sip_id": internal_target.id,
                     },
                 )
                 session.commit()

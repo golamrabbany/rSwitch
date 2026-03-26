@@ -138,12 +138,10 @@ class InboundCallHandler:
                 INSERT INTO call_records
                 (uuid, user_id, reseller_id, call_flow, caller, callee,
                  incoming_trunk_id, did_id, sip_account_id,
-                 destination_sip_account_id,
                  call_start, disposition, status, created_at)
                 VALUES
                 (:uuid, :user_id, :reseller_id, 'trunk_to_sip', :caller, :callee,
                  :trunk_id, :did_id, :sip_account_id,
-                 :dest_sip_id,
                  NOW(), 'ANSWERED', 'in_progress', NOW())
             """),
             {
@@ -155,7 +153,6 @@ class InboundCallHandler:
                 "trunk_id": trunk_id,
                 "did_id": did.id,
                 "sip_account_id": did.sip_account_id,
-                "dest_sip_id": did.sip_account_id,
             },
         )
         session.commit()
