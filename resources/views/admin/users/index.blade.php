@@ -188,7 +188,9 @@
                         </td>
                         @if($roleFilter === 'client')
                             <td class="px-3 py-2">
-                                @if($user->parent)
+                                @if($user->parent && $user->parent->isSuperAdmin())
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Direct</span>
+                                @elseif($user->parent)
                                     <a href="{{ route('admin.users.show', $user->parent) }}" class="text-indigo-600 hover:text-indigo-700 font-medium text-sm">{{ $user->parent->name }}</a>
                                 @else
                                     <span class="text-gray-300">-</span>

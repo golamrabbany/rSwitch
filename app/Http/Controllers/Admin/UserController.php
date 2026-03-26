@@ -115,6 +115,9 @@ class UserController extends Controller
         // Super Admin is parent for resellers, selected reseller is parent for clients
         if ($validated['role'] === 'reseller') {
             $validated['parent_id'] = null; // Resellers have no parent
+        } elseif ($validated['role'] === 'client' && empty($validated['parent_id'])) {
+            // Direct client — parent is the Super Admin
+            $validated['parent_id'] = $authUser->isSuperAdmin() ? $authUser->id : null;
         }
 
         $user = User::create([
