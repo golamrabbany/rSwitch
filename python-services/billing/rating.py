@@ -318,6 +318,21 @@ class RatingService:
             if not cdr:
                 raise ValueError(f"CallRecord {call_record_id} not found")
 
+            # Idempotency: skip if already rated (prevents re-rating on Celery retry)
+            if cdr.status == "rated" and cdr.rated_at:
+                logger.info(
+                    f"rate_call: SKIPPED — already rated "
+                    f"[cdr={call_record_id}, cost={cdr.total_cost}]"
+                )
+                return {
+                    "status": "rated",
+                    "call_record_id": call_record_id,
+                    "matched_prefix": cdr.matched_prefix,
+                    "total_cost": str(cdr.total_cost),
+                    "reseller_cost": str(cdr.reseller_cost),
+                    "billable_duration": cdr.billable_duration,
+                }
+
             # Use destination if it looks like a phone number, otherwise use callee
             raw_dest = cdr.destination or ""
             destination = raw_dest if any(c.isdigit() for c in raw_dest) else cdr.callee

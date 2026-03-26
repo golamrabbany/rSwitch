@@ -239,6 +239,28 @@ class BalanceService:
             if not cdr:
                 raise ValueError(f"CallRecord {call_record_id} not found")
 
+            # ── Idempotency check: prevent double charge on Celery retry ──
+            existing_txn = (
+                session.query(Transaction)
+                .filter(
+                    Transaction.reference_type == "call_record",
+                    Transaction.reference_id == cdr.id,
+                    Transaction.type == "call_charge",
+                )
+                .first()
+            )
+            if existing_txn:
+                logger.info(
+                    f"charge_call: SKIPPED — already charged "
+                    f"[cdr={call_record_id}, txn={existing_txn.id}]"
+                )
+                return {
+                    "client_transaction": existing_txn,
+                    "reseller_transaction": None,
+                    "client_charged": True,
+                    "reseller_charged": True,  # Assume reseller was handled
+                }
+
             result = {
                 "client_transaction": None,
                 "reseller_transaction": None,
