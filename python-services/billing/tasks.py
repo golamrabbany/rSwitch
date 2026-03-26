@@ -112,6 +112,8 @@ def rate_batch() -> dict:
     failed = 0
     charge_failures = 0
 
+    orphaned = 0
+
     with get_session() as session:
         unrated = (
             session.query(CallRecord.id)
@@ -126,7 +128,34 @@ def rate_batch() -> dict:
             .all()
         )
 
-    if not unrated:
+        # Orphan cleanup: CDRs stuck in "in_progress" for > 4 hours
+        # with no disposition (call_end_handler crashed before updating).
+        # Mark as unbillable so they don't pile up forever.
+        stale_cutoff = datetime.now() - timedelta(hours=4)
+        stale_cdrs = (
+            session.query(CallRecord)
+            .filter(
+                CallRecord.status == "in_progress",
+                CallRecord.disposition.is_(None),
+                CallRecord.call_start < stale_cutoff,
+                CallRecord.call_start >= cutoff,
+            )
+            .limit(100)
+            .all()
+        )
+        for cdr in stale_cdrs:
+            cdr.status = "unbillable"
+            cdr.disposition = "FAILED"
+            cdr.hangup_cause = "ORPHANED_CDR"
+            cdr.call_end = cdr.call_start  # Mark as zero-duration
+            cdr.rated_at = datetime.now()
+            orphaned += 1
+
+        if orphaned > 0:
+            session.commit()
+            logger.warning(f"rate_batch: cleaned up {orphaned} orphaned CDRs")
+
+    if not unrated and orphaned == 0:
         return {"status": "no_unrated", "checked": True}
 
     logger.info(f"rate_batch: found {len(unrated)} unrated CDRs")
@@ -161,6 +190,7 @@ def rate_batch() -> dict:
         "unbillable": unbillable,
         "failed": failed,
         "charge_failures": charge_failures,
+        "orphaned": orphaned,
         "total_processed": rated + unbillable + failed,
     }
 

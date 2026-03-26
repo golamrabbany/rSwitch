@@ -205,7 +205,7 @@ class RatingService:
         self,
         destination: str,
         rate_group_id: int,
-        user_id: Optional[int] = None,
+        reseller_id: Optional[int] = None,
         at_time: Optional[date] = None,
         session: Optional[Session] = None,
     ) -> ResolvedRates:
@@ -213,9 +213,8 @@ class RatingService:
         Resolve both sell rate (user's group) and cost rate (reseller's group).
         Raises RateNotFoundException if no sell rate found.
 
-        Cost rate is determined via user hierarchy:
-        - Client under reseller → use reseller's rate_group
-        - Direct client (parent=super_admin) → no cost rate
+        Cost rate uses reseller_id from CDR (captured at call time) — NOT
+        the current user.parent_id, which could change if client was moved.
         """
         at_time = at_time or date.today()
 
@@ -225,16 +224,16 @@ class RatingService:
 
         cost_rate = None
 
-        if user_id:
+        if reseller_id:
             if session is None:
                 from shared.database import get_session
                 with get_session() as s:
                     cost_rate = self._find_cost_rate(
-                        s, destination, user_id, at_time
+                        s, destination, reseller_id, at_time
                     )
             else:
                 cost_rate = self._find_cost_rate(
-                    session, destination, user_id, at_time
+                    session, destination, reseller_id, at_time
                 )
 
         return ResolvedRates(sell=sell_rate, cost=cost_rate)
@@ -243,22 +242,22 @@ class RatingService:
         self,
         session: Session,
         destination: str,
-        user_id: int,
+        reseller_id: int,
         at_time: date,
     ) -> Optional[Rate]:
-        """Find cost rate from reseller's rate group via user hierarchy."""
-        user = session.query(User).get(user_id)
-        if not user or not user.parent_id:
-            return None
-        parent = session.query(User).get(user.parent_id)
-        if not parent:
+        """
+        Find cost rate from reseller's rate group.
+        Uses reseller_id from CDR (captured at call time).
+        """
+        reseller = session.query(User).get(reseller_id)
+        if not reseller:
             return None
         # Parent is super_admin → direct client → no reseller cost
-        if parent.role == 'super_admin':
+        if reseller.role == 'super_admin':
             return None
         # Parent is reseller → use reseller's rate group
-        if parent.role == 'reseller' and parent.rate_group_id:
-            return self.find_rate(destination, parent.rate_group_id, at_time, session)
+        if reseller.role == 'reseller' and reseller.rate_group_id:
+            return self.find_rate(destination, reseller.rate_group_id, at_time, session)
         return None
 
     # ─────────────────────────────────────────────────────
@@ -350,11 +349,12 @@ class RatingService:
                 return {"status": "unbillable", "reason": "no_rate_group"}
 
             # Find sell + cost rates
+            # Uses cdr.reseller_id (captured at call time) for cost rate lookup
             try:
                 rates = self.resolve_rates(
                     destination,
                     user.rate_group_id,
-                    user_id=user.id,
+                    reseller_id=cdr.reseller_id,
                     at_time=cdr.call_start.date() if cdr.call_start else date.today(),
                     session=session,
                 )

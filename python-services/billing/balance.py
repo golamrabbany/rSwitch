@@ -313,42 +313,40 @@ class BalanceService:
                     result["client_charged"] = True
 
             # ── Step 2: Charge the reseller (same transaction) ──
+            # Uses cdr.reseller_id (captured at call time) — NOT user.parent_id
+            # (which could change if client moved between resellers after call).
             # If reseller debit fails, client charge still commits.
-            # InsufficientBalanceException is raised BEFORE any DB writes
-            # in debit(), so the session remains clean.
-            if reseller_amount > Decimal("0"):
-                user = session.query(User).get(cdr.user_id)
-                if user and user.parent_id:
-                    parent = session.query(User).get(user.parent_id)
-                    if parent and parent.role != 'super_admin':
-                        try:
-                            reseller_txn = self.debit(
-                                session=session,
-                                user_id=parent.id,
-                                amount=reseller_amount,
-                                type="reseller_call_charge",
-                                reference_type="call_record",
-                                reference_id=cdr.id,
-                                description=(
-                                    f"Reseller cost: call to {cdr.callee} "
-                                    f"({cdr.billable_duration}s)"
-                                ),
-                            )
-                            result["reseller_transaction"] = reseller_txn
-                            result["reseller_charged"] = True
-                        except InsufficientBalanceException as e:
-                            # Reseller can't pay — but call already happened.
-                            # Client charge must still commit. Reseller owes a debt.
-                            logger.warning(
-                                f"charge_call: reseller insufficient balance "
-                                f"[cdr={call_record_id}, reseller={e.user_id}, "
-                                f"amount={e.amount}, available={e.available}] "
-                                f"— client still charged, blocking reseller"
-                            )
-                            result["reseller_charged"] = False
+            if reseller_amount > Decimal("0") and cdr.reseller_id:
+                parent = session.query(User).get(cdr.reseller_id)
+                if parent and parent.role != 'super_admin':
+                    try:
+                        reseller_txn = self.debit(
+                            session=session,
+                            user_id=parent.id,
+                            amount=reseller_amount,
+                            type="reseller_call_charge",
+                            reference_type="call_record",
+                            reference_id=cdr.id,
+                            description=(
+                                f"Reseller cost: call to {cdr.callee} "
+                                f"({cdr.billable_duration}s)"
+                            ),
+                        )
+                        result["reseller_transaction"] = reseller_txn
+                        result["reseller_charged"] = True
+                    except InsufficientBalanceException as e:
+                        # Reseller can't pay — but call already happened.
+                        # Client charge must still commit. Reseller owes a debt.
+                        logger.warning(
+                            f"charge_call: reseller insufficient balance "
+                            f"[cdr={call_record_id}, reseller={e.user_id}, "
+                            f"amount={e.amount}, available={e.available}] "
+                            f"— client still charged, blocking reseller"
+                        )
+                        result["reseller_charged"] = False
 
-                            # Block reseller + hangup active calls
-                            self._block_reseller(parent.id)
+                        # Block reseller + hangup active calls
+                        self._block_reseller(parent.id)
 
             # ── Commit: client always charged, reseller if possible ──
             session.commit()
