@@ -32,86 +32,67 @@ class BroadcastController extends Controller
 
     public function create()
     {
-        $resellers = User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email']);
-        $clients = User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email']);
+        $authUser = auth()->user();
 
-        return view('admin.broadcasts.create', compact('resellers', 'clients'));
+        // Load all approved voice templates with client info
+        $voiceTemplates = VoiceFile::with('user:id,name,email')
+            ->ownedBy($authUser)
+            ->approved()
+            ->orderBy('name')
+            ->get(['id', 'name', 'user_id', 'format', 'duration']);
+
+        // Load all approved survey templates with client info
+        $surveyTemplates = SurveyTemplate::with('client:id,name,email');
+        if (!$authUser->isSuperAdmin()) {
+            $surveyTemplates->visibleTo($authUser);
+        }
+        $surveyTemplates = $surveyTemplates->where('status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name', 'client_id', 'config']);
+
+        return view('admin.broadcasts.create', compact('voiceTemplates', 'surveyTemplates'));
     }
 
     public function store(Request $request, BroadcastService $service)
     {
         $validated = $request->validate([
-            'user_id' => ['required', 'exists:users,id'],
             'name' => ['required', 'string', 'max:150'],
-            'sip_account_id' => ['required', 'exists:sip_accounts,id'],
-            'voice_file_id' => ['nullable', 'exists:voice_files,id'],
             'type' => ['required', 'in:simple,survey'],
+            'voice_file_id' => ['required_if:type,simple', 'nullable', 'exists:voice_files,id'],
+            'survey_template_id' => ['required_if:type,survey', 'nullable', 'exists:survey_templates,id'],
+            'sip_account_id' => ['required', 'exists:sip_accounts,id'],
             'phone_list_type' => ['required', 'in:manual,csv'],
             'phone_numbers' => ['required_if:phone_list_type,manual', 'nullable', 'string'],
             'csv_file' => ['required_if:phone_list_type,csv', 'nullable', 'file', 'mimes:csv,txt', 'max:5120'],
             'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
             'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:60'],
             'retry_attempts' => ['nullable', 'integer', 'min:0', 'max:5'],
-            'survey_config' => ['nullable', 'json'],
         ]);
 
-        $client = User::findOrFail($validated['user_id']);
+        // Derive client from selected template
+        if ($validated['type'] === 'simple') {
+            $voiceFile = VoiceFile::findOrFail($validated['voice_file_id']);
+            $client = User::findOrFail($voiceFile->user_id);
+        } else {
+            $surveyTemplate = SurveyTemplate::findOrFail($validated['survey_template_id']);
+            abort_unless($surveyTemplate->isApproved(), 422, 'Template must be approved.');
+            $client = User::findOrFail($surveyTemplate->client_id);
+        }
+
         abort_unless(auth()->user()->canManage($client), 403);
 
         $data = array_merge($validated, [
+            'user_id' => $client->id,
             'caller_id_name' => $client->name,
             'caller_id_number' => SipAccount::find($validated['sip_account_id'])->username ?? '',
             'csv_file' => $request->file('csv_file'),
         ]);
 
-        // If a survey template is selected, use its config
-        if ($request->filled('survey_template_id')) {
-            $template = SurveyTemplate::findOrFail($request->survey_template_id);
-            abort_unless($template->isApproved(), 422, 'Template must be approved.');
-            $data['survey_config'] = $template->config;
-            $data['survey_template_id'] = $template->id;
-            // Set voice_file_id from first question
-            $firstVfId = collect($template->config['questions'] ?? [])->pluck('voice_file_id')->filter()->first();
-            if ($firstVfId) {
-                $data['voice_file_id'] = $firstVfId;
-            }
-        }
-
-        if ($validated['type'] === 'survey' && !empty($validated['survey_config'])) {
-            $data['survey_config'] = json_decode($validated['survey_config'], true);
-        }
-
-        // Build survey_config v2 from form questions
-        if ($request->type === 'survey' && !$request->filled('survey_template_id') && $request->has('survey_questions')) {
-            $questions = [];
-            $qNum = 0;
-            foreach ($request->input('survey_questions', []) as $sq) {
-                $type = $sq['type'] ?? 'question';
-                $key = $type === 'intro' ? 'intro' : 'q' . (++$qNum);
-                $q = [
-                    'key' => $key,
-                    'type' => $type,
-                    'voice_file_id' => (int) ($sq['voice_file_id'] ?? 0),
-                    'label' => $sq['label'] ?? '',
-                ];
-                if ($type === 'question') {
-                    $q['max_digits'] = (int) ($sq['max_digits'] ?? 1);
-                    $q['timeout'] = (int) ($sq['timeout'] ?? 10);
-                    $q['max_retries'] = (int) ($sq['max_retries'] ?? 2);
-                    $options = [];
-                    foreach ($sq['options'] ?? [] as $opt) {
-                        if (!empty($opt['digit']) && !empty($opt['label'])) {
-                            $options[$opt['digit']] = $opt['label'];
-                        }
-                    }
-                    $q['options'] = $options;
-                }
-                $questions[] = $q;
-            }
-            $data['survey_config'] = ['version' => 2, 'questions' => $questions];
-
-            // Set voice_file_id to first voice file in questions
-            $firstVfId = collect($questions)->pluck('voice_file_id')->filter()->first();
+        // If survey, use template config
+        if ($validated['type'] === 'survey' && isset($surveyTemplate)) {
+            $data['survey_config'] = $surveyTemplate->config;
+            $data['survey_template_id'] = $surveyTemplate->id;
+            $firstVfId = collect($surveyTemplate->config['questions'] ?? [])->pluck('voice_file_id')->filter()->first();
             if ($firstVfId) {
                 $data['voice_file_id'] = $firstVfId;
             }
@@ -361,29 +342,30 @@ class BroadcastController extends Controller
     }
 
     /**
-     * AJAX: Get SIP accounts + voice files for a client.
+     * AJAX: Get client info + SIP accounts for a template.
      */
-    public function clientData(Request $request)
+    public function templateData(Request $request)
     {
-        $clientId = $request->input('client_id');
-        $sipAccounts = SipAccount::where('user_id', $clientId)->where('status', 'active')->get(['id', 'username']);
-        $voiceFiles = VoiceFile::where('user_id', $clientId)->approved()->get(['id', 'name', 'duration']);
+        $type = $request->input('type'); // 'voice' or 'survey'
+        $templateId = $request->input('template_id');
 
-        $templates = SurveyTemplate::where('client_id', $clientId)
-            ->where('status', 'approved')
-            ->get(['id', 'name', 'config'])
-            ->map(function ($t) {
-                return [
-                    'id' => $t->id,
-                    'name' => $t->name,
-                    'question_count' => $t->getQuestionCount(),
-                ];
-            });
+        if ($type === 'voice') {
+            $template = VoiceFile::with('user:id,name,email')->findOrFail($templateId);
+            $clientId = $template->user_id;
+            $client = $template->user;
+        } else {
+            $template = SurveyTemplate::with('client:id,name,email')->findOrFail($templateId);
+            $clientId = $template->client_id;
+            $client = $template->client;
+        }
+
+        abort_unless(auth()->user()->canManage($client), 403);
+
+        $sipAccounts = SipAccount::where('user_id', $clientId)->where('status', 'active')->get(['id', 'username']);
 
         return response()->json([
+            'client' => ['id' => $client->id, 'name' => $client->name, 'email' => $client->email],
             'sip_accounts' => $sipAccounts,
-            'voice_files' => $voiceFiles,
-            'survey_templates' => $templates,
         ]);
     }
 }

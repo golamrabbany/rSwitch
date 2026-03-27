@@ -3,16 +3,9 @@
 
     {{-- Page Header --}}
     <div class="page-header-row">
-        <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
-                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
-                </svg>
-            </div>
-            <div>
-                <h2 class="page-title">Create Broadcast</h2>
-                <p class="page-subtitle">Set up a new voice broadcast campaign</p>
-            </div>
+        <div>
+            <h2 class="page-title">Create Broadcast</h2>
+            <p class="page-subtitle">Set up a new voice broadcast campaign</p>
         </div>
         <div class="page-actions">
             <a href="{{ route('client.broadcasts.index') }}" class="btn-action-secondary">
@@ -27,170 +20,82 @@
     <form method="POST" action="{{ route('client.broadcasts.store') }}" enctype="multipart/form-data"
           x-data="{
               type: '{{ old('type', 'simple') }}',
-              phoneListType: '{{ old('phone_list_type', 'manual') }}',
-              surveyQuestions: [{ type: 'question', voice_file_id: '', label: '', max_digits: 1, timeout: 10, max_retries: 2, options: [{digit: '1', label: ''}] }],
-              hasIntro: false,
-              addQuestion() {
-                  this.surveyQuestions.push({ type: 'question', voice_file_id: '', label: '', max_digits: 1, timeout: 10, max_retries: 2, options: [{digit: '', label: ''}] });
-              },
-              removeQuestion(idx) {
-                  if (this.surveyQuestions.filter(q => q.type === 'question').length > 1 || this.surveyQuestions[idx].type === 'intro') {
-                      this.surveyQuestions.splice(idx, 1);
-                      if (this.surveyQuestions[0]?.type !== 'intro') this.hasIntro = false;
-                  }
-              },
-              toggleIntro() {
-                  if (this.hasIntro) {
-                      this.surveyQuestions.unshift({ type: 'intro', voice_file_id: '', label: 'Welcome message', options: [] });
-                  } else {
-                      if (this.surveyQuestions[0]?.type === 'intro') this.surveyQuestions.shift();
-                  }
-              },
-              addOption(qIdx) { this.surveyQuestions[qIdx].options.push({ digit: '', label: '' }); },
-              removeOption(qIdx, oIdx) { if (this.surveyQuestions[qIdx].options.length > 1) this.surveyQuestions[qIdx].options.splice(oIdx, 1); }
+              phoneListType: '{{ old('phone_list_type', 'manual') }}'
           }">
         @csrf
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {{-- Main Form - Left Side --}}
+            {{-- Main Form --}}
             <div class="lg:col-span-2 space-y-6">
                 <div class="form-card">
                     <div class="form-card-header">
                         <h3 class="form-card-title">Broadcast Details</h3>
-                        <p class="form-card-subtitle">Configure your broadcast campaign settings</p>
+                        <p class="form-card-subtitle">Select a template and configure settings</p>
                     </div>
                     <div class="form-card-body">
                         <div class="space-y-4">
-                            {{-- Name --}}
-                            <div class="form-group">
-                                <label for="name" class="form-label">Broadcast Name</label>
-                                <input type="text" id="name" name="name" value="{{ old('name') }}" required class="form-input" placeholder="e.g. March Promo Campaign">
-                                <p class="form-hint">A descriptive name to identify this broadcast.</p>
-                                <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                            {{-- Name + Type Row --}}
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="form-group">
+                                    <label class="form-label">Broadcast Name</label>
+                                    <input type="text" name="name" value="{{ old('name') }}" required class="form-input" placeholder="e.g. March Promo Campaign">
+                                    <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Broadcast Type</label>
+                                    <div class="flex gap-3 mt-1">
+                                        <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
+                                               :class="type === 'simple' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
+                                            <input type="radio" name="type" value="simple" x-model="type" class="sr-only">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+                                            <span class="font-medium text-sm">Simple</span>
+                                        </label>
+                                        <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
+                                               :class="type === 'survey' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
+                                            <input type="radio" name="type" value="survey" x-model="type" class="sr-only">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                                            <span class="font-medium text-sm">Survey</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Voice Template (Simple) --}}
+                            <div class="form-group" x-show="type === 'simple'" x-transition>
+                                <label class="form-label">Voice Template</label>
+                                <select name="voice_file_id" class="form-input">
+                                    <option value="">Select Voice Template</option>
+                                    @foreach($voiceFiles as $vf)
+                                        <option value="{{ $vf->id }}" {{ old('voice_file_id') == $vf->id ? 'selected' : '' }}>{{ $vf->name }} ({{ strtoupper($vf->format) }})</option>
+                                    @endforeach
+                                </select>
+                                <p class="form-hint">Your approved voice templates</p>
+                                <x-input-error :messages="$errors->get('voice_file_id')" class="mt-2" />
+                            </div>
+
+                            {{-- Survey Template (Survey) --}}
+                            <div class="form-group" x-show="type === 'survey'" x-transition>
+                                <label class="form-label">Survey Template</label>
+                                <select name="survey_template_id" class="form-input">
+                                    <option value="">Select Survey Template</option>
+                                    @foreach($surveyTemplates as $st)
+                                        <option value="{{ $st->id }}" {{ old('survey_template_id') == $st->id ? 'selected' : '' }}>{{ $st->name }} ({{ $st->getQuestionCount() }} questions)</option>
+                                    @endforeach
+                                </select>
+                                <p class="form-hint">Your approved survey templates</p>
+                                <x-input-error :messages="$errors->get('survey_template_id')" class="mt-2" />
                             </div>
 
                             {{-- SIP Account --}}
                             <div class="form-group">
-                                <label for="sip_account_id" class="form-label">SIP Account</label>
-                                <select id="sip_account_id" name="sip_account_id" required class="form-input">
+                                <label class="form-label">SIP Account</label>
+                                <select name="sip_account_id" required class="form-input">
                                     <option value="">Select SIP Account</option>
                                     @foreach($sipAccounts as $sip)
-                                        <option value="{{ $sip->id }}" {{ old('sip_account_id') == $sip->id ? 'selected' : '' }}>
-                                            {{ $sip->username }} {{ $sip->caller_id_number ? '('.$sip->caller_id_number.')' : '' }}
-                                        </option>
+                                        <option value="{{ $sip->id }}" {{ old('sip_account_id') == $sip->id ? 'selected' : '' }}>{{ $sip->username }}</option>
                                     @endforeach
                                 </select>
-                                <p class="form-hint">The SIP account used for making outbound calls.</p>
                                 <x-input-error :messages="$errors->get('sip_account_id')" class="mt-2" />
-                            </div>
-
-                            {{-- Voice File --}}
-                            <div class="form-group">
-                                <label for="voice_file_id" class="form-label">Voice File</label>
-                                <select id="voice_file_id" name="voice_file_id" required class="form-input">
-                                    <option value="">Select Voice File</option>
-                                    @foreach($voiceFiles as $file)
-                                        <option value="{{ $file->id }}" {{ old('voice_file_id') == $file->id ? 'selected' : '' }}>
-                                            {{ $file->name }} ({{ strtoupper($file->format) }})
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <p class="form-hint">Only approved voice files are shown.</p>
-                                <x-input-error :messages="$errors->get('voice_file_id')" class="mt-2" />
-                            </div>
-
-                            {{-- Broadcast Type --}}
-                            <div class="form-group">
-                                <label class="form-label">Broadcast Type</label>
-                                <div class="flex gap-4 mt-1">
-                                    <label class="flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
-                                           :class="type === 'simple' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
-                                        <input type="radio" name="type" value="simple" x-model="type" class="sr-only">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
-                                        </svg>
-                                        <span class="font-medium text-sm">Simple</span>
-                                    </label>
-                                    <label class="flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
-                                           :class="type === 'survey' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
-                                        <input type="radio" name="type" value="survey" x-model="type" class="sr-only">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
-                                        </svg>
-                                        <span class="font-medium text-sm">Survey</span>
-                                    </label>
-                                </div>
-                                <x-input-error :messages="$errors->get('type')" class="mt-2" />
-                            </div>
-
-                            {{-- Survey Questions Builder --}}
-                            <div x-show="type === 'survey'" x-transition class="space-y-4">
-                                <div class="flex items-center gap-3">
-                                    <label class="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" x-model="hasIntro" @change="toggleIntro()" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                        <span class="text-sm font-medium text-gray-700">Add Welcome/Intro File</span>
-                                    </label>
-                                    <span class="text-xs text-gray-400">(plays before questions, no DTMF)</span>
-                                </div>
-
-                                <template x-for="(q, qIdx) in surveyQuestions" :key="qIdx">
-                                    <div class="border border-gray-200 rounded-lg p-4 space-y-3" :class="q.type === 'intro' ? 'bg-blue-50/50 border-blue-200' : 'bg-white'">
-                                        <input type="hidden" :name="'survey_questions[' + qIdx + '][type]'" :value="q.type">
-                                        <div class="flex items-center justify-between">
-                                            <h4 class="text-sm font-semibold text-gray-800">
-                                                <span x-show="q.type === 'intro'" class="text-blue-600">Welcome / Intro</span>
-                                                <span x-show="q.type === 'question'">Question <span x-text="surveyQuestions.filter((s, i) => s.type === 'question' && i <= qIdx).length"></span></span>
-                                            </h4>
-                                            <button type="button" @click="removeQuestion(qIdx)" class="p-1 text-red-400 hover:text-red-600 rounded" x-show="q.type === 'intro' || surveyQuestions.filter(s => s.type === 'question').length > 1">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                            </button>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label text-xs">Voice File</label>
-                                            <select :name="'survey_questions[' + qIdx + '][voice_file_id]'" x-model="q.voice_file_id" class="form-select text-sm" required>
-                                                <option value="">Select voice file...</option>
-                                                @foreach($voiceFiles as $vf)
-                                                    <option value="{{ $vf->id }}">{{ $vf->name }} ({{ $vf->duration ?? '?' }}s)</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label text-xs" x-text="q.type === 'intro' ? 'Description' : 'Question Label'"></label>
-                                            <input type="text" :name="'survey_questions[' + qIdx + '][label]'" x-model="q.label" class="form-input text-sm" :placeholder="q.type === 'intro' ? 'e.g. Welcome to our survey' : 'e.g. How satisfied are you?'">
-                                        </div>
-                                        <template x-if="q.type === 'question'">
-                                            <div class="space-y-3">
-                                                <div class="flex gap-3">
-                                                    <div class="form-group" style="flex:0 0 100px;"><label class="form-label text-xs">Max Digits</label><input type="number" :name="'survey_questions[' + qIdx + '][max_digits]'" x-model="q.max_digits" min="1" max="10" class="form-input text-sm"></div>
-                                                    <div class="form-group" style="flex:0 0 100px;"><label class="form-label text-xs">Timeout (s)</label><input type="number" :name="'survey_questions[' + qIdx + '][timeout]'" x-model="q.timeout" min="3" max="60" class="form-input text-sm"></div>
-                                                    <div class="form-group" style="flex:0 0 100px;"><label class="form-label text-xs">Retries</label><input type="number" :name="'survey_questions[' + qIdx + '][max_retries]'" x-model="q.max_retries" min="0" max="5" class="form-input text-sm"></div>
-                                                </div>
-                                                <div>
-                                                    <label class="form-label text-xs">Response Options</label>
-                                                    <div class="space-y-1.5">
-                                                        <template x-for="(opt, oIdx) in q.options" :key="oIdx">
-                                                            <div class="flex items-center gap-2">
-                                                                <input type="text" :name="'survey_questions[' + qIdx + '][options][' + oIdx + '][digit]'" x-model="opt.digit" class="form-input text-sm" style="max-width:60px;" placeholder="#">
-                                                                <input type="text" :name="'survey_questions[' + qIdx + '][options][' + oIdx + '][label]'" x-model="opt.label" class="form-input text-sm" placeholder="Label">
-                                                                <button type="button" @click="removeOption(qIdx, oIdx)" class="p-1 text-red-400 hover:text-red-600 rounded" x-show="q.options.length > 1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
-                                                            </div>
-                                                        </template>
-                                                    </div>
-                                                    <button type="button" @click="addOption(qIdx)" class="mt-1.5 text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                                                        Add Option
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </template>
-
-                                <button type="button" @click="addQuestion()" class="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                                    Add Question
-                                </button>
-                                <x-input-error :messages="$errors->get('survey_questions')" class="mt-2" />
                             </div>
                         </div>
                     </div>
@@ -204,7 +109,6 @@
                     </div>
                     <div class="form-card-body">
                         <div class="space-y-4">
-                            {{-- Phone List Type Toggle --}}
                             <div class="form-group">
                                 <label class="form-label">Input Method</label>
                                 <div class="flex gap-4 mt-1">
@@ -221,20 +125,18 @@
                                 </div>
                             </div>
 
-                            {{-- Manual Entry --}}
                             <div x-show="phoneListType === 'manual'" x-transition class="form-group">
-                                <label for="phone_numbers" class="form-label">Phone Numbers</label>
-                                <textarea id="phone_numbers" name="phone_numbers" rows="6" class="form-input" placeholder="Enter one number per line&#10;e.g.&#10;8801712345678&#10;8801798765432">{{ old('phone_numbers') }}</textarea>
+                                <label class="form-label">Phone Numbers</label>
+                                <textarea name="phone_numbers" rows="6" class="form-input" placeholder="Enter one number per line&#10;e.g.&#10;8801712345678&#10;8801798765432">{{ old('phone_numbers') }}</textarea>
                                 <p class="form-hint">Enter one phone number per line.</p>
                                 <x-input-error :messages="$errors->get('phone_numbers')" class="mt-2" />
                             </div>
 
-                            {{-- CSV Upload --}}
                             <div x-show="phoneListType === 'csv'" x-transition class="form-group">
-                                <label for="phone_csv" class="form-label">CSV File</label>
-                                <input type="file" id="phone_csv" name="phone_csv" accept=".csv,.txt" class="form-input">
+                                <label class="form-label">CSV File</label>
+                                <input type="file" name="csv_file" accept=".csv,.txt" class="form-input">
                                 <p class="form-hint">Upload a CSV file with one phone number per row.</p>
-                                <x-input-error :messages="$errors->get('phone_csv')" class="mt-2" />
+                                <x-input-error :messages="$errors->get('csv_file')" class="mt-2" />
                             </div>
                         </div>
                     </div>
@@ -249,14 +151,14 @@
                     <div class="form-card-body">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
-                                <label for="max_concurrent" class="form-label">Max Concurrent Calls</label>
-                                <input type="number" id="max_concurrent" name="max_concurrent" value="{{ old('max_concurrent', 5) }}" min="1" max="50" class="form-input">
+                                <label class="form-label">Max Concurrent Calls</label>
+                                <input type="number" name="max_concurrent" value="{{ old('max_concurrent', 5) }}" min="1" max="50" class="form-input">
                                 <p class="form-hint">Maximum simultaneous calls.</p>
                                 <x-input-error :messages="$errors->get('max_concurrent')" class="mt-2" />
                             </div>
                             <div class="form-group">
-                                <label for="ring_timeout" class="form-label">Ring Timeout (seconds)</label>
-                                <input type="number" id="ring_timeout" name="ring_timeout" value="{{ old('ring_timeout', 30) }}" min="10" max="120" class="form-input">
+                                <label class="form-label">Ring Timeout (seconds)</label>
+                                <input type="number" name="ring_timeout" value="{{ old('ring_timeout', 30) }}" min="10" max="120" class="form-input">
                                 <p class="form-hint">How long to ring before giving up.</p>
                                 <x-input-error :messages="$errors->get('ring_timeout')" class="mt-2" />
                             </div>
@@ -276,9 +178,8 @@
                 </div>
             </div>
 
-            {{-- Sidebar - Right Side --}}
+            {{-- Sidebar --}}
             <div class="space-y-6">
-                {{-- How It Works --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
                         <h3 class="detail-card-title">How It Works</h3>
@@ -289,60 +190,47 @@
                                 <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
                                     <span class="text-xs font-bold text-indigo-600">1</span>
                                 </div>
-                                <p class="text-sm text-gray-600">Create a broadcast with your voice file and phone list</p>
+                                <p class="text-sm text-gray-600">Select type & pick a template</p>
                             </div>
                             <div class="flex items-start gap-3">
                                 <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
                                     <span class="text-xs font-bold text-indigo-600">2</span>
                                 </div>
-                                <p class="text-sm text-gray-600">Review the details and start the broadcast</p>
+                                <p class="text-sm text-gray-600">Add phone numbers (manual or CSV)</p>
                             </div>
                             <div class="flex items-start gap-3">
                                 <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
                                     <span class="text-xs font-bold text-indigo-600">3</span>
                                 </div>
-                                <p class="text-sm text-gray-600">The system dials each number and plays your message</p>
+                                <p class="text-sm text-gray-600">Start the broadcast to begin dialing</p>
                             </div>
                             <div class="flex items-start gap-3">
                                 <div class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                                     <span class="text-xs font-bold text-emerald-600">4</span>
                                 </div>
-                                <p class="text-sm text-gray-600">View results and download reports</p>
+                                <p class="text-sm text-gray-600">Monitor progress and view results</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {{-- Broadcast Tips --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
-                        <h3 class="detail-card-title">Broadcast Tips</h3>
+                        <h3 class="detail-card-title">Tips</h3>
                     </div>
                     <div class="detail-card-body">
-                        <ul class="text-sm text-gray-600 space-y-2">
+                        <ul class="text-xs text-gray-600 space-y-2">
                             <li class="flex items-start gap-2">
-                                <svg class="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>Keep voice messages under <strong>60 seconds</strong> for best engagement</span>
+                                <svg class="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <span>Upload voice templates first, then create broadcasts</span>
                             </li>
                             <li class="flex items-start gap-2">
-                                <svg class="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>Start with <strong>low concurrency</strong> and increase gradually</span>
+                                <svg class="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                <span>Use 5-10 concurrent calls for best results</span>
                             </li>
                             <li class="flex items-start gap-2">
-                                <svg class="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                <span>Use <strong>survey mode</strong> to collect DTMF responses from recipients</span>
-                            </li>
-                            <li class="flex items-start gap-2">
-                                <svg class="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span>Ensure you have <strong>sufficient balance</strong> before starting</span>
+                                <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                <span>Ensure you have sufficient balance before starting</span>
                             </li>
                         </ul>
                     </div>

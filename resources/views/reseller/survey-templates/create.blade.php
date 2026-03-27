@@ -27,6 +27,18 @@
                     </div>
                     <div class="form-card-body space-y-4">
                         <div class="form-group">
+                            <label for="client_id" class="form-label">Client</label>
+                            <select id="client_id" name="client_id" required class="form-input">
+                                <option value="">Select Client</option>
+                                @foreach($clients as $client)
+                                    <option value="{{ $client->id }}" {{ old('client_id') == $client->id ? 'selected' : '' }}>{{ $client->name }} ({{ $client->email }})</option>
+                                @endforeach
+                            </select>
+                            <p class="form-hint">This template will belong to the selected client</p>
+                            <x-input-error :messages="$errors->get('client_id')" class="mt-2" />
+                        </div>
+
+                        <div class="form-group">
                             <label for="name" class="form-label">Template Name</label>
                             <input type="text" id="name" name="name" value="{{ old('name') }}" required class="form-input" placeholder="e.g. Customer Satisfaction Survey">
                             <p class="form-hint">A descriptive name for this survey template</p>

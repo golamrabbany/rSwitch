@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Broadcast;
 use App\Models\SipAccount;
+use App\Models\SurveyTemplate;
 use App\Models\VoiceFile;
 use App\Services\BroadcastService;
 use Illuminate\Http\Request;
@@ -25,28 +26,34 @@ class BroadcastController extends Controller
     {
         $sipAccounts = SipAccount::where('user_id', auth()->id())->where('status', 'active')->get();
         $voiceFiles = VoiceFile::where('user_id', auth()->id())->approved()->get();
+        $surveyTemplates = SurveyTemplate::where('client_id', auth()->id())
+            ->where('status', 'approved')
+            ->get(['id', 'name', 'config']);
 
-        return view('client.broadcasts.create', compact('sipAccounts', 'voiceFiles'));
+        return view('client.broadcasts.create', compact('sipAccounts', 'voiceFiles', 'surveyTemplates'));
     }
 
     public function store(Request $request, BroadcastService $service)
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'sip_account_id' => ['required', 'exists:sip_accounts,id'],
-            'voice_file_id' => ['required', 'exists:voice_files,id'],
             'type' => ['required', 'in:simple,survey'],
+            'voice_file_id' => ['required_if:type,simple', 'nullable', 'exists:voice_files,id'],
+            'survey_template_id' => ['required_if:type,survey', 'nullable', 'exists:survey_templates,id'],
+            'sip_account_id' => ['required', 'exists:sip_accounts,id'],
             'phone_list_type' => ['required', 'in:manual,csv'],
             'phone_numbers' => ['required_if:phone_list_type,manual', 'nullable', 'string'],
             'csv_file' => ['required_if:phone_list_type,csv', 'nullable', 'file', 'mimes:csv,txt', 'max:5120'],
             'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
             'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:60'],
-            'survey_config' => ['nullable', 'json'],
         ]);
 
         // Verify ownership
         abort_unless(SipAccount::where('id', $validated['sip_account_id'])->where('user_id', auth()->id())->exists(), 403);
-        abort_unless(VoiceFile::where('id', $validated['voice_file_id'])->where('user_id', auth()->id())->approved()->exists(), 403);
+
+        if ($validated['type'] === 'simple') {
+            abort_unless(VoiceFile::where('id', $validated['voice_file_id'])->where('user_id', auth()->id())->approved()->exists(), 403);
+        }
 
         $data = array_merge($validated, [
             'user_id' => auth()->id(),
@@ -55,41 +62,14 @@ class BroadcastController extends Controller
             'csv_file' => $request->file('csv_file'),
         ]);
 
-        if ($validated['type'] === 'survey' && !empty($validated['survey_config'])) {
-            $data['survey_config'] = json_decode($validated['survey_config'], true);
-        }
-
-        // Build survey_config v2 from form questions
-        if ($request->type === 'survey' && $request->has('survey_questions')) {
-            $questions = [];
-            $qNum = 0;
-            foreach ($request->input('survey_questions', []) as $sq) {
-                $type = $sq['type'] ?? 'question';
-                $key = $type === 'intro' ? 'intro' : 'q' . (++$qNum);
-                $q = [
-                    'key' => $key,
-                    'type' => $type,
-                    'voice_file_id' => (int) ($sq['voice_file_id'] ?? 0),
-                    'label' => $sq['label'] ?? '',
-                ];
-                if ($type === 'question') {
-                    $q['max_digits'] = (int) ($sq['max_digits'] ?? 1);
-                    $q['timeout'] = (int) ($sq['timeout'] ?? 10);
-                    $q['max_retries'] = (int) ($sq['max_retries'] ?? 2);
-                    $options = [];
-                    foreach ($sq['options'] ?? [] as $opt) {
-                        if (!empty($opt['digit']) && !empty($opt['label'])) {
-                            $options[$opt['digit']] = $opt['label'];
-                        }
-                    }
-                    $q['options'] = $options;
-                }
-                $questions[] = $q;
-            }
-            $data['survey_config'] = ['version' => 2, 'questions' => $questions];
-
-            // Set voice_file_id to first voice file in questions
-            $firstVfId = collect($questions)->pluck('voice_file_id')->filter()->first();
+        // If survey, use template config
+        if ($validated['type'] === 'survey' && !empty($validated['survey_template_id'])) {
+            $surveyTemplate = SurveyTemplate::findOrFail($validated['survey_template_id']);
+            abort_unless($surveyTemplate->client_id === auth()->id(), 403);
+            abort_unless($surveyTemplate->isApproved(), 422, 'Template must be approved.');
+            $data['survey_config'] = $surveyTemplate->config;
+            $data['survey_template_id'] = $surveyTemplate->id;
+            $firstVfId = collect($surveyTemplate->config['questions'] ?? [])->pluck('voice_file_id')->filter()->first();
             if ($firstVfId) {
                 $data['voice_file_id'] = $firstVfId;
             }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Reseller;
 
 use App\Http\Controllers\Controller;
 use App\Models\SurveyTemplate;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class SurveyTemplateController extends Controller
@@ -37,21 +38,29 @@ class SurveyTemplateController extends Controller
 
     public function create()
     {
-        return view('reseller.survey-templates.create');
+        $clients = User::whereIn('id', auth()->user()->descendantIds())
+            ->where('role', 'client')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        return view('reseller.survey-templates.create', compact('clients'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
+            'client_id' => 'required|exists:users,id',
             'name' => 'required|string|max:150',
             'description' => 'nullable|string|max:500',
         ]);
 
         $authUser = auth()->user();
+        $client = User::findOrFail($request->client_id);
+        abort_unless(in_array((int) $client->id, $authUser->descendantIds()), 403);
 
         $template = SurveyTemplate::create([
             'user_id' => $authUser->id,
-            'client_id' => $authUser->id,
+            'client_id' => $client->id,
             'name' => $request->name,
             'description' => $request->description,
             'status' => 'pending',

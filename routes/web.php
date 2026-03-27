@@ -188,7 +188,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('broadcasts', [Admin\BroadcastController::class, 'index'])->name('broadcasts.index');
     Route::get('broadcasts/create', [Admin\BroadcastController::class, 'create'])->name('broadcasts.create');
     Route::post('broadcasts', [Admin\BroadcastController::class, 'store'])->name('broadcasts.store');
-    Route::get('broadcasts/client-data', [Admin\BroadcastController::class, 'clientData'])->name('broadcasts.client-data');
+    Route::get('broadcasts/template-data', [Admin\BroadcastController::class, 'templateData'])->name('broadcasts.template-data');
     Route::get('broadcasts/{broadcast}', [Admin\BroadcastController::class, 'show'])->name('broadcasts.show');
     Route::post('broadcasts/{broadcast}/start', [Admin\BroadcastController::class, 'start'])->name('broadcasts.start');
     Route::post('broadcasts/{broadcast}/pause', [Admin\BroadcastController::class, 'pause'])->name('broadcasts.pause');
@@ -294,7 +294,7 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::get('broadcasts', [Reseller\BroadcastController::class, 'index'])->name('broadcasts.index');
         Route::get('broadcasts/create', [Reseller\BroadcastController::class, 'create'])->name('broadcasts.create');
         Route::post('broadcasts', [Reseller\BroadcastController::class, 'store'])->name('broadcasts.store');
-        Route::get('broadcasts/client-data', [Reseller\BroadcastController::class, 'clientData'])->name('broadcasts.client-data');
+        Route::get('broadcasts/template-data', [Reseller\BroadcastController::class, 'templateData'])->name('broadcasts.template-data');
         Route::get('broadcasts/{broadcast}', [Reseller\BroadcastController::class, 'show'])->name('broadcasts.show');
         Route::post('broadcasts/{broadcast}/start', [Reseller\BroadcastController::class, 'start'])->name('broadcasts.start');
         Route::post('broadcasts/{broadcast}/pause', [Reseller\BroadcastController::class, 'pause'])->name('broadcasts.pause');
