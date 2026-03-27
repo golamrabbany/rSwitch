@@ -50,9 +50,12 @@
                   }, 300);
               },
               kycError: '',
+              clientEmail: '', clientBalance: 0,
               selectClient(user) {
                   this.clientSearch = user.name;
                   this.clientId = user.id;
+                  this.clientEmail = user.email;
+                  this.clientBalance = parseFloat(user.balance || 0);
                   this.clientOpen = false;
                   if (user.kyc_status !== 'approved') {
                       this.kycError = user.name + '\'s KYC is not approved (' + (user.kyc_status || 'not submitted') + '). Template cannot be created.';
@@ -60,7 +63,7 @@
                       this.kycError = '';
                   }
               },
-              clearClient() { this.clientSearch = ''; this.clientId = ''; this.clientResults = []; this.kycError = ''; }
+              clearClient() { this.clientSearch = ''; this.clientId = ''; this.clientResults = []; this.kycError = ''; this.clientEmail = ''; this.clientBalance = 0; }
           }">
         @csrf
 
@@ -127,6 +130,24 @@
                                 </div>
                             </div>
                             <p class="form-hint">Select the client this survey template is for</p>
+
+                            {{-- Client Info Banner --}}
+                            <div x-show="clientId && !kycError" x-cloak class="mt-2 flex items-center justify-between p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center">
+                                        <span class="text-xs font-bold text-indigo-600" x-text="clientSearch.substring(0, 2).toUpperCase()"></span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-indigo-800" x-text="clientSearch"></p>
+                                        <p class="text-xs text-indigo-600" x-text="clientEmail"></p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-mono font-semibold" :class="clientBalance > 0 ? 'text-emerald-600' : 'text-red-500'" x-text="'{{ currency_symbol() }}' + clientBalance.toFixed(2)"></p>
+                                    <p class="text-xs text-gray-500">Balance</p>
+                                </div>
+                            </div>
+
                             <div x-show="kycError" x-cloak class="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
                                 <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                 <span class="text-xs text-red-700" x-text="kycError"></span>

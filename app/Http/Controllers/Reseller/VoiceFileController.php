@@ -48,7 +48,7 @@ class VoiceFileController extends Controller
         $clients = User::whereIn('id', auth()->user()->descendantIds())
             ->where('role', 'client')
             ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+            ->get(['id', 'name', 'email', 'balance']);
 
         return view('reseller.voice-files.create', compact('clients'));
     }

@@ -14,7 +14,15 @@
         </div>
     </div>
 
-    <form method="POST" action="{{ route('reseller.survey-templates.store') }}">
+    <script>var _clients = @json($clients->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'email' => $c->email, 'balance' => (float)$c->balance]));</script>
+
+    <form method="POST" action="{{ route('reseller.survey-templates.store') }}"
+          x-data="{
+              selectedClient: null,
+              onClientChange(id) {
+                  this.selectedClient = _clients.find(c => c.id == id) || null;
+              }
+          }">
         @csrf
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -28,7 +36,7 @@
                     <div class="form-card-body space-y-4">
                         <div class="form-group">
                             <label for="client_id" class="form-label">Client</label>
-                            <select id="client_id" name="client_id" required class="form-input">
+                            <select id="client_id" name="client_id" required class="form-input" @change="onClientChange($event.target.value)">
                                 <option value="">Select Client</option>
                                 @foreach($clients as $client)
                                     <option value="{{ $client->id }}" {{ old('client_id') == $client->id ? 'selected' : '' }}>{{ $client->name }} ({{ $client->email }})</option>
@@ -36,6 +44,23 @@
                             </select>
                             <p class="form-hint">This template will belong to the selected client</p>
                             <x-input-error :messages="$errors->get('client_id')" class="mt-2" />
+
+                            {{-- Client Info Banner --}}
+                            <div x-show="selectedClient" x-transition class="mt-2 flex items-center justify-between p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-emerald-800" x-text="selectedClient?.name"></p>
+                                        <p class="text-xs text-emerald-600" x-text="selectedClient?.email"></p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-mono font-semibold" :class="selectedClient?.balance > 0 ? 'text-emerald-600' : 'text-red-500'" x-text="'৳' + (selectedClient?.balance || 0).toFixed(2)"></p>
+                                    <p class="text-xs text-gray-500">Balance</p>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-group">
