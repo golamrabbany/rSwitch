@@ -65,12 +65,14 @@ class InboundCallHandler:
             did = session.execute(
                 text("""
                     SELECT d.id, d.number, d.destination_type, d.destination_number,
-                           d.sip_account_id, d.ring_group_id, d.user_id,
+                           d.destination_id as sip_account_id,
+                           d.destination_id as ring_group_id,
+                           d.assigned_to_user_id as user_id,
                            s.username as sip_username,
                            u.parent_id as reseller_id
                     FROM dids d
-                    LEFT JOIN sip_accounts s ON d.sip_account_id = s.id
-                    LEFT JOIN users u ON d.user_id = u.id
+                    LEFT JOIN sip_accounts s ON d.destination_id = s.id AND d.destination_type = 'sip_account'
+                    LEFT JOIN users u ON d.assigned_to_user_id = u.id
                     WHERE d.number = :number AND d.status = 'active'
                     LIMIT 1
                 """),
