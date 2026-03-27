@@ -413,9 +413,9 @@ class AMIListener:
             logger.debug(f"Could not load contacts: {e}")
 
     async def _periodic_contact_refresh(self):
-        """Refresh contacts from ps_contacts every 30 seconds."""
+        """Refresh contacts from ps_contacts every 1 second for instant updates."""
         while True:
-            await asyncio.sleep(30)
+            await asyncio.sleep(1)
             try:
                 await self._load_registered_contacts()
             except Exception as e:
