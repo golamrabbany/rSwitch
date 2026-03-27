@@ -57,7 +57,7 @@ exten => _X.,1,NoOp(Outbound call from ${CALLERID(all)} to ${EXTEN})
 [from-trunk]
 exten => _X.,1,NoOp(Inbound call from ${CALLERID(all)} to DID ${EXTEN})
  same => n,Set(CHANNEL(language)=en)
- same => n,Set(TRUNK_ENDPOINT=${CHANNEL(pjsip,endpoint)})
+ same => n,Set(TRUNK_ENDPOINT=${CHANNEL(endpoint)})
  same => n,Set(CHANNEL(hangup_handler_push)=hangup-handler,s,1)
  same => n,AGI(agi://${AGI_HOST}:${AGI_PORT}/route_inbound)
  same => n,GotoIf($["${AGISTATUS}" != "SUCCESS"]?error)
