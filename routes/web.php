@@ -280,8 +280,15 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
 
         // Voice Broadcast — Voice Files
         Route::get('voice-files', [Reseller\VoiceFileController::class, 'index'])->name('voice-files.index');
+        Route::get('voice-files/create', [Reseller\VoiceFileController::class, 'create'])->name('voice-files.create');
+        Route::post('voice-files', [Reseller\VoiceFileController::class, 'store'])->name('voice-files.store');
         Route::get('voice-files/{voiceFile}', [Reseller\VoiceFileController::class, 'show'])->name('voice-files.show');
         Route::get('voice-files/{voiceFile}/play', [Reseller\VoiceFileController::class, 'play'])->name('voice-files.play');
+
+        Route::get('survey-templates', [Reseller\SurveyTemplateController::class, 'index'])->name('survey-templates.index');
+        Route::get('survey-templates/create', [Reseller\SurveyTemplateController::class, 'create'])->name('survey-templates.create');
+        Route::post('survey-templates', [Reseller\SurveyTemplateController::class, 'store'])->name('survey-templates.store');
+        Route::get('survey-templates/{surveyTemplate}', [Reseller\SurveyTemplateController::class, 'show'])->name('survey-templates.show');
 
         // Voice Broadcast — Broadcasts
         Route::get('broadcasts', [Reseller\BroadcastController::class, 'index'])->name('broadcasts.index');
@@ -296,6 +303,13 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::get('broadcasts/{broadcast}/results', [Reseller\BroadcastController::class, 'results'])->name('broadcasts.results');
         Route::get('broadcasts/{broadcast}/export-results', [Reseller\BroadcastController::class, 'exportResults'])->name('broadcasts.export-results');
         Route::get('broadcasts/{broadcast}/stats', [Reseller\BroadcastController::class, 'stats'])->name('broadcasts.stats');
+        Route::get('broadcasts/{broadcast}/edit', [Reseller\BroadcastController::class, 'edit'])->name('broadcasts.edit');
+        Route::put('broadcasts/{broadcast}', [Reseller\BroadcastController::class, 'update'])->name('broadcasts.update');
+
+        // DNC List
+        Route::get('dnc', [Reseller\DncController::class, 'index'])->name('dnc.index');
+        Route::post('dnc', [Reseller\DncController::class, 'store'])->name('dnc.store');
+        Route::delete('dnc/{dncNumber}', [Reseller\DncController::class, 'destroy'])->name('dnc.destroy');
 
         // Financial
         Route::get('transactions', [Reseller\TransactionController::class, 'index'])->name('transactions.index');

@@ -334,6 +334,30 @@ class BroadcastController extends Controller
         return response()->json(['sip_accounts' => $sipAccounts, 'voice_files' => $voiceFiles]);
     }
 
+    public function edit(Broadcast $broadcast)
+    {
+        $this->authorize($broadcast);
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled']), 403, 'Only draft or scheduled broadcasts can be edited.');
+
+        return view('reseller.broadcasts.edit', compact('broadcast'));
+    }
+
+    public function update(Request $request, Broadcast $broadcast)
+    {
+        $this->authorize($broadcast);
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled']), 403, 'Only draft or scheduled broadcasts can be edited.');
+
+        $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:120'],
+        ]);
+
+        $broadcast->update($request->only('name', 'max_concurrent', 'ring_timeout'));
+
+        return redirect()->route('reseller.broadcasts.show', $broadcast)->with('success', 'Broadcast updated.');
+    }
+
     private function authorize(Broadcast $broadcast): void
     {
         $descendantIds = auth()->user()->descendantIds();

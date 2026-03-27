@@ -81,6 +81,28 @@
                     </div>
                 </div>
 
+                <!-- Voice Broadcast -->
+                @php $broadcastActive = request()->routeIs('reseller.voice-files.*', 'reseller.survey-templates.*', 'reseller.broadcasts.*', 'reseller.dnc.*'); @endphp
+                <div x-data="{ open: {{ $broadcastActive ? 'true' : 'false' }} }" class="mb-1">
+                    <button @click="open = !open" class="nav-parent {{ $broadcastActive ? 'has-active' : 'text-gray-600' }}">
+                        <div class="flex items-center">
+                            <svg class="nav-icon {{ $broadcastActive ? 'text-emerald-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                            </svg>
+                            <span class="nav-text">Voice Broadcast</span>
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-collapse class="nav-children">
+                        <a href="{{ route('reseller.voice-files.index') }}" class="nav-child {{ request()->routeIs('reseller.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Template</a>
+                        <a href="{{ route('reseller.survey-templates.index') }}" class="nav-child {{ request()->routeIs('reseller.survey-templates.*') ? 'active' : 'text-gray-500' }}">Survey Templates</a>
+                        <a href="{{ route('reseller.broadcasts.index') }}" class="nav-child {{ request()->routeIs('reseller.broadcasts.*') ? 'active' : 'text-gray-500' }}">Broadcasts</a>
+                        <a href="{{ route('reseller.dnc.index') }}" class="nav-child {{ request()->routeIs('reseller.dnc.*') ? 'active' : 'text-gray-500' }}">DNC List</a>
+                    </div>
+                </div>
+
                 <!-- Reports Menu -->
                 @php $reportsActive = request()->routeIs('reseller.reports.*'); @endphp
                 <div x-data="{ open: {{ $reportsActive ? 'true' : 'false' }} }" class="mb-1">
@@ -100,26 +122,6 @@
                         <a href="{{ route('reseller.reports.success-calls') }}" class="nav-child {{ request()->routeIs('reseller.reports.success-calls') ? 'active' : 'text-gray-500' }}">Success Calls</a>
                         <a href="{{ route('reseller.reports.failed-calls') }}" class="nav-child {{ request()->routeIs('reseller.reports.failed-calls') ? 'active' : 'text-gray-500' }}">Failed Calls</a>
                         <a href="{{ route('reseller.reports.call-summary') }}" class="nav-child {{ request()->routeIs('reseller.reports.call-summary') ? 'active' : 'text-gray-500' }}">Call Summary</a>
-                    </div>
-                </div>
-
-                <!-- Voice Broadcast -->
-                @php $broadcastActive = request()->routeIs('reseller.voice-files.*', 'reseller.broadcasts.*'); @endphp
-                <div x-data="{ open: {{ $broadcastActive ? 'true' : 'false' }} }" class="mb-1">
-                    <button @click="open = !open" class="nav-parent {{ $broadcastActive ? 'has-active' : 'text-gray-600' }}">
-                        <div class="flex items-center">
-                            <svg class="nav-icon {{ $broadcastActive ? 'text-emerald-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
-                            </svg>
-                            <span class="nav-text">Voice Broadcast</span>
-                        </div>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </button>
-                    <div x-show="open" x-collapse class="nav-children">
-                        <a href="{{ route('reseller.voice-files.index') }}" class="nav-child {{ request()->routeIs('reseller.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Files</a>
-                        <a href="{{ route('reseller.broadcasts.index') }}" class="nav-child {{ request()->routeIs('reseller.broadcasts.*') ? 'active' : 'text-gray-500' }}">Broadcasts</a>
                     </div>
                 </div>
 
