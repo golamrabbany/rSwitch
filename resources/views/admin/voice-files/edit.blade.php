@@ -171,16 +171,6 @@
                     </div>
                 </div>
             </div>
-
-            {{-- Tips --}}
-            <div class="detail-card">
-                <div class="detail-card-header"><h3 class="detail-card-title">Tips</h3></div>
-                <div class="detail-card-body text-xs text-gray-500 space-y-2">
-                    <p>Record in a quiet environment for best quality.</p>
-                    <p>Speak clearly and at a moderate pace.</p>
-                    <p>Files are auto-converted to Asterisk-compatible format.</p>
-                </div>
-            </div>
         </div>
     </div>
 </x-admin-layout>

@@ -43,7 +43,11 @@ class SurveyTemplateController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'balance']);
 
-        return view('reseller.survey-templates.create', compact('clients'));
+        $clientsJson = $clients->map(function ($c) {
+            return ['id' => $c->id, 'name' => $c->name, 'email' => $c->email, 'balance' => (float) $c->balance];
+        })->values();
+
+        return view('reseller.survey-templates.create', compact('clients', 'clientsJson'));
     }
 
     public function store(Request $request)
@@ -80,5 +84,33 @@ class SurveyTemplateController extends Controller
         $surveyTemplate->load(['user', 'client', 'approvedBy']);
 
         return view('reseller.survey-templates.show', compact('surveyTemplate'));
+    }
+
+    public function edit(SurveyTemplate $surveyTemplate)
+    {
+        $authUser = auth()->user();
+        abort_unless($surveyTemplate->user_id === $authUser->id || in_array($surveyTemplate->client_id, $authUser->descendantIds()), 403);
+        abort_unless($surveyTemplate->status === 'pending', 403, 'Only pending templates can be edited.');
+
+        $surveyTemplate->load('client');
+
+        return view('reseller.survey-templates.edit', compact('surveyTemplate'));
+    }
+
+    public function update(Request $request, SurveyTemplate $surveyTemplate)
+    {
+        $authUser = auth()->user();
+        abort_unless($surveyTemplate->user_id === $authUser->id || in_array($surveyTemplate->client_id, $authUser->descendantIds()), 403);
+        abort_unless($surveyTemplate->status === 'pending', 403, 'Only pending templates can be edited.');
+
+        $request->validate([
+            'name' => 'required|string|max:150',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        $surveyTemplate->update($request->only('name', 'description'));
+
+        return redirect()->route('reseller.survey-templates.show', $surveyTemplate)
+            ->with('success', 'Survey template updated.');
     }
 }

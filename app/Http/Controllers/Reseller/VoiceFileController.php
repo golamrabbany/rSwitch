@@ -50,7 +50,11 @@ class VoiceFileController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'balance']);
 
-        return view('reseller.voice-files.create', compact('clients'));
+        $clientsJson = $clients->map(function ($c) {
+            return ['id' => $c->id, 'name' => $c->name, 'email' => $c->email, 'balance' => (float) $c->balance];
+        })->values();
+
+        return view('reseller.voice-files.create', compact('clients', 'clientsJson'));
     }
 
     public function store(Request $request, VoiceFileService $service)
@@ -86,6 +90,38 @@ class VoiceFileController extends Controller
         $voiceFile->load('user', 'approver');
 
         return view('reseller.voice-files.show', compact('voiceFile'));
+    }
+
+    public function edit(VoiceFile $voiceFile)
+    {
+        $descendantIds = auth()->user()->descendantIds();
+        abort_unless(in_array($voiceFile->user_id, $descendantIds), 403);
+        abort_unless($voiceFile->status === 'pending', 403, 'Only pending templates can be edited.');
+
+        $voiceFile->load('user');
+
+        return view('reseller.voice-files.edit', compact('voiceFile'));
+    }
+
+    public function update(Request $request, VoiceFile $voiceFile, VoiceFileService $service)
+    {
+        $descendantIds = auth()->user()->descendantIds();
+        abort_unless(in_array($voiceFile->user_id, $descendantIds), 403);
+        abort_unless($voiceFile->status === 'pending', 403, 'Only pending templates can be edited.');
+
+        $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'voice_file' => ['nullable', 'file', 'mimes:wav,mp3', 'max:10240'],
+        ]);
+
+        $voiceFile->update(['name' => $request->name]);
+
+        if ($request->hasFile('voice_file')) {
+            $service->replace($voiceFile, $request->file('voice_file'));
+        }
+
+        return redirect()->route('reseller.voice-files.show', $voiceFile)
+            ->with('success', 'Voice template updated.');
     }
 
     public function play(VoiceFile $voiceFile, VoiceFileService $service)

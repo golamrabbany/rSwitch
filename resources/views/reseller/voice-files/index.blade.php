@@ -67,7 +67,7 @@
             <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
                 <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                    Total : {{ number_format($voiceFiles->total()) }} &middot; Showing {{ $voiceFiles->firstItem() }}–{{ $voiceFiles->lastItem() }}
+                    Voice Templates Total : {{ number_format($voiceFiles->total()) }} &middot; Showing {{ $voiceFiles->firstItem() }} to {{ $voiceFiles->lastItem() }}
                 </span>
             </div>
         @endif
@@ -76,6 +76,7 @@
                 <tr class="border-b border-gray-200">
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Format</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
@@ -90,6 +91,9 @@
                         <td class="px-3 py-2">
                             <p class="font-semibold text-gray-800 group-hover:text-emerald-600 transition-colors">{{ $file->name }}</p>
                             <p class="text-xs text-gray-400">{{ $file->original_filename ?? '' }}</p>
+                        </td>
+                        <td class="px-3 py-2">
+                            <p class="text-sm text-gray-800">{{ $file->user?->name ?? '—' }}</p>
                         </td>
                         <td class="px-3 py-2 text-gray-700 tabular-nums">
                             @if($file->duration)
@@ -124,12 +128,21 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                     </svg>
                                 </a>
+                                @if($file->status === 'pending')
+                                    <a href="{{ route('reseller.voice-files.edit', $file) }}" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                    </a>
+                                @elseif($file->status === 'approved')
+                                    <span class="p-1.5 rounded-lg text-gray-300 cursor-not-allowed" title="Approved — cannot edit">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                    </span>
+                                @endif
                             </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-4 py-12 text-center">
+                        <td colspan="8" class="px-4 py-12 text-center">
                             <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
                             </svg>

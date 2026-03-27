@@ -284,11 +284,15 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::post('voice-files', [Reseller\VoiceFileController::class, 'store'])->name('voice-files.store');
         Route::get('voice-files/{voiceFile}', [Reseller\VoiceFileController::class, 'show'])->name('voice-files.show');
         Route::get('voice-files/{voiceFile}/play', [Reseller\VoiceFileController::class, 'play'])->name('voice-files.play');
+        Route::get('voice-files/{voiceFile}/edit', [Reseller\VoiceFileController::class, 'edit'])->name('voice-files.edit');
+        Route::put('voice-files/{voiceFile}', [Reseller\VoiceFileController::class, 'update'])->name('voice-files.update');
 
         Route::get('survey-templates', [Reseller\SurveyTemplateController::class, 'index'])->name('survey-templates.index');
         Route::get('survey-templates/create', [Reseller\SurveyTemplateController::class, 'create'])->name('survey-templates.create');
         Route::post('survey-templates', [Reseller\SurveyTemplateController::class, 'store'])->name('survey-templates.store');
         Route::get('survey-templates/{surveyTemplate}', [Reseller\SurveyTemplateController::class, 'show'])->name('survey-templates.show');
+        Route::get('survey-templates/{surveyTemplate}/edit', [Reseller\SurveyTemplateController::class, 'edit'])->name('survey-templates.edit');
+        Route::put('survey-templates/{surveyTemplate}', [Reseller\SurveyTemplateController::class, 'update'])->name('survey-templates.update');
 
         // Voice Broadcast — Broadcasts
         Route::get('broadcasts', [Reseller\BroadcastController::class, 'index'])->name('broadcasts.index');
