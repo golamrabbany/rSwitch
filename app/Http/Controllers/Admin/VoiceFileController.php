@@ -92,6 +92,7 @@ class VoiceFileController extends Controller
     public function edit(VoiceFile $voiceFile)
     {
         abort_unless(auth()->user()->isSuperAdmin(), 403);
+        $voiceFile->load('user');
         return view('admin.voice-files.edit', compact('voiceFile'));
     }
 

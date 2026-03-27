@@ -34,11 +34,6 @@
                     </div>
                     <div class="form-card-body space-y-4">
                         <div class="form-group">
-                            <label class="form-label">Client</label>
-                            <input type="text" class="form-input bg-gray-50" value="{{ $voiceFile->user?->name ?? '-' }} ({{ $voiceFile->user?->email }})" disabled>
-                        </div>
-
-                        <div class="form-group">
                             <label class="form-label">Template Name</label>
                             <input type="text" name="name" value="{{ old('name', $voiceFile->name) }}" required class="form-input" placeholder="e.g. Welcome Message, Payment Reminder" x-ref="nameInput">
                             @error('name') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
@@ -123,16 +118,67 @@
         </div>
 
         <div class="space-y-4" style="position:sticky; top:1rem;">
+            {{-- Client Info --}}
+            <div class="detail-card">
+                <div class="detail-card-header"><h3 class="detail-card-title">Client</h3></div>
+                <div class="detail-card-body">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <span class="text-sm font-bold text-indigo-600">{{ strtoupper(substr($voiceFile->user?->name ?? '?', 0, 2)) }}</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">{{ $voiceFile->user?->name }}</p>
+                            <p class="text-xs text-gray-500 truncate">{{ $voiceFile->user?->email }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                        <span class="text-xs text-gray-500">Balance</span>
+                        <span class="text-sm font-mono font-semibold {{ ($voiceFile->user?->balance ?? 0) > 0 ? 'text-emerald-600' : 'text-red-500' }}">{{ currency_symbol() }}{{ number_format($voiceFile->user?->balance ?? 0, 2) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Current Status --}}
             <div class="detail-card">
                 <div class="detail-card-header"><h3 class="detail-card-title">Current Status</h3></div>
                 <div class="detail-card-body space-y-2 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-500">Status</span>
-                        <span class="font-medium {{ $voiceFile->status === 'approved' ? 'text-emerald-600' : ($voiceFile->status === 'pending' ? 'text-amber-600' : 'text-gray-500') }}">{{ ucfirst($voiceFile->status) }}</span>
+                        <span class="font-medium {{ $voiceFile->status === 'approved' ? 'text-emerald-600' : ($voiceFile->status === 'pending' ? 'text-amber-600' : ($voiceFile->status === 'rejected' ? 'text-red-600' : 'text-gray-500')) }}">{{ ucfirst($voiceFile->status) }}</span>
                     </div>
-                    <div class="flex justify-between"><span class="text-gray-500">Client</span><span class="font-medium">{{ $voiceFile->user?->name }}</span></div>
-                    <div class="flex justify-between"><span class="text-gray-500">Uploaded</span><span class="font-medium">{{ $voiceFile->created_at->format('M d, Y') }}</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Format</span><span class="font-medium text-gray-700">{{ strtoupper($voiceFile->format) }}</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Duration</span><span class="font-medium text-gray-700">{{ $voiceFile->duration ? $voiceFile->duration . 's' : 'Unknown' }}</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Uploaded</span><span class="font-medium text-gray-700">{{ $voiceFile->created_at->format('M d, Y') }}</span></div>
                     <p class="text-xs text-gray-400 pt-2">Editing will not change the approval status.</p>
+                </div>
+            </div>
+
+            {{-- File Requirements --}}
+            <div class="detail-card">
+                <div class="detail-card-header"><h3 class="detail-card-title">File Requirements</h3></div>
+                <div class="detail-card-body text-sm text-gray-500 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span>Formats</span>
+                        <span class="font-medium text-gray-700">WAV, MP3</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Max size</span>
+                        <span class="font-medium text-gray-700">10MB per file</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Conversion</span>
+                        <span class="font-medium text-gray-700">Auto 8kHz WAV</span>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Tips --}}
+            <div class="detail-card">
+                <div class="detail-card-header"><h3 class="detail-card-title">Tips</h3></div>
+                <div class="detail-card-body text-xs text-gray-500 space-y-2">
+                    <p>Record in a quiet environment for best quality.</p>
+                    <p>Speak clearly and at a moderate pace.</p>
+                    <p>Files are auto-converted to Asterisk-compatible format.</p>
                 </div>
             </div>
         </div>
