@@ -118,7 +118,7 @@
         </div>
 
         <div class="space-y-4" style="position:sticky; top:1rem;">
-            {{-- Client Info --}}
+            {{-- Client --}}
             <div class="detail-card">
                 <div class="detail-card-header"><h3 class="detail-card-title">Client</h3></div>
                 <div class="detail-card-body">
@@ -138,18 +138,44 @@
                 </div>
             </div>
 
-            {{-- Current Status --}}
+            {{-- Template Info --}}
             <div class="detail-card">
-                <div class="detail-card-header"><h3 class="detail-card-title">Current Status</h3></div>
-                <div class="detail-card-body space-y-2 text-sm">
+                <div class="detail-card-header"><h3 class="detail-card-title">Template Info</h3></div>
+                <div class="detail-card-body space-y-2.5 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-500">Status</span>
-                        <span class="font-medium {{ $voiceFile->status === 'approved' ? 'text-emerald-600' : ($voiceFile->status === 'pending' ? 'text-amber-600' : ($voiceFile->status === 'rejected' ? 'text-red-600' : 'text-gray-500')) }}">{{ ucfirst($voiceFile->status) }}</span>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                            {{ $voiceFile->status === 'approved' ? 'bg-emerald-100 text-emerald-700' : ($voiceFile->status === 'pending' ? 'bg-amber-100 text-amber-700' : ($voiceFile->status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700')) }}">{{ ucfirst($voiceFile->status) }}</span>
                     </div>
                     <div class="flex justify-between"><span class="text-gray-500">Format</span><span class="font-medium text-gray-700">{{ strtoupper($voiceFile->format) }}</span></div>
                     <div class="flex justify-between"><span class="text-gray-500">Duration</span><span class="font-medium text-gray-700">{{ $voiceFile->duration ? $voiceFile->duration . 's' : 'Unknown' }}</span></div>
-                    <div class="flex justify-between"><span class="text-gray-500">Uploaded</span><span class="font-medium text-gray-700">{{ $voiceFile->created_at->format('M d, Y') }}</span></div>
-                    <p class="text-xs text-gray-400 pt-2">Editing will not change the approval status.</p>
+                    <div class="flex justify-between"><span class="text-gray-500">File Size</span><span class="font-medium text-gray-700">{{ $voiceFile->file_path ? round(\Illuminate\Support\Facades\Storage::disk('private')->size($voiceFile->file_path) / 1024) . ' KB' : '—' }}</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Uploaded</span><span class="font-medium text-gray-700">{{ $voiceFile->created_at->format('d M Y, g:i A') }}</span></div>
+                    @if($voiceFile->approved_at)
+                        <div class="flex justify-between"><span class="text-gray-500">Approved</span><span class="font-medium text-gray-700">{{ $voiceFile->approved_at->format('d M Y') }}</span></div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- What You Can Change --}}
+            <div class="detail-card">
+                <div class="detail-card-header"><h3 class="detail-card-title">What You Can Change</h3></div>
+                <div class="detail-card-body text-xs space-y-2">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span class="text-gray-600">Template Name</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span class="text-gray-600">Audio File (replace)</span>
+                    </div>
+                    <div class="border-t border-gray-100 pt-2 mt-2">
+                        <div class="flex items-center gap-2 text-gray-400">
+                            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <span>Client, status — fixed</span>
+                        </div>
+                    </div>
+                    <p class="text-gray-400 pt-1">Editing will not change the approval status.</p>
                 </div>
             </div>
 
@@ -157,18 +183,10 @@
             <div class="detail-card">
                 <div class="detail-card-header"><h3 class="detail-card-title">File Requirements</h3></div>
                 <div class="detail-card-body text-sm text-gray-500 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span>Formats</span>
-                        <span class="font-medium text-gray-700">WAV, MP3</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span>Max size</span>
-                        <span class="font-medium text-gray-700">10MB per file</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span>Conversion</span>
-                        <span class="font-medium text-gray-700">Auto 8kHz WAV</span>
-                    </div>
+                    <div class="flex items-center justify-between"><span>Formats</span><span class="font-medium text-gray-700">WAV, MP3</span></div>
+                    <div class="flex items-center justify-between"><span>Max size</span><span class="font-medium text-gray-700">10MB per file</span></div>
+                    <div class="flex items-center justify-between"><span>Conversion</span><span class="font-medium text-gray-700">Auto 8kHz WAV</span></div>
+                    <div class="flex items-center justify-between"><span>Recommended</span><span class="font-medium text-gray-700">Under 60 seconds</span></div>
                 </div>
             </div>
         </div>

@@ -142,7 +142,7 @@
                         </div>
 
                         <div class="px-4 py-3 border-t">
-                            {{ $numbers->withQueryString()->links('vendor.pagination.tailwind') }}
+                            {{ $numbers->withQueryString()->onEachSide(1)->links('pagination::simple-tailwind') }}
                         </div>
                     @else
                         <div class="text-center py-12">

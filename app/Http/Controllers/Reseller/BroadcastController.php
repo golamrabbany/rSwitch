@@ -328,10 +328,10 @@ class BroadcastController extends Controller
 
         abort_unless(in_array((int) $clientId, $descendantIds), 403);
 
-        $sipAccounts = SipAccount::where('user_id', $clientId)->where('status', 'active')->get(['id', 'username']);
+        $sipAccounts = SipAccount::where('user_id', $clientId)->where('status', 'active')->get(['id', 'username', 'max_channels']);
 
         return response()->json([
-            'client' => ['id' => $client->id, 'name' => $client->name, 'email' => $client->email],
+            'client' => ['id' => $client->id, 'name' => $client->name, 'email' => $client->email, 'balance' => (float) $client->balance],
             'sip_accounts' => $sipAccounts,
         ]);
     }
@@ -339,7 +339,7 @@ class BroadcastController extends Controller
     public function edit(Broadcast $broadcast)
     {
         $this->authorize($broadcast);
-        abort_unless(in_array($broadcast->status, ['draft', 'scheduled']), 403, 'Only draft or scheduled broadcasts can be edited.');
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled', 'paused']), 403, 'Pause the broadcast first to edit.');
 
         return view('reseller.broadcasts.edit', compact('broadcast'));
     }
@@ -347,7 +347,7 @@ class BroadcastController extends Controller
     public function update(Request $request, Broadcast $broadcast)
     {
         $this->authorize($broadcast);
-        abort_unless(in_array($broadcast->status, ['draft', 'scheduled']), 403, 'Only draft or scheduled broadcasts can be edited.');
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled', 'paused']), 403, 'Pause the broadcast first to edit.');
 
         $request->validate([
             'name' => ['required', 'string', 'max:150'],

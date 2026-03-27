@@ -17,6 +17,38 @@
         </div>
     </div>
 
+    {{-- Summary Tabs --}}
+    <div class="flex flex-wrap gap-2 mb-4">
+        <a href="{{ route('admin.broadcasts.index') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ !request('status') ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+            All <span class="font-bold">{{ $stats['total'] }}</span>
+        </a>
+        <a href="{{ route('admin.broadcasts.index', ['status' => 'draft']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ request('status') === 'draft' ? 'bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+            Draft <span class="font-bold">{{ $stats['draft'] }}</span>
+        </a>
+        <a href="{{ route('admin.broadcasts.index', ['status' => 'scheduled']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ request('status') === 'scheduled' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+            Scheduled <span class="font-bold">{{ $stats['scheduled'] }}</span>
+        </a>
+        <a href="{{ route('admin.broadcasts.index', ['status' => 'running']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ request('status') === 'running' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Running <span class="font-bold">{{ $stats['running'] }}</span>
+        </a>
+        <a href="{{ route('admin.broadcasts.index', ['status' => 'paused']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ request('status') === 'paused' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            Paused <span class="font-bold">{{ $stats['paused'] }}</span>
+        </a>
+        <a href="{{ route('admin.broadcasts.index', ['status' => 'completed']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ request('status') === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Completed <span class="font-bold">{{ $stats['completed'] }}</span>
+        </a>
+        <a href="{{ route('admin.broadcasts.index', ['status' => 'cancelled']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ request('status') === 'cancelled' ? 'bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+            Cancelled <span class="font-bold">{{ $stats['cancelled'] }}</span>
+        </a>
+    </div>
+
     {{-- Filter Card --}}
     <div class="filter-card mb-3">
         <form method="GET" class="filter-row flex-wrap">
@@ -64,11 +96,11 @@
                 <tr class="border-b border-gray-200">
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Progress</th>
                     <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Cost</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Schedule</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
                     <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -78,17 +110,8 @@
                     <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
                         <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $broadcasts->firstItem() + $loop->index }}</td>
                         <td class="px-3 py-2">
-                            <div class="font-medium text-gray-900">{{ $broadcast->name }}</div>
-                        </td>
-                        <td class="px-3 py-2">
-                            @if($broadcast->user)
-                                <a href="{{ route('admin.users.show', $broadcast->user) }}" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
-                                    {{ $broadcast->user->name }}
-                                </a>
-                                <div class="text-xs text-gray-400">{{ $broadcast->user->email }}</div>
-                            @else
-                                <span class="text-gray-400">--</span>
-                            @endif
+                            <p class="font-semibold text-gray-800 group-hover:text-indigo-600 transition-colors">{{ $broadcast->user?->name ?? '—' }}</p>
+                            <p class="text-xs text-gray-400">{{ $broadcast->name }}</p>
                         </td>
                         <td class="px-3 py-2">
                             @if($broadcast->type === 'survey')
@@ -136,6 +159,14 @@
                         <td class="px-3 py-2 text-right text-sm text-gray-700">
                             {{ format_currency($broadcast->total_cost ?? 0) }}
                         </td>
+                        <td class="px-3 py-2 text-sm">
+                            @if($broadcast->scheduled_at)
+                                <div class="text-gray-800">{{ $broadcast->scheduled_at->format('M d, Y') }}</div>
+                                <div class="text-xs text-gray-400">{{ $broadcast->scheduled_at->format('g:i A') }}</div>
+                            @else
+                                <span class="text-xs text-gray-400">Manual</span>
+                            @endif
+                        </td>
                         <td class="px-3 py-2 text-sm text-gray-500">
                             <div>{{ $broadcast->created_at->format('M d, Y') }}</div>
                             <div class="text-xs text-gray-400">{{ $broadcast->created_at->diffForHumans() }}</div>
@@ -149,9 +180,16 @@
                                     </svg>
                                 </a>
                                 @if(auth()->user()->isSuperAdmin())
-                                    <a href="{{ route('admin.broadcasts.edit', $broadcast) }}" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                                    </a>
+                                    @if(in_array($broadcast->status, ['draft', 'scheduled', 'paused']))
+                                        <a href="{{ route('admin.broadcasts.edit', $broadcast) }}" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        </a>
+                                    @else
+                                        <span class="p-1.5 rounded-lg text-gray-300 cursor-not-allowed" title="{{ $broadcast->status === 'running' ? 'Pause first to edit' : ucfirst($broadcast->status) . ' — cannot edit' }}">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        </span>
+                                    @endif
+
                                 @endif
                             </div>
                         </td>

@@ -191,15 +191,100 @@
 
             {{-- Sidebar --}}
             <div class="space-y-4" style="position:sticky; top:1rem;">
+                {{-- Client --}}
                 <div class="detail-card">
-                    <div class="detail-card-header"><h3 class="detail-card-title">Current Status</h3></div>
-                    <div class="detail-card-body space-y-2 text-sm">
-                        <div class="flex justify-between"><span class="text-gray-500">Status</span>
-                            <span class="font-medium {{ $template->isApproved() ? 'text-emerald-600' : ($template->isPending() ? 'text-amber-600' : 'text-gray-500') }}">{{ ucfirst($template->status) }}</span>
+                    <div class="detail-card-header"><h3 class="detail-card-title">Client</h3></div>
+                    <div class="detail-card-body">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <span class="text-sm font-bold text-indigo-600">{{ strtoupper(substr($template->client?->name ?? '?', 0, 2)) }}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900 truncate">{{ $template->client?->name }}</p>
+                                <p class="text-xs text-gray-500 truncate">{{ $template->client?->email }}</p>
+                            </div>
                         </div>
-                        <div class="flex justify-between"><span class="text-gray-500">Client</span><span class="font-medium">{{ $template->client?->name }}</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Created</span><span class="font-medium">{{ $template->created_at->format('M d, Y') }}</span></div>
-                        <p class="text-xs text-gray-400 pt-2">Editing will not change the approval status.</p>
+                        <div class="mt-3 flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                            <span class="text-xs text-gray-500">Balance</span>
+                            <span class="text-sm font-mono font-semibold {{ ($template->client?->balance ?? 0) > 0 ? 'text-emerald-600' : 'text-red-500' }}">{{ currency_symbol() }}{{ number_format($template->client?->balance ?? 0, 2) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Template Info --}}
+                <div class="detail-card">
+                    <div class="detail-card-header"><h3 class="detail-card-title">Template Info</h3></div>
+                    <div class="detail-card-body space-y-2.5 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Status</span>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                                {{ $template->isApproved() ? 'bg-emerald-100 text-emerald-700' : ($template->isPending() ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-700') }}">{{ ucfirst($template->status) }}</span>
+                        </div>
+                        <div class="flex justify-between"><span class="text-gray-500">Questions</span><span class="font-medium text-gray-700">{{ $template->getQuestionCount() }}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Has Intro</span><span class="font-medium text-gray-700">{{ collect($template->config['questions'] ?? [])->contains('type', 'intro') ? 'Yes' : 'No' }}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Created</span><span class="font-medium text-gray-700">{{ $template->created_at->format('d M Y, g:i A') }}</span></div>
+                        @if($template->approved_at)
+                            <div class="flex justify-between"><span class="text-gray-500">Approved</span><span class="font-medium text-gray-700">{{ $template->approved_at->format('d M Y') }}</span></div>
+                        @endif
+                        @if($template->rejection_reason)
+                            <div class="mt-2 p-2 bg-red-50 rounded-lg">
+                                <p class="text-xs text-red-600 font-medium">Rejection Reason:</p>
+                                <p class="text-xs text-red-500 mt-0.5">{{ $template->rejection_reason }}</p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- What You Can Change --}}
+                <div class="detail-card">
+                    <div class="detail-card-header"><h3 class="detail-card-title">What You Can Change</h3></div>
+                    <div class="detail-card-body text-xs space-y-2">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-gray-600">Template Name & Description</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-gray-600">Questions & Voice Files</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-gray-600">Response Options & Timeouts</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span class="text-gray-600">Add/Remove Questions & Intro</span>
+                        </div>
+                        <div class="border-t border-gray-100 pt-2 mt-2">
+                            <div class="flex items-center gap-2 text-gray-400">
+                                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                <span>Client — fixed</span>
+                            </div>
+                        </div>
+                        <p class="text-gray-400 pt-1">Editing will not change the approval status.</p>
+                    </div>
+                </div>
+
+                {{-- Voice File Tips --}}
+                <div class="detail-card">
+                    <div class="detail-card-header"><h3 class="detail-card-title">Voice File Tips</h3></div>
+                    <div class="detail-card-body text-xs text-gray-500 space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span>Each question needs its own voice file</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span>Click <strong>"Change"</strong> to replace a voice file</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span>Files auto-convert to 8kHz WAV</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span>Keep each audio under <strong>30 seconds</strong></span>
+                        </div>
                     </div>
                 </div>
             </div>

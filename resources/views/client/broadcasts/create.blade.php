@@ -17,6 +17,8 @@
         </div>
     </div>
 
+    <script>var _sipChannels = { @foreach($sipAccounts as $sip){{ $sip->id }}: {{ $sip->max_channels ?? 5 }},@endforeach };</script>
+
     <form method="POST" action="{{ route('client.broadcasts.store') }}" enctype="multipart/form-data"
           x-data="{
               type: '{{ old('type', 'simple') }}',
@@ -89,10 +91,11 @@
                             {{-- SIP Account --}}
                             <div class="form-group">
                                 <label class="form-label">SIP Account</label>
-                                <select name="sip_account_id" required class="form-input">
+                                <select name="sip_account_id" required class="form-input"
+                                        @change="let ch = _sipChannels[$event.target.value]; if (ch) { $refs.maxConcurrent.value = ch; }">
                                     <option value="">Select SIP Account</option>
                                     @foreach($sipAccounts as $sip)
-                                        <option value="{{ $sip->id }}" {{ old('sip_account_id') == $sip->id ? 'selected' : '' }}>{{ $sip->username }}</option>
+                                        <option value="{{ $sip->id }}" {{ old('sip_account_id') == $sip->id ? 'selected' : '' }}>{{ $sip->username }}{{ $sip->max_channels ? ' ('.$sip->max_channels.' ch)' : '' }}</option>
                                     @endforeach
                                 </select>
                                 <x-input-error :messages="$errors->get('sip_account_id')" class="mt-2" />
@@ -152,8 +155,8 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
                                 <label class="form-label">Max Concurrent Calls</label>
-                                <input type="number" name="max_concurrent" value="{{ old('max_concurrent', 5) }}" min="1" max="50" class="form-input">
-                                <p class="form-hint">Maximum simultaneous calls.</p>
+                                <input type="number" name="max_concurrent" x-ref="maxConcurrent" value="{{ old('max_concurrent', 5) }}" min="1" max="50" class="form-input">
+                                <p class="form-hint">Auto-set from SIP channel limit.</p>
                                 <x-input-error :messages="$errors->get('max_concurrent')" class="mt-2" />
                             </div>
                             <div class="form-group">

@@ -123,10 +123,11 @@
                             {{-- SIP Account --}}
                             <div class="form-group">
                                 <label class="form-label">SIP Account</label>
-                                <select name="sip_account_id" required class="form-input">
+                                <select name="sip_account_id" required class="form-input"
+                                        @change="let sip = sipAccounts.find(s => s.id == $event.target.value); if (sip && sip.max_channels) { $refs.maxConcurrent.value = sip.max_channels; }">
                                     <option value="">Select SIP Account</option>
                                     <template x-for="sip in sipAccounts" :key="sip.id">
-                                        <option :value="sip.id" x-text="sip.username"></option>
+                                        <option :value="sip.id" x-text="sip.username + (sip.max_channels ? ' (' + sip.max_channels + ' ch)' : '')"></option>
                                     </template>
                                 </select>
                                 <p class="form-hint">Auto-populated from the selected template's client</p>
@@ -187,8 +188,8 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
                                 <label class="form-label">Max Concurrent Calls</label>
-                                <input type="number" name="max_concurrent" value="{{ old('max_concurrent', 5) }}" min="1" max="50" class="form-input">
-                                <p class="form-hint">Maximum simultaneous calls.</p>
+                                <input type="number" name="max_concurrent" x-ref="maxConcurrent" value="{{ old('max_concurrent', 5) }}" min="1" max="50" class="form-input">
+                                <p class="form-hint">Auto-set from SIP channel limit. You can increase.</p>
                                 <x-input-error :messages="$errors->get('max_concurrent')" class="mt-2" />
                             </div>
                             <div class="form-group">

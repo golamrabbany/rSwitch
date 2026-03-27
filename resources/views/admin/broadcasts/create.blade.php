@@ -17,17 +17,96 @@
         </div>
     </div>
 
+    <script>
+        var _voiceTemplates = @json($voiceTemplatesJson);
+        var _surveyTemplates = @json($surveyTemplatesJson);
+    </script>
+
     <form method="POST" action="{{ route('admin.broadcasts.store') }}" enctype="multipart/form-data"
           x-data="{
               type: '{{ old('type', 'simple') }}',
               phoneListType: '{{ old('phone_list_type', 'manual') }}',
               scheduleType: '{{ old('schedule_type', 'now') }}',
-              selectedTemplateId: '{{ old('voice_file_id', '') }}',
-              selectedSurveyId: '{{ old('survey_template_id', '') }}',
+
+              // Voice template search
+              vtOpen: false,
+              vtSearch: '',
+              vtResults: [],
+              selectedTemplateId: '',
+              selectedTemplateName: '',
+
+              // Survey template search
+              stOpen: false,
+              stSearch: '',
+              stResults: [],
+              selectedSurveyId: '',
+              selectedSurveyName: '',
+
+              // Client
               clientName: '',
               clientEmail: '',
+              clientBalance: 0,
               sipAccounts: [],
               loading: false,
+
+              searchVoiceTemplates() {
+                  if (!this.vtSearch || this.vtSearch.length < 1) {
+                      this.vtResults = _voiceTemplates.slice(0, 10);
+                      return;
+                  }
+                  var q = this.vtSearch.toLowerCase();
+                  this.vtResults = _voiceTemplates.filter(function(t) {
+                      return t.name.toLowerCase().indexOf(q) > -1 || t.client.toLowerCase().indexOf(q) > -1;
+                  }).slice(0, 10);
+              },
+              selectVoiceTemplate(t) {
+                  this.vtSearch = t.name + ' — ' + t.client;
+                  this.selectedTemplateId = t.id;
+                  this.selectedTemplateName = t.name;
+                  this.vtOpen = false;
+                  this.loadTemplateData();
+              },
+              clearVoiceTemplate() {
+                  this.vtSearch = '';
+                  this.selectedTemplateId = '';
+                  this.selectedTemplateName = '';
+                  this.vtResults = [];
+                  this.clientName = '';
+                  this.clientEmail = '';
+                  this.clientBalance = 0;
+                  this.sipAccounts = [];
+                  this.$nextTick(() => this.$refs.vtInput.focus());
+              },
+
+              searchSurveyTemplates() {
+                  if (!this.stSearch || this.stSearch.length < 1) {
+                      this.stResults = _surveyTemplates.slice(0, 10);
+                      return;
+                  }
+                  var q = this.stSearch.toLowerCase();
+                  this.stResults = _surveyTemplates.filter(function(t) {
+                      return t.name.toLowerCase().indexOf(q) > -1 || t.client.toLowerCase().indexOf(q) > -1;
+                  }).slice(0, 10);
+              },
+              selectSurveyTemplate(t) {
+                  this.stSearch = t.name + ' — ' + t.client;
+                  this.selectedSurveyId = t.id;
+                  this.selectedSurveyName = t.name;
+                  this.stOpen = false;
+                  this.loadTemplateData();
+              },
+              clearSurveyTemplate() {
+                  this.stSearch = '';
+                  this.selectedSurveyId = '';
+                  this.selectedSurveyName = '';
+                  this.stResults = [];
+                  this.clientName = '';
+                  this.clientEmail = '';
+                  this.clientBalance = 0;
+                  this.sipAccounts = [];
+                  this.$nextTick(() => this.$refs.stInput.focus());
+              },
+
               loadTemplateData() {
                   let type = this.type === 'simple' ? 'voice' : 'survey';
                   let templateId = this.type === 'simple' ? this.selectedTemplateId : this.selectedSurveyId;
@@ -40,10 +119,23 @@
                   .then(data => {
                       this.clientName = data.client.name;
                       this.clientEmail = data.client.email;
+                      this.clientBalance = data.client.balance || 0;
                       this.sipAccounts = data.sip_accounts || [];
                       this.loading = false;
                   })
                   .catch(() => { this.loading = false; });
+              },
+
+              switchType() {
+                  this.clientName = '';
+                  this.clientEmail = '';
+                  this.clientBalance = 0;
+                  this.sipAccounts = [];
+                  if (this.type === 'simple') {
+                      this.clearSurveyTemplate();
+                  } else {
+                      this.clearVoiceTemplate();
+                  }
               }
           }">
         @csrf
@@ -70,13 +162,13 @@
                                     <div class="flex gap-3 mt-1">
                                         <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
                                                :class="type === 'simple' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
-                                            <input type="radio" name="type" value="simple" x-model="type" @change="clientName = ''; sipAccounts = []; selectedSurveyId = ''" class="sr-only">
+                                            <input type="radio" name="type" value="simple" x-model="type" @change="switchType()" class="sr-only">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
                                             <span class="font-medium text-sm">Simple</span>
                                         </label>
                                         <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors"
                                                :class="type === 'survey' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
-                                            <input type="radio" name="type" value="survey" x-model="type" @change="clientName = ''; sipAccounts = []; selectedTemplateId = ''" class="sr-only">
+                                            <input type="radio" name="type" value="survey" x-model="type" @change="switchType()" class="sr-only">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
                                             <span class="font-medium text-sm">Survey</span>
                                         </label>
@@ -84,50 +176,131 @@
                                 </div>
                             </div>
 
-                            {{-- Voice Template (Simple) --}}
+                            {{-- Voice Template Search (Simple) --}}
                             <div class="form-group" x-show="type === 'simple'" x-transition>
                                 <label class="form-label">Voice Template</label>
-                                <select name="voice_file_id" x-model="selectedTemplateId" @change="loadTemplateData()" class="form-input">
-                                    <option value="">Select Voice Template</option>
-                                    @foreach($voiceTemplates as $vt)
-                                        <option value="{{ $vt->id }}">{{ $vt->name }} — {{ $vt->user->name ?? 'Unknown' }}</option>
-                                    @endforeach
-                                </select>
-                                <p class="form-hint">Approved voice templates with client name</p>
+                                <div class="relative" @click.outside="vtOpen = false">
+                                    <input type="hidden" name="voice_file_id" :value="selectedTemplateId">
+                                    <div class="relative">
+                                        <input type="text"
+                                               x-ref="vtInput"
+                                               x-model="vtSearch"
+                                               @input="vtOpen = true; selectedTemplateId = ''; searchVoiceTemplates()"
+                                               @focus="vtOpen = true; searchVoiceTemplates()"
+                                               @keydown.escape="vtOpen = false"
+                                               @keydown.tab="vtOpen = false"
+                                               class="form-input pr-16"
+                                               placeholder="Search template by name or client..."
+                                               autocomplete="off">
+                                        <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                            <button type="button" x-show="vtSearch" x-cloak @click="clearVoiceTemplate()" class="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                        </div>
+                                    </div>
+                                    <div x-show="vtOpen && vtResults.length > 0" x-cloak
+                                         class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                                        <template x-for="t in vtResults" :key="t.id">
+                                            <div @click="selectVoiceTemplate(t)"
+                                                 class="px-4 py-2.5 cursor-pointer hover:bg-indigo-50 flex items-center justify-between border-b border-gray-50"
+                                                 :class="{ 'bg-indigo-50': selectedTemplateId == t.id }">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                                        <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6"/></svg>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-sm font-medium text-gray-900" x-text="t.name"></p>
+                                                        <p class="text-xs text-gray-500" x-text="t.client + ' · ' + t.format + (t.duration ? ' · ' + t.duration + 's' : '')"></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <div x-show="vtOpen && vtSearch.length >= 1 && vtResults.length === 0" x-cloak
+                                         class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                                        No templates found
+                                    </div>
+                                </div>
+                                <p class="form-hint">Search by template name or client name</p>
                                 <x-input-error :messages="$errors->get('voice_file_id')" class="mt-2" />
                             </div>
 
-                            {{-- Survey Template (Survey) --}}
+                            {{-- Survey Template Search (Survey) --}}
                             <div class="form-group" x-show="type === 'survey'" x-transition>
                                 <label class="form-label">Survey Template</label>
-                                <select name="survey_template_id" x-model="selectedSurveyId" @change="loadTemplateData()" class="form-input">
-                                    <option value="">Select Survey Template</option>
-                                    @foreach($surveyTemplates as $st)
-                                        <option value="{{ $st->id }}">{{ $st->name }} — {{ $st->client->name ?? 'Unknown' }} ({{ $st->getQuestionCount() }} questions)</option>
-                                    @endforeach
-                                </select>
-                                <p class="form-hint">Approved survey templates with client name</p>
+                                <div class="relative" @click.outside="stOpen = false">
+                                    <input type="hidden" name="survey_template_id" :value="selectedSurveyId">
+                                    <div class="relative">
+                                        <input type="text"
+                                               x-ref="stInput"
+                                               x-model="stSearch"
+                                               @input="stOpen = true; selectedSurveyId = ''; searchSurveyTemplates()"
+                                               @focus="stOpen = true; searchSurveyTemplates()"
+                                               @keydown.escape="stOpen = false"
+                                               @keydown.tab="stOpen = false"
+                                               class="form-input pr-16"
+                                               placeholder="Search template by name or client..."
+                                               autocomplete="off">
+                                        <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                            <button type="button" x-show="stSearch" x-cloak @click="clearSurveyTemplate()" class="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                        </div>
+                                    </div>
+                                    <div x-show="stOpen && stResults.length > 0" x-cloak
+                                         class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                                        <template x-for="t in stResults" :key="t.id">
+                                            <div @click="selectSurveyTemplate(t)"
+                                                 class="px-4 py-2.5 cursor-pointer hover:bg-indigo-50 flex items-center justify-between border-b border-gray-50"
+                                                 :class="{ 'bg-indigo-50': selectedSurveyId == t.id }">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                                                        <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-sm font-medium text-gray-900" x-text="t.name"></p>
+                                                        <p class="text-xs text-gray-500" x-text="t.client + ' · ' + t.questions + ' questions'"></p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <div x-show="stOpen && stSearch.length >= 1 && stResults.length === 0" x-cloak
+                                         class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                                        No templates found
+                                    </div>
+                                </div>
+                                <p class="form-hint">Search by template name or client name</p>
                                 <x-input-error :messages="$errors->get('survey_template_id')" class="mt-2" />
                             </div>
 
                             {{-- Auto-filled Client Info --}}
-                            <div x-show="clientName" x-transition class="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
-                                <div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center">
-                                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            <div x-show="clientName" x-cloak x-transition class="flex items-center justify-between p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center">
+                                        <span class="text-xs font-bold text-indigo-600" x-text="clientName.substring(0, 2).toUpperCase()"></span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-indigo-800" x-text="'Client: ' + clientName"></p>
+                                        <p class="text-xs text-indigo-600" x-text="clientEmail"></p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p class="text-sm font-medium text-indigo-800" x-text="'Client: ' + clientName"></p>
-                                    <p class="text-xs text-indigo-600" x-text="clientEmail"></p>
+                                <div class="text-right">
+                                    <p class="text-sm font-mono font-semibold" :class="clientBalance > 0 ? 'text-emerald-600' : 'text-red-500'" x-text="'{{ currency_symbol() }}' + clientBalance.toFixed(2)"></p>
+                                    <p class="text-xs text-gray-500">Balance</p>
                                 </div>
                             </div>
 
                             {{-- SIP Account --}}
                             <div class="form-group">
                                 <label class="form-label">SIP Account</label>
-                                <select name="sip_account_id" required class="form-input">
+                                <select name="sip_account_id" required class="form-input"
+                                        @change="let sip = sipAccounts.find(s => s.id == $event.target.value); if (sip && sip.max_channels) { $refs.maxConcurrent.value = sip.max_channels; }">
                                     <option value="">Select SIP Account</option>
                                     <template x-for="sip in sipAccounts" :key="sip.id">
-                                        <option :value="sip.id" x-text="sip.username"></option>
+                                        <option :value="sip.id" x-text="sip.username + (sip.max_channels ? ' (' + sip.max_channels + ' ch)' : '')"></option>
                                     </template>
                                 </select>
                                 <p class="form-hint">Auto-populated from the selected template's client</p>
@@ -234,8 +407,8 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
                                 <label class="form-label">Max Concurrent Calls</label>
-                                <input type="number" name="max_concurrent" value="{{ old('max_concurrent', 5) }}" min="1" max="50" class="form-input">
-                                <p class="form-hint">Maximum simultaneous calls.</p>
+                                <input type="number" name="max_concurrent" x-ref="maxConcurrent" value="{{ old('max_concurrent', 5) }}" min="1" max="50" class="form-input">
+                                <p class="form-hint">Auto-set from SIP channel limit. You can increase.</p>
                                 <x-input-error :messages="$errors->get('max_concurrent')" class="mt-2" />
                             </div>
                             <div class="form-group">
@@ -262,53 +435,112 @@
                 {{-- How It Works --}}
                 <div class="detail-card">
                     <div class="detail-card-header"><h3 class="detail-card-title">How It Works</h3></div>
-                    <div class="detail-card-body text-sm text-gray-600 space-y-3">
-                        <div class="flex items-start gap-2">
-                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                            <p>Select type & pick a template</p>
+                    <div class="detail-card-body space-y-3">
+                        <div class="flex items-start gap-3">
+                            <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">Pick a Template</p>
+                                <p class="text-xs text-gray-500">Search voice or survey template by name</p>
+                            </div>
                         </div>
-                        <div class="flex items-start gap-2">
-                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                            <p>Client auto-fills from template</p>
+                        <div class="flex items-start gap-3">
+                            <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">Client Auto-Fills</p>
+                                <p class="text-xs text-gray-500">Name, balance & SIP accounts load automatically</p>
+                            </div>
                         </div>
-                        <div class="flex items-start gap-2">
-                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                            <p>Add phone numbers & schedule</p>
+                        <div class="flex items-start gap-3">
+                            <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">Add Phone Numbers</p>
+                                <p class="text-xs text-gray-500">Enter manually or upload CSV file</p>
+                            </div>
                         </div>
-                        <div class="flex items-start gap-2">
-                            <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
-                            <p>Start broadcast & monitor results</p>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Requirements --}}
-                <div class="detail-card">
-                    <div class="detail-card-header"><h3 class="detail-card-title">Requirements</h3></div>
-                    <div class="detail-card-body text-sm text-gray-500 space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span>Template</span>
-                            <span class="font-medium text-gray-700">Approved</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span>SIP Account</span>
-                            <span class="font-medium text-gray-700">Active</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span>Client Balance</span>
-                            <span class="font-medium text-gray-700">Sufficient</span>
+                        <div class="flex items-start gap-3">
+                            <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">Start & Monitor</p>
+                                <p class="text-xs text-gray-500">Launch immediately or schedule for later</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {{-- Tips --}}
+                {{-- Checklist --}}
                 <div class="detail-card">
-                    <div class="detail-card-header"><h3 class="detail-card-title">Tips</h3></div>
+                    <div class="detail-card-header"><h3 class="detail-card-title">Pre-Launch Checklist</h3></div>
+                    <div class="detail-card-body space-y-2.5">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                                 :class="selectedTemplateId || selectedSurveyId ? 'bg-emerald-100' : 'bg-gray-100'">
+                                <svg class="w-3 h-3" :class="selectedTemplateId || selectedSurveyId ? 'text-emerald-600' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <span class="text-sm" :class="selectedTemplateId || selectedSurveyId ? 'text-gray-800' : 'text-gray-400'">Template selected</span>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                                 :class="clientName ? 'bg-emerald-100' : 'bg-gray-100'">
+                                <svg class="w-3 h-3" :class="clientName ? 'text-emerald-600' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <span class="text-sm" :class="clientName ? 'text-gray-800' : 'text-gray-400'">Client identified</span>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                                 :class="clientBalance > 0 ? 'bg-emerald-100' : 'bg-gray-100'">
+                                <svg class="w-3 h-3" :class="clientBalance > 0 ? 'text-emerald-600' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <span class="text-sm" :class="clientBalance > 0 ? 'text-gray-800' : 'text-gray-400'">Sufficient balance</span>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                                 :class="sipAccounts.length > 0 ? 'bg-emerald-100' : 'bg-gray-100'">
+                                <svg class="w-3 h-3" :class="sipAccounts.length > 0 ? 'text-emerald-600' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <span class="text-sm" :class="sipAccounts.length > 0 ? 'text-gray-800' : 'text-gray-400'">SIP account available</span>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Billing Info --}}
+                <div class="detail-card">
+                    <div class="detail-card-header"><h3 class="detail-card-title">Billing</h3></div>
+                    <div class="detail-card-body text-sm space-y-2">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <p class="text-gray-600">Calls billed to <strong>client's prepaid balance</strong> at their rate plan</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            <p class="text-gray-600">Auto-pauses when balance runs <strong>low</strong></p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <p class="text-gray-600">Answered calls only — <strong>no charge</strong> for failed/no-answer</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Best Practices --}}
+                <div class="detail-card">
+                    <div class="detail-card-header"><h3 class="detail-card-title">Best Practices</h3></div>
                     <div class="detail-card-body text-xs text-gray-500 space-y-2">
-                        <p>Calls are billed to the client's prepaid balance.</p>
-                        <p>Broadcast auto-pauses if balance runs low.</p>
-                        <p>Use 5-10 concurrent calls for best results.</p>
-                        <p>Schedule broadcasts during business hours for higher answer rates.</p>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span>Use <strong>5-10 concurrent</strong> calls for best results</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span>Schedule during <strong>business hours</strong> for higher answer rates</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span>Keep voice messages under <strong>60 seconds</strong></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span><strong>30s ring timeout</strong> works well for most campaigns</span>
+                        </div>
                     </div>
                 </div>
             </div>

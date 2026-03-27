@@ -183,6 +183,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::post('voice-files/{voiceFile}/reject', [Admin\VoiceFileController::class, 'reject'])->name('voice-files.reject');
     Route::post('voice-files/{voiceFile}/suspend', [Admin\VoiceFileController::class, 'suspend'])->name('voice-files.suspend');
     Route::post('voice-files/{voiceFile}/set-pending', [Admin\VoiceFileController::class, 'setPending'])->name('voice-files.set-pending');
+    Route::delete('voice-files/{voiceFile}', [Admin\VoiceFileController::class, 'destroy'])->name('voice-files.destroy');
 
     // Voice Broadcast — Broadcasts
     Route::get('broadcasts', [Admin\BroadcastController::class, 'index'])->name('broadcasts.index');
@@ -200,6 +201,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('broadcasts/{broadcast}/edit', [Admin\BroadcastController::class, 'edit'])->name('broadcasts.edit');
     Route::put('broadcasts/{broadcast}', [Admin\BroadcastController::class, 'update'])->name('broadcasts.update');
     Route::post('broadcasts/{broadcast}/suspend', [Admin\BroadcastController::class, 'suspend'])->name('broadcasts.suspend');
+    Route::delete('broadcasts/{broadcast}', [Admin\BroadcastController::class, 'destroy'])->name('broadcasts.destroy');
 
     // Voice Broadcast — DNC List
     Route::get('dnc', [Admin\DncController::class, 'index'])->name('dnc.index');

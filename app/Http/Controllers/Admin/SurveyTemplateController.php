@@ -197,6 +197,7 @@ class SurveyTemplateController extends Controller
     public function edit(SurveyTemplate $surveyTemplate)
     {
         abort_unless(auth()->user()->isSuperAdmin(), 403);
+        $surveyTemplate->load('client', 'approvedBy');
 
         return view('admin.survey-templates.edit', ['template' => $surveyTemplate]);
     }

@@ -201,4 +201,14 @@ class VoiceFileController extends Controller
             'Content-Type' => $voiceFile->format === 'mp3' ? 'audio/mpeg' : 'audio/wav',
         ]);
     }
+
+    public function destroy(VoiceFile $voiceFile, VoiceFileService $service)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+        abort_if($voiceFile->broadcasts()->exists(), 422, 'Cannot delete — this template is used in broadcasts.');
+
+        $service->delete($voiceFile);
+
+        return redirect()->route('admin.voice-files.index')->with('success', "Voice template '{$voiceFile->name}' deleted.");
+    }
 }

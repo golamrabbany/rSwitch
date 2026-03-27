@@ -27,7 +27,18 @@ class BroadcastController extends Controller
 
         $broadcasts = $query->orderByDesc('created_at')->paginate(20);
 
-        return view('admin.broadcasts.index', compact('broadcasts'));
+        $baseQuery = Broadcast::ownedBy(auth()->user());
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'draft' => (clone $baseQuery)->where('status', 'draft')->count(),
+            'scheduled' => (clone $baseQuery)->where('status', 'scheduled')->count(),
+            'running' => (clone $baseQuery)->where('status', 'running')->count(),
+            'paused' => (clone $baseQuery)->where('status', 'paused')->count(),
+            'completed' => (clone $baseQuery)->where('status', 'completed')->count(),
+            'cancelled' => (clone $baseQuery)->where('status', 'cancelled')->count(),
+        ];
+
+        return view('admin.broadcasts.index', compact('broadcasts', 'stats'));
     }
 
     public function create()
@@ -50,7 +61,15 @@ class BroadcastController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'client_id', 'config']);
 
-        return view('admin.broadcasts.create', compact('voiceTemplates', 'surveyTemplates'));
+        $voiceTemplatesJson = $voiceTemplates->map(function ($vt) {
+            return ['id' => $vt->id, 'name' => $vt->name, 'client' => $vt->user->name ?? 'Unknown', 'format' => strtoupper($vt->format), 'duration' => $vt->duration];
+        })->values();
+
+        $surveyTemplatesJson = $surveyTemplates->map(function ($st) {
+            return ['id' => $st->id, 'name' => $st->name, 'client' => $st->client->name ?? 'Unknown', 'questions' => $st->getQuestionCount()];
+        })->values();
+
+        return view('admin.broadcasts.create', compact('voiceTemplates', 'surveyTemplates', 'voiceTemplatesJson', 'surveyTemplatesJson'));
     }
 
     public function store(Request $request, BroadcastService $service)
@@ -125,7 +144,11 @@ class BroadcastController extends Controller
             ->groupBy('status')
             ->pluck('count', 'status');
 
-        return view('admin.broadcasts.show', compact('broadcast', 'numberStats'));
+        $callStats = $broadcast->numbers()
+            ->selectRaw('COALESCE(SUM(cost), 0) as total_cost, AVG(CASE WHEN duration > 0 THEN duration END) as avg_duration, SUM(duration) as total_duration')
+            ->first();
+
+        return view('admin.broadcasts.show', compact('broadcast', 'numberStats', 'callStats'));
     }
 
     public function start(Broadcast $broadcast, BroadcastService $service)
@@ -155,20 +178,41 @@ class BroadcastController extends Controller
     public function edit(Broadcast $broadcast)
     {
         abort_unless(auth()->user()->isSuperAdmin(), 403);
-        return view('admin.broadcasts.edit', compact('broadcast'));
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled', 'paused']), 403, 'Pause the broadcast first to edit.');
+
+        $broadcast->load('user', 'voiceFile', 'sipAccount');
+
+        $sipAccounts = SipAccount::where('user_id', $broadcast->user_id)
+            ->where('status', 'active')
+            ->get(['id', 'username', 'max_channels']);
+
+        $voiceFiles = VoiceFile::where('user_id', $broadcast->user_id)
+            ->approved()
+            ->orderBy('name')
+            ->get(['id', 'name', 'format', 'duration']);
+
+        return view('admin.broadcasts.edit', compact('broadcast', 'sipAccounts', 'voiceFiles'));
     }
 
     public function update(Request $request, Broadcast $broadcast)
     {
         abort_unless(auth()->user()->isSuperAdmin(), 403);
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled', 'paused']), 403, 'Pause the broadcast first to edit.');
 
         $request->validate([
-            'name' => ['required', 'string', 'max:150'],
+            'sip_account_id' => ['nullable', 'exists:sip_accounts,id'],
             'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
             'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:120'],
         ]);
 
-        $broadcast->update($request->only('name', 'max_concurrent', 'ring_timeout'));
+        $data = $request->only('max_concurrent', 'ring_timeout');
+
+        if ($request->filled('sip_account_id')) {
+            $data['sip_account_id'] = $request->sip_account_id;
+            $data['caller_id_number'] = SipAccount::find($request->sip_account_id)->username ?? $broadcast->caller_id_number;
+        }
+
+        $broadcast->update($data);
 
         return redirect()->route('admin.broadcasts.show', $broadcast)->with('success', 'Broadcast updated.');
     }
@@ -299,46 +343,157 @@ class BroadcastController extends Controller
 
     public function exportResults(Broadcast $broadcast)
     {
+        $broadcast->load('user', 'voiceFile', 'sipAccount');
         $numbers = $broadcast->numbers()->orderBy('phone_number')->get();
 
-        $filename = 'broadcast-' . $broadcast->id . '-results.csv';
-        $headers = ['Content-Type' => 'text/csv', 'Content-Disposition' => "attachment; filename=\"{$filename}\""];
+        $isMultiQ = $broadcast->isMultiQuestion();
+        $questions = $isMultiQ ? $broadcast->getSurveyQuestions() : collect();
 
-        return response()->stream(function () use ($numbers, $broadcast) {
-            $out = fopen('php://output', 'w');
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
 
-            $config = $broadcast->survey_config;
-            $isMultiQ = $broadcast->isMultiQuestion();
-            $questions = $isMultiQ ? $broadcast->getSurveyQuestions() : collect();
+        // --- Sheet 1: Summary ---
+        $summary = $spreadsheet->getActiveSheet();
+        $summary->setTitle('Summary');
 
-            $cols = ['Phone Number', 'Status', 'Attempts', 'Duration (s)', 'Cost'];
+        // Title
+        $summary->setCellValue('A1', 'Broadcast Report');
+        $summary->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $summary->mergeCells('A1:D1');
+
+        // Broadcast info
+        $info = [
+            ['Broadcast Name', $broadcast->name],
+            ['Type', ucfirst($broadcast->type)],
+            ['Status', ucfirst($broadcast->status)],
+            ['Client', $broadcast->user?->name ?? '—'],
+            ['Voice Template', $broadcast->voiceFile?->name ?? '—'],
+            ['SIP Account', $broadcast->sipAccount?->username ?? '—'],
+            ['Max Concurrent', $broadcast->max_concurrent],
+            ['Ring Timeout', $broadcast->ring_timeout . 's'],
+            ['Created', $broadcast->created_at->format('d M Y, g:i A')],
+            [''],
+            ['Total Numbers', $broadcast->total_numbers],
+            ['Answered', $broadcast->answered_count],
+            ['Failed', $broadcast->failed_count],
+            ['Answer Rate', $broadcast->total_numbers > 0 ? round(($broadcast->answered_count / $broadcast->total_numbers) * 100, 1) . '%' : '0%'],
+            ['Total Cost', format_currency($broadcast->total_cost ?? 0)],
+        ];
+
+        $row = 3;
+        foreach ($info as $line) {
+            if (count($line) === 2) {
+                $summary->setCellValue("A{$row}", $line[0]);
+                $summary->setCellValue("B{$row}", $line[1]);
+                $summary->getStyle("A{$row}")->getFont()->setBold(true);
+                $summary->getStyle("A{$row}")->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('666666'));
+            }
+            $row++;
+        }
+
+        $summary->getColumnDimension('A')->setWidth(20);
+        $summary->getColumnDimension('B')->setWidth(30);
+
+        // --- Sheet 2: Call Data ---
+        $data = $spreadsheet->createSheet();
+        $data->setTitle('Call Data');
+
+        // Headers
+        $cols = ['Phone Number', 'Status', 'Attempts', 'Duration (s)', 'Cost'];
+        if ($broadcast->isSurvey()) {
+            if ($isMultiQ) {
+                foreach ($questions as $q) {
+                    $cols[] = $q['label'] ?? $q['key'];
+                }
+            } else {
+                $cols[] = 'Survey Response';
+            }
+        }
+
+        $colIdx = 'A';
+        foreach ($cols as $col) {
+            $data->setCellValue("{$colIdx}1", $col);
+            $colIdx++;
+        }
+
+        // Header style
+        $lastCol = chr(ord('A') + count($cols) - 1);
+        $headerStyle = $data->getStyle("A1:{$lastCol}1");
+        $headerStyle->getFont()->setBold(true)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFFFFF'));
+        $headerStyle->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('4F46E5');
+        $headerStyle->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+        // Data rows
+        $row = 2;
+        foreach ($numbers as $n) {
+            $data->setCellValue("A{$row}", $n->phone_number);
+            $data->setCellValue("B{$row}", ucfirst($n->status));
+            $data->setCellValue("C{$row}", $n->attempts);
+            $data->setCellValue("D{$row}", $n->duration ?? 0);
+            $data->setCellValue("E{$row}", $n->cost ?? 0);
+
             if ($broadcast->isSurvey()) {
+                $resp = is_string($n->survey_response) ? json_decode($n->survey_response, true) : $n->survey_response;
+                $ci = 5; // column F onwards
                 if ($isMultiQ) {
                     foreach ($questions as $q) {
-                        $cols[] = $q['label'] ?? $q['key'];
+                        $data->setCellValueByColumnAndRow($ci + 1, $row, is_array($resp) ? ($resp[$q['key']] ?? '') : '');
+                        $ci++;
                     }
                 } else {
-                    $cols[] = 'Survey Response';
+                    $data->setCellValue("F{$row}", is_array($resp) ? ($resp['q1'] ?? '') : ($n->getRawOriginal('survey_response') ?? ''));
                 }
             }
-            fputcsv($out, $cols);
 
-            foreach ($numbers as $n) {
-                $row = [$n->phone_number, $n->status, $n->attempts, $n->duration ?? 0, $n->cost ?? 0];
-                if ($broadcast->isSurvey()) {
-                    $resp = is_string($n->survey_response) ? json_decode($n->survey_response, true) : $n->survey_response;
-                    if ($isMultiQ) {
-                        foreach ($questions as $q) {
-                            $row[] = is_array($resp) ? ($resp[$q['key']] ?? '') : '';
-                        }
-                    } else {
-                        $row[] = is_array($resp) ? ($resp['q1'] ?? '') : ($n->getRawOriginal('survey_response') ?? '');
-                    }
-                }
-                fputcsv($out, $row);
+            // Status color
+            $statusColors = ['answered' => 'DCFCE7', 'failed' => 'FEE2E2', 'no_answer' => 'FEF3C7', 'busy' => 'FFEDD5', 'pending' => 'F3F4F6'];
+            if (isset($statusColors[$n->status])) {
+                $data->getStyle("B{$row}")->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB($statusColors[$n->status]);
             }
-            fclose($out);
-        }, 200, $headers);
+
+            // Alternate row shading
+            if ($row % 2 === 0) {
+                $data->getStyle("A{$row}:{$lastCol}{$row}")->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('F9FAFB');
+            }
+
+            $row++;
+        }
+
+        // Auto-size columns
+        foreach (range('A', $lastCol) as $c) {
+            $data->getColumnDimension($c)->setAutoSize(true);
+        }
+
+        // Borders
+        $data->getStyle("A1:{$lastCol}" . ($row - 1))->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('E5E7EB'));
+
+        // Freeze header row
+        $data->freezePane('A2');
+        $data->setAutoFilter("A1:{$lastCol}1");
+
+        // Set Call Data as active sheet
+        $spreadsheet->setActiveSheetIndex(1);
+
+        // Generate file
+        $filename = 'broadcast-' . $broadcast->id . '-' . \Illuminate\Support\Str::slug($broadcast->name) . '.xlsx';
+        $temp = tempnam(sys_get_temp_dir(), 'broadcast');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save($temp);
+
+        return response()->download($temp, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    public function destroy(Broadcast $broadcast)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+        abort_unless(in_array($broadcast->status, ['draft', 'cancelled']), 403, 'Only draft or cancelled broadcasts can be deleted.');
+        abort_if($broadcast->answered_count > 0, 403, 'Cannot delete — broadcast has answered calls.');
+
+        $broadcast->numbers()->delete();
+        $broadcast->delete();
+
+        return redirect()->route('admin.broadcasts.index')->with('success', "Broadcast '{$broadcast->name}' deleted.");
     }
 
     /**
@@ -361,10 +516,10 @@ class BroadcastController extends Controller
 
         abort_unless(auth()->user()->canManage($client), 403);
 
-        $sipAccounts = SipAccount::where('user_id', $clientId)->where('status', 'active')->get(['id', 'username']);
+        $sipAccounts = SipAccount::where('user_id', $clientId)->where('status', 'active')->get(['id', 'username', 'max_channels']);
 
         return response()->json([
-            'client' => ['id' => $client->id, 'name' => $client->name, 'email' => $client->email],
+            'client' => ['id' => $client->id, 'name' => $client->name, 'email' => $client->email, 'balance' => (float) $client->balance],
             'sip_accounts' => $sipAccounts,
         ]);
     }
