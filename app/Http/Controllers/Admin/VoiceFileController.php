@@ -95,15 +95,21 @@ class VoiceFileController extends Controller
         return view('admin.voice-files.edit', compact('voiceFile'));
     }
 
-    public function update(Request $request, VoiceFile $voiceFile)
+    public function update(Request $request, VoiceFile $voiceFile, VoiceFileService $service)
     {
         abort_unless(auth()->user()->isSuperAdmin(), 403);
 
         $request->validate([
             'name' => ['required', 'string', 'max:100'],
+            'voice_file' => ['nullable', 'file', 'mimes:wav,mp3', 'max:10240'],
         ]);
 
         $voiceFile->update(['name' => $request->name]);
+
+        // Replace voice file if a new one is uploaded
+        if ($request->hasFile('voice_file')) {
+            $service->replace($voiceFile, $request->file('voice_file'));
+        }
 
         return redirect()->route('admin.voice-files.show', $voiceFile)
             ->with('success', 'Voice template updated.');

@@ -65,7 +65,7 @@
 
                         <div class="form-group">
                             <label for="name" class="form-label">Template Name</label>
-                            <input type="text" id="name" name="name" value="{{ old('name') }}" required class="form-input" placeholder="e.g. Payment Reminder">
+                            <input type="text" id="name" name="name" value="{{ old('name') }}" required class="form-input" placeholder="e.g. Welcome Message, Payment Reminder">
                             <p class="form-hint">A descriptive name for this voice template</p>
                             <x-input-error :messages="$errors->get('name')" class="mt-2" />
                         </div>

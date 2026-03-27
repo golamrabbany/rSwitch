@@ -81,6 +81,43 @@ class VoiceFileService
     }
 
     /**
+     * Replace the audio file on an existing VoiceFile record.
+     */
+    public function replace(VoiceFile $voiceFile, UploadedFile $file): void
+    {
+        $format = strtolower($file->getClientOriginalExtension());
+        $originalFilename = $file->getClientOriginalName();
+
+        // Delete old files
+        Storage::disk('private')->delete($voiceFile->file_path);
+        $oldAsteriskPath = $this->getAsteriskDir() . '/' . $voiceFile->file_path_asterisk . '.wav';
+        if (file_exists($oldAsteriskPath)) {
+            @unlink($oldAsteriskPath);
+        }
+
+        // Store new original
+        $uuid = Str::uuid();
+        $storagePath = "voice-files/{$voiceFile->user_id}/{$uuid}.{$format}";
+        $file->storeAs("voice-files/{$voiceFile->user_id}", "{$uuid}.{$format}", 'private');
+
+        // Extract duration
+        $duration = $this->extractDuration($file->getRealPath());
+
+        // Convert for Asterisk
+        $asteriskFilename = "vf_{$uuid}";
+        $asteriskPath = $this->getAsteriskDir() . "/{$asteriskFilename}.wav";
+        $this->convertForAsterisk($file->getRealPath(), $asteriskPath);
+
+        $voiceFile->update([
+            'original_filename' => $originalFilename,
+            'file_path' => $storagePath,
+            'file_path_asterisk' => $asteriskFilename,
+            'duration' => $duration,
+            'format' => $format,
+        ]);
+    }
+
+    /**
      * Delete a voice file and its converted copy.
      */
     public function delete(VoiceFile $voiceFile): void
