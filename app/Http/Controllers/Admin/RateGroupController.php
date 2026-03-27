@@ -150,52 +150,60 @@ class RateGroupController extends Controller
             ->with('success', "Rate group deleted.");
     }
 
-    public function exportCsv(RateGroup $rateGroup)
+    public function export(RateGroup $rateGroup)
     {
-        $filename = 'rates_' . str_replace(' ', '_', strtolower($rateGroup->name)) . '_' . now()->format('Ymd') . '.csv';
+        $filename = 'rates_' . str_replace(' ', '_', strtolower($rateGroup->name)) . '_' . now()->format('Ymd') . '.xlsx';
 
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Rates');
 
-        $callback = function () use ($rateGroup) {
-            $handle = fopen('php://output', 'w');
+        $headers = ['Prefix', 'Destination', 'Rate/Min', 'Connection Fee', 'Min Duration', 'Billing Increment', 'Effective Date', 'End Date', 'Status', 'Rate Type'];
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue(chr(65 + $col) . '1', $header);
+        }
 
-            fputcsv($handle, [
-                'prefix', 'destination', 'rate_per_minute', 'connection_fee',
-                'min_duration', 'billing_increment', 'effective_date', 'end_date', 'status', 'rate_type',
-            ]);
+        // Style header
+        $lastCol = chr(64 + count($headers));
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '4338CA']],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+        ]);
 
-            $rateGroup->rates()
-                ->orderBy('prefix')
-                ->chunk(1000, function ($rates) use ($handle) {
-                    foreach ($rates as $rate) {
-                        fputcsv($handle, [
-                            $rate->prefix,
-                            $rate->destination,
-                            $rate->rate_per_minute,
-                            $rate->connection_fee,
-                            $rate->min_duration,
-                            $rate->billing_increment,
-                            $rate->effective_date?->format('Y-m-d'),
-                            $rate->end_date?->format('Y-m-d'),
-                            $rate->status,
-                            $rate->rate_type ?? 'regular',
-                        ]);
-                    }
-                });
+        $row = 2;
+        $rateGroup->rates()->orderBy('prefix')->chunk(1000, function ($rates) use ($sheet, &$row) {
+            foreach ($rates as $rate) {
+                $sheet->setCellValueExplicit("A{$row}", $rate->prefix, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                $sheet->setCellValue("B{$row}", $rate->destination);
+                $sheet->setCellValue("C{$row}", (float) $rate->rate_per_minute);
+                $sheet->setCellValue("D{$row}", (float) $rate->connection_fee);
+                $sheet->setCellValue("E{$row}", (int) $rate->min_duration);
+                $sheet->setCellValue("F{$row}", (int) $rate->billing_increment);
+                $sheet->setCellValue("G{$row}", $rate->effective_date?->format('Y-m-d'));
+                $sheet->setCellValue("H{$row}", $rate->end_date?->format('Y-m-d'));
+                $sheet->setCellValue("I{$row}", $rate->status);
+                $sheet->setCellValue("J{$row}", $rate->rate_type ?? 'regular');
+                $row++;
+            }
+        });
 
-            fclose($handle);
-        };
+        // Auto-width columns
+        foreach (range('A', $lastCol) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
 
-        return response()->stream($callback, 200, $headers);
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
-    public function importCsv(Request $request, RateGroup $rateGroup)
+    public function import(Request $request, RateGroup $rateGroup)
     {
         $request->validate([
-            'file' => 'required|file|mimes:csv,txt|max:10240',
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
             'mode' => ['required', Rule::in(['merge', 'replace', 'add_only'])],
             'effective_date' => 'required|date',
         ]);
@@ -216,28 +224,37 @@ class RateGroupController extends Controller
             'status' => 'processing',
         ]);
 
-        $handle = fopen($file->getRealPath(), 'r');
-        $header = fgetcsv($handle);
-
-        if (!$header) {
-            $import->update(['status' => 'failed', 'error_log' => ['Empty CSV file']]);
-            fclose($handle);
-            return back()->withErrors(['file' => 'The CSV file is empty.']);
+        // Read file using PhpSpreadsheet (supports xlsx, xls, csv)
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file->getRealPath());
+            $sheet = $spreadsheet->getActiveSheet();
+            $rows = $sheet->toArray(null, true, true, true);
+        } catch (\Exception $e) {
+            $import->update(['status' => 'failed', 'error_log' => ['Cannot read file: ' . $e->getMessage()]]);
+            return back()->withErrors(['file' => 'Cannot read file. Please upload a valid XLSX or CSV file.']);
         }
 
-        // Normalize header names
-        $header = array_map(fn($h) => strtolower(trim($h)), $header);
+        if (empty($rows)) {
+            $import->update(['status' => 'failed', 'error_log' => ['Empty file']]);
+            return back()->withErrors(['file' => 'The file is empty.']);
+        }
+
+        // First row is header
+        $headerRow = array_shift($rows);
+        $header = array_map(fn($h) => strtolower(trim($h ?? '')), array_values($headerRow));
 
         $requiredColumns = ['prefix', 'destination', 'rate_per_minute'];
-        $missing = array_diff($requiredColumns, $header);
+        // Also accept 'rate/min' as alias
+        $normalizedHeader = array_map(fn($h) => str_replace(['rate/min', 'rate per minute'], 'rate_per_minute', str_replace(' ', '_', $h)), $header);
+        $missing = array_diff($requiredColumns, $normalizedHeader);
         if (!empty($missing)) {
             $import->update([
                 'status' => 'failed',
                 'error_log' => ['Missing required columns: ' . implode(', ', $missing)],
             ]);
-            fclose($handle);
             return back()->withErrors(['file' => 'Missing required columns: ' . implode(', ', $missing)]);
         }
+        $header = $normalizedHeader;
 
         // If REPLACE mode, delete all existing rates first
         if ($mode === 'replace') {
@@ -255,8 +272,9 @@ class RateGroupController extends Controller
         $errors = [];
         $rowNum = 1;
 
-        while (($row = fgetcsv($handle)) !== false) {
+        foreach ($rows as $rowValues) {
             $rowNum++;
+            $row = array_values($rowValues);
 
             if (count($row) < count($header)) {
                 $errors[] = "Row {$rowNum}: insufficient columns";
@@ -267,6 +285,11 @@ class RateGroupController extends Controller
             $prefix = trim($data['prefix'] ?? '');
             $destination = trim($data['destination'] ?? '');
             $ratePerMinute = trim($data['rate_per_minute'] ?? '');
+
+            // Skip empty rows
+            if (empty($prefix) && empty($destination)) {
+                continue;
+            }
 
             // Validate
             if (!preg_match('/^\d{1,20}$/', $prefix)) {
@@ -313,8 +336,6 @@ class RateGroupController extends Controller
             $existingPrefixes[$prefix] = $prefix;
             $imported++;
         }
-
-        fclose($handle);
 
         $import->update([
             'total_rows' => $rowNum - 1,

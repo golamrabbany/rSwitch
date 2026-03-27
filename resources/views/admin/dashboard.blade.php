@@ -244,39 +244,42 @@
     <div class="grid grid-cols-12 gap-6">
         {{-- Recent Calls --}}
         <div class="col-span-12 lg:col-span-8">
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm h-full">
-                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col" style="height: 420px;">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                     <h3 class="font-semibold text-gray-900">Recent Calls</h3>
                     <a href="{{ route('admin.cdr.index') }}" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">View CDR</a>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="bg-gray-50">
+                <div class="overflow-y-auto overflow-x-auto flex-1">
+                    <table class="w-full text-xs">
+                        <thead class="bg-gray-50 sticky top-0">
                             <tr>
-                                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Time</th>
-                                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Caller / Callee</th>
-                                <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Dur</th>
-                                <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Cost</th>
-                                <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                                <th class="px-3 py-1.5 text-left font-semibold text-gray-500 uppercase">Time</th>
+                                <th class="px-3 py-1.5 text-left font-semibold text-gray-500 uppercase">Caller / Callee</th>
+                                <th class="px-3 py-1.5 text-right font-semibold text-gray-500 uppercase">Dur</th>
+                                <th class="px-3 py-1.5 text-right font-semibold text-gray-500 uppercase">Cost</th>
+                                <th class="px-3 py-1.5 text-center font-semibold text-gray-500 uppercase">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
                             @forelse ($recentCalls as $call)
                                 <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="px-4 py-2.5 whitespace-nowrap">
-                                        <a href="{{ route('admin.cdr.show', ['uuid' => $call->uuid, 'date' => $call->call_start?->format('Y-m-d')]) }}" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">{{ $call->call_start?->format('H:i:s') }}</a>
+                                    <td class="px-3 py-1.5 whitespace-nowrap">
+                                        <a href="{{ route('admin.cdr.show', ['uuid' => $call->uuid, 'date' => $call->call_start?->format('Y-m-d')]) }}" class="font-medium text-indigo-600 hover:text-indigo-800 leading-tight">
+                                            {{ $call->call_start?->format('d M Y') }}<br>
+                                            <span class="text-gray-400">{{ $call->call_start?->format('H:i:s') }}</span>
+                                        </a>
                                     </td>
-                                    <td class="px-4 py-2.5">
-                                        <p class="text-xs font-mono text-gray-900 truncate" style="max-width:120px;">{{ $call->caller }}</p>
-                                        <p class="text-xs font-mono text-gray-400 truncate" style="max-width:120px;">{{ $call->callee }}</p>
+                                    <td class="px-3 py-1.5">
+                                        <p class="font-mono text-gray-900 truncate" style="max-width:120px;">{{ $call->caller }}</p>
+                                        <p class="font-mono text-gray-400 truncate" style="max-width:120px;">{{ $call->callee }}</p>
                                     </td>
-                                    <td class="px-4 py-2.5 text-right">
-                                        <span class="text-xs font-mono text-gray-700 tabular-nums">{{ sprintf('%d:%02d', intdiv($call->duration, 60), $call->duration % 60) }}</span>
+                                    <td class="px-3 py-1.5 text-right">
+                                        <span class="font-mono text-gray-700 tabular-nums">{{ sprintf('%d:%02d', intdiv($call->duration, 60), $call->duration % 60) }}</span>
                                     </td>
-                                    <td class="px-4 py-2.5 text-right">
-                                        <span class="text-xs font-mono text-gray-700 tabular-nums">{{ format_currency($call->total_cost ?? 0, 2) }}</span>
+                                    <td class="px-3 py-1.5 text-right">
+                                        <span class="font-mono text-gray-700 tabular-nums">{{ format_currency($call->total_cost ?? 0, 2) }}</span>
                                     </td>
-                                    <td class="px-4 py-2.5 text-center">
+                                    <td class="px-3 py-1.5 text-center">
                                         @switch($call->disposition)
                                             @case('ANSWERED')
                                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700"><span class="w-1 h-1 rounded-full bg-emerald-500 mr-1"></span>OK</span>
@@ -311,18 +314,28 @@
 
         {{-- Quick Actions --}}
         <div class="col-span-12 lg:col-span-4">
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm h-full">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm" style="height: 420px;">
                 <div class="px-5 py-4 border-b border-gray-100">
                     <h3 class="font-semibold text-gray-900">Quick Actions</h3>
                 </div>
                 <div class="p-4 space-y-2">
-                    <a href="{{ route('admin.users.create') }}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
-                        <div class="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                    <a href="{{ route('admin.users.create', ['role' => 'reseller']) }}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
+                        <div class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
                         </div>
                         <div class="flex-1">
-                            <p class="text-sm font-semibold text-gray-900">Create User</p>
-                            <p class="text-xs text-gray-500">Add reseller or client</p>
+                            <p class="text-sm font-semibold text-gray-900">Create Reseller</p>
+                            <p class="text-xs text-gray-500">Add new reseller</p>
+                        </div>
+                    </a>
+
+                    <a href="{{ route('admin.users.create', ['role' => 'client']) }}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
+                        <div class="w-9 h-9 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center group-hover:bg-sky-500 group-hover:text-white transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm font-semibold text-gray-900">Create Client</p>
+                            <p class="text-xs text-gray-500">Add new client</p>
                         </div>
                     </a>
 

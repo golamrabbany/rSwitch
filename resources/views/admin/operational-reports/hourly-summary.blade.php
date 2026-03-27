@@ -44,10 +44,9 @@
                     @endforeach
                 </select>
                 <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden text-xs flex-shrink-0">
-                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), [])) }}" class="px-3 py-2 font-medium {{ !request('call_flow') ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
-                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'trunk_to_sip'])) }}" class="px-3 py-2 font-medium border-l {{ request('call_flow') === 'trunk_to_sip' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Inbound</a>
-                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'sip_to_trunk'])) }}" class="px-3 py-2 font-medium border-l {{ request('call_flow') === 'sip_to_trunk' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Outbound</a>
-                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'sip_to_sip'])) }}" class="px-3 py-2 font-medium border-l {{ request('call_flow') === 'sip_to_sip' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">P2P</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_type'), [])) }}" class="px-3 py-2 font-medium {{ !request('call_type') ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_type'), ['call_type' => 'regular'])) }}" class="px-3 py-2 font-medium border-l {{ request('call_type') === 'regular' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Regular</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_type'), ['call_type' => 'broadcast'])) }}" class="px-3 py-2 font-medium border-l {{ request('call_type') === 'broadcast' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Broadcast</a>
                 </div>
                 <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden text-xs flex-shrink-0">
                     <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('disposition'), [])) }}" class="px-3 py-2 font-medium {{ !request('disposition') ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
@@ -60,9 +59,11 @@
             {{-- Row 2: Type + Reseller + Client + Buttons --}}
             <div class="flex items-center gap-3">
                 <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden text-xs flex-shrink-0">
-                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_type'), [])) }}" class="px-2.5 py-2 font-medium {{ !request('call_type') ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
-                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_type'), ['call_type' => 'regular'])) }}" class="px-2.5 py-2 font-medium border-l {{ request('call_type') === 'regular' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Regular</a>
-                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_type'), ['call_type' => 'broadcast'])) }}" class="px-2.5 py-2 font-medium border-l {{ request('call_type') === 'broadcast' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Broadcast</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), [])) }}" class="px-2.5 py-2 font-medium {{ !request('call_flow') ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">All</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'trunk_to_sip'])) }}" class="px-2.5 py-2 font-medium border-l {{ request('call_flow') === 'trunk_to_sip' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Inbound</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'sip_to_trunk'])) }}" class="px-2.5 py-2 font-medium border-l {{ request('call_flow') === 'sip_to_trunk' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Outbound</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'sip_to_sip'])) }}" class="px-2.5 py-2 font-medium border-l {{ request('call_flow') === 'sip_to_sip' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">P2P</a>
+                    <a href="{{ route('admin.operational-reports.hourly', array_merge(request()->except('call_flow'), ['call_flow' => 'trunk_to_trunk'])) }}" class="px-2.5 py-2 font-medium border-l {{ request('call_flow') === 'trunk_to_trunk' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50' }}">Transit</a>
                 </div>
                 {{-- Reseller --}}
                 <div class="relative flex-1" x-data="resellerFilter()" @click.away="open = false">

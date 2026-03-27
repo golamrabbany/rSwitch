@@ -12,18 +12,6 @@ use Illuminate\Validation\Rule;
 
 class RateController extends Controller
 {
-    public function create(RateGroup $rateGroup)
-    {
-        return view('admin.rates.create', compact('rateGroup'));
-    }
-
-    public function show(RateGroup $rateGroup, Rate $rate)
-    {
-        $rate->load('rateGroup');
-
-        return view('admin.rates.show', compact('rateGroup', 'rate'));
-    }
-
     public function store(Request $request, RateGroup $rateGroup)
     {
         $validated = $this->validateRate($request);
@@ -33,16 +21,10 @@ class RateController extends Controller
 
         AuditService::logCreated($rate);
 
-        // Notify Python billing service to clear rate cache
         Redis::publish('rswitch:rate.updated', json_encode(['rate_group_id' => $rateGroup->id]));
 
         return redirect()->route('admin.rate-groups.show', $rateGroup)
             ->with('success', "Rate for prefix \"{$rate->prefix}\" created.");
-    }
-
-    public function edit(RateGroup $rateGroup, Rate $rate)
-    {
-        return view('admin.rates.edit', compact('rateGroup', 'rate'));
     }
 
     public function update(Request $request, RateGroup $rateGroup, Rate $rate)
@@ -54,7 +36,6 @@ class RateController extends Controller
 
         AuditService::logUpdated($rate, $original);
 
-        // Notify Python billing service to clear rate cache
         Redis::publish('rswitch:rate.updated', json_encode(['rate_group_id' => $rateGroup->id]));
 
         return redirect()->route('admin.rate-groups.show', $rateGroup)
@@ -66,7 +47,6 @@ class RateController extends Controller
         AuditService::logAction('deleted', $rate, $rate->toArray());
         $rate->delete();
 
-        // Notify Python billing service to clear rate cache
         Redis::publish('rswitch:rate.updated', json_encode(['rate_group_id' => $rateGroup->id]));
 
         return redirect()->route('admin.rate-groups.show', $rateGroup)
@@ -75,7 +55,7 @@ class RateController extends Controller
 
     private function validateRate(Request $request, ?Rate $rate = null): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'prefix' => ['required', 'string', 'regex:/^\d{1,20}$/'],
             'destination' => 'required|string|max:100',
             'rate_per_minute' => 'required|numeric|min:0',
@@ -89,5 +69,7 @@ class RateController extends Controller
         ]);
 
         $validated['rate_type'] = $validated['rate_type'] ?? 'regular';
+
+        return $validated;
     }
 }

@@ -149,7 +149,7 @@
             <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
                 <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                    {{ $roleFilter === 'client' ? 'Client' : 'Reseller' }} Accounts Total : {{ number_format($users->total()) }} &middot; Showing {{ $users->firstItem() }} to {{ $users->lastItem() }}
+                    {{ $roleFilter === 'client' ? 'Client Accounts' : ($roleFilter === 'reseller' ? 'Reseller Accounts' : 'Users') }} Total : {{ number_format($users->total()) }} &middot; Showing {{ $users->firstItem() }} to {{ $users->lastItem() }}
                 </span>
             </div>
         @endif

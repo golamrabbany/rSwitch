@@ -29,9 +29,10 @@ class VoiceFileController extends Controller
         $voiceFiles = $query->orderByDesc('created_at')->paginate(20);
 
         $stats = [
+            'total' => VoiceFile::ownedBy(auth()->user())->count(),
             'pending' => VoiceFile::ownedBy(auth()->user())->pending()->count(),
             'approved' => VoiceFile::ownedBy(auth()->user())->approved()->count(),
-            'total' => VoiceFile::ownedBy(auth()->user())->count(),
+            'rejected' => VoiceFile::ownedBy(auth()->user())->where('status', 'rejected')->count(),
         ];
 
         return view('admin.voice-files.index', compact('voiceFiles', 'stats'));

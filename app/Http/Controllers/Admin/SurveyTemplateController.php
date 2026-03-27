@@ -27,7 +27,18 @@ class SurveyTemplateController extends Controller
 
         $templates = $query->orderByDesc('created_at')->paginate(20);
 
-        return view('admin.survey-templates.index', compact('templates'));
+        $baseQuery = SurveyTemplate::query();
+        if (!auth()->user()->isSuperAdmin()) {
+            $baseQuery->visibleTo(auth()->user());
+        }
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'pending' => (clone $baseQuery)->where('status', 'pending')->count(),
+            'approved' => (clone $baseQuery)->where('status', 'approved')->count(),
+            'rejected' => (clone $baseQuery)->where('status', 'rejected')->count(),
+        ];
+
+        return view('admin.survey-templates.index', compact('templates', 'stats'));
     }
 
     public function create()

@@ -37,7 +37,7 @@ class TrunkController extends Controller
             });
         }
 
-        $trunks = $query->orderByDesc('created_at')->paginate(20);
+        $trunks = $query->with('rateGroup:id,name')->orderByDesc('created_at')->paginate(20);
 
         return view('admin.trunks.index', compact('trunks'));
     }

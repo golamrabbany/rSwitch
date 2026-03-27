@@ -46,23 +46,38 @@
                             <div class="form-group">
                                 <label for="name" class="form-label">Trunk Name</label>
                                 <input type="text" id="name" name="name" value="{{ old('name') }}" required class="form-input" placeholder="e.g. VoIP-Provider-1">
+                                <p class="form-hint">Unique name to identify this trunk</p>
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
 
                             <div class="form-group">
                                 <label for="provider" class="form-label">Provider</label>
                                 <input type="text" id="provider" name="provider" value="{{ old('provider') }}" required class="form-input" placeholder="e.g. Twilio, Telnyx">
+                                <p class="form-hint">SIP trunk provider company name</p>
                                 <x-input-error :messages="$errors->get('provider')" class="mt-2" />
                             </div>
 
-                            <div class="form-group md:col-span-2">
+                            <div class="form-group">
                                 <label for="direction" class="form-label">Direction</label>
                                 <select id="direction" name="direction" required x-model="direction" class="form-input">
                                     <option value="outgoing">Outgoing</option>
                                     <option value="incoming">Incoming</option>
                                     <option value="both">Both (Incoming & Outgoing)</option>
                                 </select>
+                                <p class="form-hint">Outgoing for sending, Incoming for receiving calls</p>
                                 <x-input-error :messages="$errors->get('direction')" class="mt-2" />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="rate_group_id" class="form-label">Provider Rate Group</label>
+                                <select id="rate_group_id" name="rate_group_id" class="form-input">
+                                    <option value="">— No Rate Group —</option>
+                                    @foreach ($rateGroups as $rg)
+                                        <option value="{{ $rg->id }}" {{ old('rate_group_id') == $rg->id ? 'selected' : '' }}>{{ $rg->name }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="form-hint">Provider's rate card — used for trunk cost in P&L reports</p>
+                                <x-input-error :messages="$errors->get('rate_group_id')" class="mt-2" />
                             </div>
                         </div>
                     </div>
@@ -79,11 +94,13 @@
                             <div class="form-group">
                                 <label for="host" class="form-label">Host / IP</label>
                                 <input type="text" id="host" name="host" value="{{ old('host') }}" required class="form-input" placeholder="sip.provider.com">
+                                <p class="form-hint">Provider's SIP server hostname or IP address</p>
                                 <x-input-error :messages="$errors->get('host')" class="mt-2" />
                             </div>
                             <div class="form-group">
                                 <label for="port" class="form-label">Port</label>
                                 <input type="number" id="port" name="port" value="{{ old('port', '5060') }}" required min="1" max="65535" class="form-input">
+                                <p class="form-hint">Default: 5060 (UDP/TCP), 5061 (TLS)</p>
                                 <x-input-error :messages="$errors->get('port')" class="mt-2" />
                             </div>
 
@@ -94,30 +111,51 @@
                                     <option value="tcp" {{ old('transport') === 'tcp' ? 'selected' : '' }}>TCP</option>
                                     <option value="tls" {{ old('transport') === 'tls' ? 'selected' : '' }}>TLS</option>
                                 </select>
+                                <p class="form-hint">UDP is standard, TLS for encrypted connections</p>
                                 <x-input-error :messages="$errors->get('transport')" class="mt-2" />
                             </div>
                             <div class="form-group">
                                 <label for="max_channels" class="form-label">Max Channels</label>
                                 <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', '30') }}" required min="1" max="9999" class="form-input">
+                                <p class="form-hint">Maximum concurrent calls on this trunk</p>
                                 <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                             </div>
 
                             <div class="form-group">
-                                <label for="rate_group_id" class="form-label">Provider Rate Group</label>
-                                <select id="rate_group_id" name="rate_group_id" class="form-input">
-                                    <option value="">— No Rate Group —</option>
-                                    @foreach ($rateGroups as $rg)
-                                        <option value="{{ $rg->id }}" {{ old('rate_group_id') == $rg->id ? 'selected' : '' }}>{{ $rg->name }}</option>
-                                    @endforeach
-                                </select>
-                                <p class="form-hint">Provider's rate card — used to calculate trunk cost for P&L</p>
-                                <x-input-error :messages="$errors->get('rate_group_id')" class="mt-2" />
+                                <label for="outgoing_priority" class="form-label">Outgoing Priority</label>
+                                <input type="number" id="outgoing_priority" name="outgoing_priority" value="{{ old('outgoing_priority', '10') }}" required min="1" max="100" class="form-input">
+                                <p class="form-hint">Lower number = higher priority for route selection</p>
+                                <x-input-error :messages="$errors->get('outgoing_priority')" class="mt-2" />
                             </div>
 
-                            <div class="form-group md:col-span-2">
-                                <label for="codec_allow" class="form-label">Codecs</label>
-                                <input type="text" id="codec_allow" name="codec_allow" value="{{ old('codec_allow', 'ulaw,alaw,g729') }}" required class="form-input font-mono">
-                                <p class="form-hint">Comma-separated codec list in priority order</p>
+                            <div class="form-group md:col-span-2" x-data="{
+                                codecs: ['ulaw', 'alaw', 'g729', 'g722', 'opus', 'gsm', 'ilbc'],
+                                selected: '{{ old('codec_allow', 'ulaw,alaw,g729') }}'.split(',').map(s => s.trim()).filter(Boolean),
+                                toggle(val) {
+                                    const idx = this.selected.indexOf(val);
+                                    if (idx > -1) { this.selected.splice(idx, 1); }
+                                    else { this.selected.push(val); }
+                                },
+                                isSelected(val) { return this.selected.includes(val); },
+                                get value() { return this.selected.join(','); }
+                            }">
+                                <label class="form-label">Codecs</label>
+                                <input type="hidden" name="codec_allow" :value="value">
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="codec in codecs" :key="codec">
+                                        <button type="button" @click="toggle(codec)"
+                                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-150 cursor-pointer"
+                                            :class="isSelected(codec)
+                                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-200'
+                                                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'">
+                                            <svg x-show="isSelected(codec)" class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                            <span class="font-mono" x-text="codec"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                                <p class="form-hint mt-2">Click to select/deselect. At least one required.</p>
                                 <x-input-error :messages="$errors->get('codec_allow')" class="mt-2" />
                             </div>
                         </div>
@@ -136,13 +174,14 @@
                                 <div class="form-group">
                                     <label for="username" class="form-label">Username</label>
                                     <input type="text" id="username" name="username" value="{{ old('username') }}" class="form-input">
-                                    <p class="form-hint">Required for registration-based auth</p>
+                                    <p class="form-hint">SIP username provided by the trunk provider</p>
                                     <x-input-error :messages="$errors->get('username')" class="mt-2" />
                                 </div>
 
                                 <div class="form-group">
                                     <label for="password" class="form-label">Password</label>
                                     <input type="text" id="password" name="password" value="{{ old('password') }}" class="form-input font-mono">
+                                    <p class="form-hint">SIP password for authentication</p>
                                     <x-input-error :messages="$errors->get('password')" class="mt-2" />
                                 </div>
 
@@ -176,6 +215,7 @@
                                 <div class="form-group">
                                     <label for="incoming_context" class="form-label">Incoming Context</label>
                                     <input type="text" id="incoming_context" name="incoming_context" value="{{ old('incoming_context', 'from-trunk') }}" required class="form-input font-mono">
+                                    <p class="form-hint">Asterisk dialplan context, usually "from-trunk"</p>
                                     <x-input-error :messages="$errors->get('incoming_context')" class="mt-2" />
                                 </div>
 
@@ -186,13 +226,14 @@
                                         <option value="registration" {{ old('incoming_auth_type') === 'registration' ? 'selected' : '' }}>Registration</option>
                                         <option value="both" {{ old('incoming_auth_type') === 'both' ? 'selected' : '' }}>Both</option>
                                     </select>
+                                    <p class="form-hint">How to identify calls from this trunk</p>
                                     <x-input-error :messages="$errors->get('incoming_auth_type')" class="mt-2" />
                                 </div>
 
                                 <div class="form-group md:col-span-2">
                                     <label for="incoming_ip_acl" class="form-label">IP ACL</label>
                                     <input type="text" id="incoming_ip_acl" name="incoming_ip_acl" value="{{ old('incoming_ip_acl') }}" class="form-input font-mono" placeholder="1.2.3.4, 5.6.7.0/24">
-                                    <p class="form-hint">Comma-separated IPs/CIDRs</p>
+                                    <p class="form-hint">Allowed source IPs, comma-separated. Required for IP-based auth.</p>
                                     <x-input-error :messages="$errors->get('incoming_ip_acl')" class="mt-2" />
                                 </div>
                             </div>
@@ -212,29 +253,34 @@
                                 <div class="form-group">
                                     <label for="dial_pattern_match" class="form-label">Pattern Match</label>
                                     <input type="text" id="dial_pattern_match" name="dial_pattern_match" value="{{ old('dial_pattern_match') }}" class="form-input font-mono" placeholder="^0(\d+)$">
+                                    <p class="form-hint">Regex to match numbers before sending to trunk</p>
                                     <x-input-error :messages="$errors->get('dial_pattern_match')" class="mt-2" />
                                 </div>
 
                                 <div class="form-group">
                                     <label for="dial_pattern_replace" class="form-label">Pattern Replace</label>
                                     <input type="text" id="dial_pattern_replace" name="dial_pattern_replace" value="{{ old('dial_pattern_replace') }}" class="form-input font-mono" placeholder="+44$1">
+                                    <p class="form-hint">Replacement pattern using regex groups</p>
                                     <x-input-error :messages="$errors->get('dial_pattern_replace')" class="mt-2" />
                                 </div>
 
                                 <div class="form-group">
                                     <label for="dial_prefix" class="form-label">Dial Prefix</label>
                                     <input type="text" id="dial_prefix" name="dial_prefix" value="{{ old('dial_prefix') }}" class="form-input font-mono">
+                                    <p class="form-hint">Prefix added before the number when dialing</p>
                                     <x-input-error :messages="$errors->get('dial_prefix')" class="mt-2" />
                                 </div>
                                 <div class="form-group">
                                     <label for="dial_strip_digits" class="form-label">Strip Digits</label>
                                     <input type="number" id="dial_strip_digits" name="dial_strip_digits" value="{{ old('dial_strip_digits', '0') }}" required min="0" max="20" class="form-input">
+                                    <p class="form-hint">Number of leading digits to remove</p>
                                     <x-input-error :messages="$errors->get('dial_strip_digits')" class="mt-2" />
                                 </div>
 
                                 <div class="form-group md:col-span-2">
                                     <label for="tech_prefix" class="form-label">Tech Prefix</label>
                                     <input type="text" id="tech_prefix" name="tech_prefix" value="{{ old('tech_prefix') }}" class="form-input font-mono">
+                                    <p class="form-hint">Technical prefix prepended for routing (e.g. provider-specific code)</p>
                                     <x-input-error :messages="$errors->get('tech_prefix')" class="mt-2" />
                                 </div>
                             </div>
@@ -260,12 +306,14 @@
                                         <option value="translate">Translate</option>
                                         <option value="hide">Hide (Anonymous)</option>
                                     </select>
+                                    <p class="form-hint">How caller ID is handled on outgoing calls</p>
                                     <x-input-error :messages="$errors->get('cli_mode')" class="mt-2" />
                                 </div>
 
                                 <div x-show="cliMode === 'override'" x-cloak class="form-group md:col-span-2">
                                     <label for="cli_override_number" class="form-label">Override Number</label>
                                     <input type="text" id="cli_override_number" name="cli_override_number" value="{{ old('cli_override_number') }}" class="form-input font-mono" placeholder="+44123456789">
+                                    <p class="form-hint">Fixed caller ID number sent to provider</p>
                                     <x-input-error :messages="$errors->get('cli_override_number')" class="mt-2" />
                                 </div>
 
@@ -273,6 +321,7 @@
                                     <div class="form-group">
                                         <label for="cli_prefix_strip" class="form-label">Strip Digits</label>
                                         <input type="number" id="cli_prefix_strip" name="cli_prefix_strip" value="{{ old('cli_prefix_strip', '0') }}" min="0" max="20" class="form-input">
+                                        <p class="form-hint">Remove leading digits from caller ID</p>
                                         <x-input-error :messages="$errors->get('cli_prefix_strip')" class="mt-2" />
                                     </div>
                                 </template>
@@ -280,6 +329,7 @@
                                     <div class="form-group">
                                         <label for="cli_prefix_add" class="form-label">Add Prefix</label>
                                         <input type="text" id="cli_prefix_add" name="cli_prefix_add" value="{{ old('cli_prefix_add') }}" class="form-input font-mono">
+                                        <p class="form-hint">Prefix added to caller ID after stripping</p>
                                         <x-input-error :messages="$errors->get('cli_prefix_add')" class="mt-2" />
                                     </div>
                                 </template>
@@ -307,19 +357,21 @@
                             <div x-show="healthCheck" x-cloak class="form-group">
                                 <label for="health_check_interval" class="form-label">Check Interval (sec)</label>
                                 <input type="number" id="health_check_interval" name="health_check_interval" value="{{ old('health_check_interval', '60') }}" required min="10" max="3600" class="form-input">
+                                <p class="form-hint">How often to send OPTIONS ping (seconds)</p>
                                 <x-input-error :messages="$errors->get('health_check_interval')" class="mt-2" />
                             </div>
 
                             <div x-show="healthCheck" x-cloak class="form-group">
                                 <label for="health_auto_disable_threshold" class="form-label">Auto-disable Threshold</label>
                                 <input type="number" id="health_auto_disable_threshold" name="health_auto_disable_threshold" value="{{ old('health_auto_disable_threshold', '5') }}" required min="1" max="100" class="form-input">
-                                <p class="form-hint">Consecutive failures before disable</p>
+                                <p class="form-hint">Consecutive failures before auto-disabling trunk</p>
                                 <x-input-error :messages="$errors->get('health_auto_disable_threshold')" class="mt-2" />
                             </div>
 
                             <div x-show="healthCheck" x-cloak class="form-group md:col-span-2">
                                 <label for="health_asr_threshold" class="form-label">ASR Threshold (%)</label>
                                 <input type="number" id="health_asr_threshold" name="health_asr_threshold" value="{{ old('health_asr_threshold') }}" step="0.01" min="0" max="100" class="form-input" placeholder="Optional">
+                                <p class="form-hint">Disable trunk if ASR drops below this percentage</p>
                                 <x-input-error :messages="$errors->get('health_asr_threshold')" class="mt-2" />
                             </div>
                         </div>
@@ -335,6 +387,7 @@
                     <div class="form-card-body">
                         <div class="form-group">
                             <textarea id="notes" name="notes" rows="3" class="form-input" placeholder="Optional notes about this trunk...">{{ old('notes') }}</textarea>
+                            <p class="form-hint">Internal notes — not visible to providers or clients</p>
                             <x-input-error :messages="$errors->get('notes')" class="mt-2" />
                         </div>
                     </div>

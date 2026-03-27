@@ -94,8 +94,26 @@
                             <span class="detail-value">{{ $trunk->max_channels }}</span>
                         </div>
                         <div class="detail-item">
+                            <span class="detail-label">Rate Group</span>
+                            <span class="detail-value">
+                                @if($trunk->rateGroup)
+                                    <span class="text-indigo-600 font-medium">{{ $trunk->rateGroup->name }}</span>
+                                @else
+                                    <span class="text-gray-400">None</span>
+                                @endif
+                            </span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Priority</span>
+                            <span class="detail-value">{{ $trunk->outgoing_priority }}</span>
+                        </div>
+                        <div class="detail-item md:col-span-2">
                             <span class="detail-label">Codecs</span>
-                            <span class="detail-value font-mono">{{ $trunk->codec_allow }}</span>
+                            <div class="flex flex-wrap gap-1.5 mt-1">
+                                @foreach(explode(',', $trunk->codec_allow) as $codec)
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-xs font-mono font-medium text-indigo-700">{{ trim($codec) }}</span>
+                                @endforeach
+                            </div>
                         </div>
                     </div>
                 </div>

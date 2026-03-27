@@ -61,9 +61,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:super_admin'])
 
     // Rate Groups & Rates (global system)
     Route::resource('rate-groups', Admin\RateGroupController::class);
-    Route::get('rate-groups/{rate_group}/export', [Admin\RateGroupController::class, 'exportCsv'])->name('rate-groups.export');
-    Route::post('rate-groups/{rate_group}/import', [Admin\RateGroupController::class, 'importCsv'])->name('rate-groups.import');
-    Route::resource('rate-groups.rates', Admin\RateController::class)->except(['index']);
+    Route::get('rate-groups/{rate_group}/export', [Admin\RateGroupController::class, 'export'])->name('rate-groups.export');
+    Route::post('rate-groups/{rate_group}/import', [Admin\RateGroupController::class, 'import'])->name('rate-groups.import');
+    Route::resource('rate-groups.rates', Admin\RateController::class)->only(['store', 'update', 'destroy']);
 
     // Audit logs
     Route::get('audit-logs', [Admin\AuditLogController::class, 'index'])->name('audit-logs.index');
