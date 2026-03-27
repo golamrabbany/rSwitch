@@ -14,49 +14,89 @@
         </div>
     </div>
 
-    <div class="max-w-2xl">
-        <form method="POST" action="{{ route('reseller.survey-templates.store') }}">
-            @csrf
+    <form method="POST" action="{{ route('reseller.survey-templates.store') }}">
+        @csrf
 
-            <div class="form-card">
-                <div class="form-card-header">
-                    <h3 class="form-card-title">Template Details</h3>
-                    <p class="form-card-subtitle">Basic information about the survey</p>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {{-- Main Form --}}
+            <div class="lg:col-span-2 space-y-6">
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Template Details</h3>
+                        <p class="form-card-subtitle">Basic information about the survey</p>
+                    </div>
+                    <div class="form-card-body space-y-4">
+                        <div class="form-group">
+                            <label for="name" class="form-label">Template Name</label>
+                            <input type="text" id="name" name="name" value="{{ old('name') }}" required class="form-input" placeholder="e.g. Customer Satisfaction Survey">
+                            <p class="form-hint">A descriptive name for this survey template</p>
+                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea id="description" name="description" rows="3" class="form-input" placeholder="Brief description of the survey purpose...">{{ old('description') }}</textarea>
+                            <p class="form-hint">Optional description for internal reference</p>
+                            <x-input-error :messages="$errors->get('description')" class="mt-2" />
+                        </div>
+                    </div>
                 </div>
-                <div class="form-card-body space-y-4">
-                    <div class="form-group">
-                        <label for="name" class="form-label">Template Name</label>
-                        <input type="text" id="name" name="name" value="{{ old('name') }}" required class="form-input" placeholder="e.g. Customer Satisfaction Survey">
-                        <p class="form-hint">A descriptive name for this survey template</p>
-                        <x-input-error :messages="$errors->get('name')" class="mt-2" />
-                    </div>
 
-                    <div class="form-group">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea id="description" name="description" rows="3" class="form-input" placeholder="Brief description of the survey purpose...">{{ old('description') }}</textarea>
-                        <p class="form-hint">Optional description for internal reference</p>
-                        <x-input-error :messages="$errors->get('description')" class="mt-2" />
-                    </div>
+                {{-- Form Actions --}}
+                <div class="flex items-center justify-end gap-3">
+                    <a href="{{ route('reseller.survey-templates.index') }}" class="btn-secondary">Cancel</a>
+                    <button type="submit" class="btn-primary" style="background: #059669;">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        Create Template
+                    </button>
+                </div>
+            </div>
 
-                    <div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                        <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                        <div class="text-sm text-amber-800">
-                            <p class="font-medium">Requires Admin Approval</p>
-                            <p class="text-amber-600 mt-0.5">Your survey template will be submitted for review. Admin will configure the survey questions and voice files.</p>
+            {{-- Sidebar --}}
+            <div class="space-y-6">
+                {{-- Approval Notice --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Approval Required</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
+                            <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-amber-800">Pending Review</p>
+                                <p class="text-xs text-amber-600">Admin will configure questions and voice files</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- How It Works --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">How It Works</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3">
+                                <div class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
+                                <p class="text-sm text-gray-600">You create the template with name and description</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
+                                <p class="text-sm text-gray-600">Admin reviews, adds survey questions and voice files</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
+                                <p class="text-sm text-gray-600">Once approved, use it when creating survey broadcasts</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <div class="flex items-center justify-end gap-3 mt-6">
-                <a href="{{ route('reseller.survey-templates.index') }}" class="btn-secondary">Cancel</a>
-                <button type="submit" class="btn-primary" style="background: #059669;">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                    Create Template
-                </button>
-            </div>
-        </form>
-    </div>
+        </div>
+    </form>
 </x-reseller-layout>
