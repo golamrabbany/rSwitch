@@ -123,9 +123,25 @@ class CallEndHandler:
             try:
                 from billing.tasks import rate_and_charge
                 rate_and_charge.delay(cdr.id)
-                logger.info(f"Queued billing for CDR {cdr.id}")
+                logger.info(f"Queued billing for CDR {cdr.id} via Celery")
             except Exception as e:
-                logger.warning(f"Could not queue billing for CDR {cdr.id}: {e}")
+                logger.warning(f"Celery dispatch failed for CDR {cdr.id}: {e} — billing sync")
+                # Fallback: bill synchronously if Celery broker is unavailable
+                try:
+                    from billing.rating import RatingService
+                    from billing.balance import BalanceService
+                    from shared.config import get_settings
+                    settings = get_settings()
+                    r = redis_lib.from_url(settings.redis_url)
+                    rating = RatingService(r)
+                    balance = BalanceService()
+
+                    result = rating.rate_call(cdr.id)
+                    if result.get("status") == "rated":
+                        balance.charge_call(cdr.id)
+                    logger.info(f"Billed CDR {cdr.id} synchronously (Celery fallback)")
+                except Exception as e2:
+                    logger.error(f"Sync billing also failed for CDR {cdr.id}: {e2}")
 
         # 7. Clean up credit control metadata from Redis
         try:
