@@ -107,6 +107,8 @@ class AMIListener:
             # Load current state on connect
             await self._load_active_channels()
             await self._load_registered_contacts()
+            # Start periodic contact refresh
+            asyncio.create_task(self._periodic_contact_refresh())
         except Exception as e:
             self._connected = False
             logger.warning(f"AMI connection failed: {e}")
@@ -354,7 +356,7 @@ class AMIListener:
             })
 
     async def _load_registered_contacts(self):
-        """Load current registered contacts from ps_contacts table on startup."""
+        """Sync registered contacts from ps_contacts table. Detects new/removed."""
         try:
             import re
             from shared.database import get_sync_engine
@@ -366,16 +368,16 @@ class AMIListener:
                     text("SELECT id, uri, user_agent, endpoint FROM ps_contacts WHERE uri IS NOT NULL")
                 ).fetchall()
 
+            current_db = {}
             for row in rows:
-                # endpoint column has the clean username
                 aor = row.endpoint or row.id.split("^3B")[0].split(";")[0]
                 uri = (row.uri or "").replace("^3B", ";")
-
                 ip_match = re.search(r"@([\d.]+)", uri)
                 ip = ip_match.group(1) if ip_match else ""
 
-                if aor and uri:
-                    self._registered_contacts[aor] = {
+                # Skip trunk contacts
+                if aor and uri and not aor.startswith("trunk-"):
+                    current_db[aor] = {
                         "ip": ip,
                         "uri": uri,
                         "user_agent": row.user_agent or "",
@@ -383,11 +385,41 @@ class AMIListener:
                         "status": "Avail",
                     }
 
+            # Detect newly registered
+            for aor, info in current_db.items():
+                if aor not in self._registered_contacts:
+                    logger.info(f"SIP registered (DB sync): {aor} @ {info['ip']}")
+                    await self._broadcast({
+                        "type": "sip_registered",
+                        "username": aor,
+                        "ip": info["ip"],
+                    })
+                self._registered_contacts[aor] = info
+
+            # Detect unregistered (was in cache but no longer in DB)
+            stale = [aor for aor in self._registered_contacts if aor not in current_db and not aor.startswith("trunk-")]
+            for aor in stale:
+                logger.info(f"SIP unregistered (DB sync): {aor}")
+                self._registered_contacts.pop(aor, None)
+                await self._broadcast({
+                    "type": "sip_unregistered",
+                    "username": aor,
+                })
+
             count = len(self._registered_contacts)
             if count > 0:
-                logger.info(f"Loaded {count} registered contacts from database")
+                logger.debug(f"Contact sync: {count} registered")
         except Exception as e:
             logger.debug(f"Could not load contacts: {e}")
+
+    async def _periodic_contact_refresh(self):
+        """Refresh contacts from ps_contacts every 30 seconds."""
+        while True:
+            await asyncio.sleep(30)
+            try:
+                await self._load_registered_contacts()
+            except Exception as e:
+                logger.debug(f"Periodic contact refresh failed: {e}")
 
     def get_registered_contacts(self) -> dict:
         """Return all registered contacts as {username: {ip, status, ...}}."""
