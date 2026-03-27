@@ -101,14 +101,34 @@ class VoiceFileController extends Controller
 
         $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'voice_file' => ['nullable', 'file', 'mimes:wav,mp3', 'max:10240'],
+            'new_voice_file_id' => ['nullable', 'exists:voice_files,id'],
         ]);
 
         $voiceFile->update(['name' => $request->name]);
 
-        // Replace voice file if a new one is uploaded
-        if ($request->hasFile('voice_file')) {
-            $service->replace($voiceFile, $request->file('voice_file'));
+        // Replace with AJAX-uploaded file
+        if ($request->filled('new_voice_file_id')) {
+            $newVf = VoiceFile::find($request->new_voice_file_id);
+            if ($newVf && $newVf->id !== $voiceFile->id) {
+                // Delete old files
+                \Illuminate\Support\Facades\Storage::disk('private')->delete($voiceFile->file_path);
+                $oldAsteriskPath = env('BROADCAST_VOICE_PATH', '/var/spool/asterisk/voicebroadcast') . '/' . $voiceFile->file_path_asterisk . '.wav';
+                if (file_exists($oldAsteriskPath)) {
+                    @unlink($oldAsteriskPath);
+                }
+
+                // Transfer new file's paths to existing record
+                $voiceFile->update([
+                    'original_filename' => $newVf->original_filename,
+                    'file_path' => $newVf->file_path,
+                    'file_path_asterisk' => $newVf->file_path_asterisk,
+                    'duration' => $newVf->duration,
+                    'format' => $newVf->format,
+                ]);
+
+                // Delete the temp record (not the files — they're now owned by $voiceFile)
+                $newVf->delete();
+            }
         }
 
         return redirect()->route('admin.voice-files.show', $voiceFile)
