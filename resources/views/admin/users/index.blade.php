@@ -258,9 +258,12 @@
                                 @if($user->parent && $user->parent->isSuperAdmin())
                                     <span class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Direct</span>
                                 @elseif($user->parent)
-                                    <a href="{{ route('admin.users.show', $user->parent) }}" class="text-indigo-600 hover:text-indigo-700 font-medium text-sm">{{ $user->parent->name }}</a>
+                                    <a href="{{ route('admin.users.show', $user->parent) }}" class="block">
+                                        <p class="text-sm font-medium text-gray-800 hover:text-indigo-600">{{ $user->parent->name }}</p>
+                                        <p class="text-xs text-gray-400">{{ $user->parent->email }}</p>
+                                    </a>
                                 @else
-                                    <span class="text-gray-300">-</span>
+                                    <span class="text-gray-300">—</span>
                                 @endif
                             </td>
                         @endif
