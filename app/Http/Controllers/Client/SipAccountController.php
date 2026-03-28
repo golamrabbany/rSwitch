@@ -103,7 +103,7 @@ class SipAccountController extends Controller
         $contacts = [];
         try {
             $response = Http::timeout(3)
-                ->post('http://127.0.0.1:8001/api/contacts/status', [
+                ->post(rtrim(env('PYTHON_API_URL', 'http://python-api:8000'), '/') . '/api/contacts/status', [
                     'usernames' => $ownUsernames,
                 ]);
 

@@ -55,15 +55,14 @@
                     <x-input-error :messages="$errors->get('allowed_ips')" class="mt-2" />
                 </div>
 
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                    <select id="status" name="status" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="active" {{ old('status', $sipAccount->status) === 'active' ? 'selected' : '' }}>Active</option>
-                        <option value="suspended" {{ old('status', $sipAccount->status) === 'suspended' ? 'selected' : '' }}>Suspended</option>
-                        <option value="disabled" {{ old('status', $sipAccount->status) === 'disabled' ? 'selected' : '' }}>Disabled</option>
-                    </select>
-                    <p class="mt-1 text-xs text-gray-500">Suspended/disabled accounts are deprovisioned from rSwitch.</p>
+                <div x-data="{ status: '{{ old('status', $sipAccount->status) }}' }">
+                    <label class="block text-sm font-medium text-gray-700">Status</label>
+                    <input type="hidden" name="status" :value="status">
+                    <div class="mt-1 flex gap-2">
+                        <button type="button" @click="status = 'active'" class="flex-1 py-2 rounded-lg border-2 text-sm font-medium transition-all" :class="status === 'active' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">Active</button>
+                        <button type="button" @click="status = 'suspended'" class="flex-1 py-2 rounded-lg border-2 text-sm font-medium transition-all" :class="status === 'suspended' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">Suspended</button>
+                        <button type="button" @click="status = 'disabled'" class="flex-1 py-2 rounded-lg border-2 text-sm font-medium transition-all" :class="status === 'disabled' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">Disabled</button>
+                    </div>
                     <x-input-error :messages="$errors->get('status')" class="mt-2" />
                 </div>
 

@@ -1,66 +1,30 @@
-@php
-    $config = $surveyTemplate->config ?? ['version' => 2, 'questions' => []];
-    $existingQuestions = collect($config['questions'] ?? [])->map(function ($q) {
-        return [
-            'type' => $q['type'] ?? 'question',
-            'label' => $q['label'] ?? '',
-            'max_digits' => $q['max_digits'] ?? 1,
-            'timeout' => $q['timeout'] ?? 10,
-            'max_retries' => $q['max_retries'] ?? 2,
-            'options' => collect($q['options'] ?? [])->map(function($label, $digit) {
-                return ['digit' => (string)$digit, 'label' => $label];
-            })->values()->toArray(),
-            'voice_file_id' => $q['voice_file_id'] ?? '',
-            'voice_file_name' => !empty($q['voice_file_id']) ? (\App\Models\VoiceFile::find($q['voice_file_id'])?->name ?? '') : '',
-            'voice_file_duration' => !empty($q['voice_file_id']) ? (\App\Models\VoiceFile::find($q['voice_file_id'])?->duration ?? '') : '',
-            'uploading' => false,
-            'uploadError' => '',
-        ];
-    })->toArray();
-    if (empty($existingQuestions)) {
-        $existingQuestions = [['type' => 'question', 'label' => '', 'max_digits' => 1, 'timeout' => 10, 'max_retries' => 2, 'options' => [['digit' => '1', 'label' => '']], 'voice_file_id' => '', 'voice_file_name' => '', 'voice_file_duration' => '', 'uploading' => false, 'uploadError' => '']];
-    }
-    $hasIntroExisting = collect($config['questions'] ?? [])->contains('type', 'intro');
-@endphp
-
-<x-reseller-layout>
-    <x-slot name="header">Edit Survey Template</x-slot>
+<x-client-layout>
+    <x-slot name="header">Create Survey Template</x-slot>
 
     <div class="page-header-row">
         <div>
-            <h2 class="page-title">Edit: {{ $surveyTemplate->name }}</h2>
-            <p class="page-subtitle">Update questions and voice files</p>
+            <h2 class="page-title">Create Survey Template</h2>
+            <p class="page-subtitle">Build a reusable survey with voice files and questions</p>
         </div>
         <div class="page-actions">
-            <a href="{{ route('reseller.survey-templates.show', $surveyTemplate) }}" class="btn-action-secondary">
+            <a href="{{ route('client.survey-templates.index') }}" class="btn-action-secondary">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                Cancel
+                Back
             </a>
         </div>
     </div>
 
-    <form method="POST" action="{{ route('reseller.survey-templates.update', $surveyTemplate) }}" enctype="multipart/form-data"
+    <form method="POST" action="{{ route('client.survey-templates.store') }}" enctype="multipart/form-data"
           x-data="{
-              surveyQuestions: {{ json_encode($existingQuestions) }},
-              hasIntro: {{ $hasIntroExisting ? 'true' : 'false' }},
-              addQuestion() {
-                  this.surveyQuestions.push({ type: 'question', label: '', max_digits: 1, timeout: 10, max_retries: 2, options: [{digit: '', label: ''}], voice_file_id: '', voice_file_name: '', voice_file_duration: '', uploading: false, uploadError: '' });
-              },
-              removeQuestion(idx) {
-                  if (this.surveyQuestions.filter(q => q.type === 'question').length > 1 || this.surveyQuestions[idx].type === 'intro') {
-                      this.surveyQuestions.splice(idx, 1);
-                      if (this.surveyQuestions[0]?.type !== 'intro') this.hasIntro = false;
-                  }
-              },
-              toggleIntro() {
-                  if (this.hasIntro) this.surveyQuestions.unshift({ type: 'intro', label: 'Welcome message', options: [], voice_file_id: '', voice_file_name: '', voice_file_duration: '', uploading: false, uploadError: '' });
-                  else if (this.surveyQuestions[0]?.type === 'intro') this.surveyQuestions.shift();
-              },
+              surveyQuestions: [{ type: 'question', label: '', max_digits: 1, timeout: 10, max_retries: 2, options: [{digit: '1', label: ''}], voice_file_id: '', voice_file_name: '', voice_file_duration: '', uploading: false, uploadError: '' }],
+              hasIntro: false,
+              addQuestion() { this.surveyQuestions.push({ type: 'question', label: '', max_digits: 1, timeout: 10, max_retries: 2, options: [{digit: '', label: ''}], voice_file_id: '', voice_file_name: '', voice_file_duration: '', uploading: false, uploadError: '' }); },
+              removeQuestion(idx) { if (this.surveyQuestions.filter(q => q.type === 'question').length > 1 || this.surveyQuestions[idx].type === 'intro') { this.surveyQuestions.splice(idx, 1); if (this.surveyQuestions[0]?.type !== 'intro') this.hasIntro = false; } },
+              toggleIntro() { if (this.hasIntro) this.surveyQuestions.unshift({ type: 'intro', label: 'Welcome message', options: [], voice_file_id: '', voice_file_name: '', voice_file_duration: '', uploading: false, uploadError: '' }); else if (this.surveyQuestions[0]?.type === 'intro') this.surveyQuestions.shift(); },
               addOption(qIdx) { this.surveyQuestions[qIdx].options.push({ digit: '', label: '' }); },
               removeOption(qIdx, oIdx) { if (this.surveyQuestions[qIdx].options.length > 1) this.surveyQuestions[qIdx].options.splice(oIdx, 1); }
           }">
         @csrf
-        @method('PUT')
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-6">
@@ -68,17 +32,18 @@
                 <div class="form-card">
                     <div class="form-card-header">
                         <h3 class="form-card-title">Template Details</h3>
+                        <p class="form-card-subtitle">Basic information about the survey</p>
                     </div>
                     <div class="form-card-body space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
                                 <label class="form-label">Template Name</label>
-                                <input type="text" name="name" value="{{ old('name', $surveyTemplate->name) }}" required class="form-input" placeholder="e.g. Customer Satisfaction Survey">
-                                @error('name') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                                <input type="text" name="name" value="{{ old('name') }}" required class="form-input" placeholder="e.g. Customer Satisfaction Survey">
+                                <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Description</label>
-                                <input type="text" name="description" value="{{ old('description', $surveyTemplate->description) }}" class="form-input" placeholder="Brief purpose...">
+                                <input type="text" name="description" value="{{ old('description') }}" class="form-input" placeholder="Brief purpose...">
                             </div>
                         </div>
                     </div>
@@ -90,10 +55,10 @@
                         <div class="flex items-center justify-between w-full">
                             <div>
                                 <h3 class="form-card-title">Survey Questions</h3>
-                                <p class="form-card-subtitle">Edit voice files and configure questions</p>
+                                <p class="form-card-subtitle">Upload voice files and configure questions</p>
                             </div>
                             <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" x-model="hasIntro" @change="toggleIntro()" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <input type="checkbox" x-model="hasIntro" @change="toggleIntro()" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                                 <span class="text-xs font-medium text-gray-600">Welcome Intro</span>
                             </label>
                         </div>
@@ -122,18 +87,19 @@
                                         <div class="form-group">
                                             <label class="form-label">Voice File</label>
                                             <input type="hidden" :name="'survey_questions[' + qIdx + '][voice_file_id]'" :value="q.voice_file_id || ''">
+
                                             <div x-show="!q.voice_file_id && !q.uploading">
-                                                <label class="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/50 transition-all">
-                                                    <svg class="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                                                <label class="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all">
+                                                    <svg class="w-5 h-5 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                                                     <span class="text-sm text-gray-500">Upload audio <span class="text-xs text-gray-400">(WAV/MP3)</span></span>
                                                     <input type="file" accept=".wav,.mp3" class="hidden"
-                                                           @change="let file=$event.target.files[0]; if(!file) return; q.uploading=true; q.uploadError=''; let fd=new FormData(); fd.append('voice_file',file); fd.append('label',q.label||'Survey Audio'); fd.append('_token','{{ csrf_token() }}'); fetch('{{ route('reseller.survey-templates.upload-voice-file') }}',{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}}).then(r=>{if(!r.ok) throw new Error(); return r.json();}).then(d=>{q.voice_file_id=d.id;q.voice_file_name=d.name;q.voice_file_duration=d.duration;q.uploading=false;}).catch(()=>{q.uploadError='Upload failed.';q.uploading=false;});">
+                                                           @change="let file=$event.target.files[0]; if(!file) return; q.uploading=true; q.uploadError=''; let fd=new FormData(); fd.append('voice_file',file); fd.append('label',q.label||'Survey Audio'); fd.append('_token','{{ csrf_token() }}'); fetch('{{ route('client.survey-templates.upload-voice-file') }}',{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}}).then(r=>{if(!r.ok) throw new Error(); return r.json();}).then(d=>{q.voice_file_id=d.id;q.voice_file_name=d.name;q.voice_file_duration=d.duration;q.uploading=false;}).catch(()=>{q.uploadError='Upload failed.';q.uploading=false;});">
                                                 </label>
                                                 <p x-show="q.uploadError" class="text-xs text-red-500 mt-1" x-text="q.uploadError"></p>
                                             </div>
-                                            <div x-show="q.uploading" class="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
-                                                <svg class="w-4 h-4 text-emerald-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                                                <span class="text-sm text-emerald-600">Uploading...</span>
+                                            <div x-show="q.uploading" class="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                                                <svg class="w-4 h-4 text-indigo-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                                <span class="text-sm text-indigo-600">Uploading...</span>
                                             </div>
                                             <div x-show="q.voice_file_id" class="flex items-center justify-between px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
                                                 <div class="flex items-center gap-2">
@@ -166,7 +132,7 @@
                                                         </div>
                                                     </template>
                                                 </div>
-                                                <button type="button" @click="addOption(qIdx)" class="mt-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
+                                                <button type="button" @click="addOption(qIdx)" class="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                                                     Add Option
                                                 </button>
@@ -177,66 +143,73 @@
                             </div>
                         </template>
 
-                        <button type="button" @click="addQuestion()" class="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-500 hover:border-emerald-400 hover:text-emerald-600 transition-colors flex items-center justify-center gap-2">
+                        <button type="button" @click="addQuestion()" class="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                             Add Question
                         </button>
                     </div>
                 </div>
 
-                {{-- Actions --}}
                 <div class="flex items-center justify-end gap-3">
-                    <a href="{{ route('reseller.survey-templates.show', $surveyTemplate) }}" class="btn-secondary">Cancel</a>
+                    <a href="{{ route('client.survey-templates.index') }}" class="btn-secondary">Cancel</a>
                     <button type="submit" name="action" value="draft" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                         Save Draft
                     </button>
-                    <button type="submit" name="action" value="submit" class="btn-primary" style="background: #059669;">
+                    <button type="submit" name="action" value="submit" class="btn-primary">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        Update & Submit
+                        Submit for Review
                     </button>
                 </div>
             </div>
 
             {{-- Sidebar --}}
-            <div class="space-y-4" style="position:sticky; top:1rem;">
+            <div class="space-y-6">
                 <div class="detail-card">
-                    <div class="detail-card-header"><h3 class="detail-card-title">Client</h3></div>
+                    <div class="detail-card-header"><h3 class="detail-card-title">Approval Required</h3></div>
                     <div class="detail-card-body">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                                <span class="text-sm font-bold text-emerald-600">{{ strtoupper(substr($surveyTemplate->client?->name ?? '?', 0, 2)) }}</span>
+                        <div class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
+                            <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 truncate">{{ $surveyTemplate->client?->name }}</p>
-                                <p class="text-xs text-gray-500 truncate">{{ $surveyTemplate->client?->email }}</p>
+                            <div>
+                                <p class="text-sm font-medium text-amber-800">Pending Review</p>
+                                <p class="text-xs text-amber-600">Admin will review and approve</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="detail-card">
-                    <div class="detail-card-header"><h3 class="detail-card-title">Template Info</h3></div>
-                    <div class="detail-card-body space-y-2.5 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-gray-500">Status</span>
-                            <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ $surveyTemplate->status === 'draft' ? 'bg-gray-100 text-gray-700' : 'bg-amber-100 text-amber-700' }}">{{ ucfirst($surveyTemplate->status) }}</span>
+                    <div class="detail-card-header"><h3 class="detail-card-title">How It Works</h3></div>
+                    <div class="detail-card-body">
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3">
+                                <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
+                                <p class="text-sm text-gray-600">Add questions with voice files</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
+                                <p class="text-sm text-gray-600">Admin reviews and approves</p>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
+                                <p class="text-sm text-gray-600">Use it when creating survey broadcasts</p>
+                            </div>
                         </div>
-                        <div class="flex justify-between"><span class="text-gray-500">Questions</span><span class="font-medium text-gray-700">{{ $surveyTemplate->getQuestionCount() }}</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Created</span><span class="font-medium text-gray-700">{{ $surveyTemplate->created_at->format('d M Y') }}</span></div>
                     </div>
                 </div>
 
                 <div class="detail-card">
                     <div class="detail-card-header"><h3 class="detail-card-title">Voice File Tips</h3></div>
                     <div class="detail-card-body text-xs text-gray-500 space-y-2">
-                        <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span><span>Each question needs its own voice file</span></div>
-                        <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span><span>Click <strong>"Change"</strong> to replace a voice file</span></div>
-                        <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span><span>Files auto-convert to 8kHz WAV</span></div>
-                        <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span><span>Keep each audio under 30 seconds</span></div>
+                        <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span><span>Each question needs its own voice file</span></div>
+                        <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span><span>WAV or MP3, max 10MB per file</span></div>
+                        <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span><span>Files auto-convert to 8kHz WAV</span></div>
+                        <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span><span>Keep each audio under 30 seconds</span></div>
                     </div>
                 </div>
             </div>
         </div>
     </form>
-</x-reseller-layout>
+</x-client-layout>

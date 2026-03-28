@@ -12,7 +12,7 @@ class VoiceFileController extends Controller
 {
     public function index(Request $request)
     {
-        $query = VoiceFile::with('user:id,name')->ownedBy(auth()->user());
+        $query = VoiceFile::with('user:id,name')->ownedBy(auth()->user())->where('status', '!=', 'draft');
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -29,7 +29,7 @@ class VoiceFileController extends Controller
         $voiceFiles = $query->orderByDesc('created_at')->paginate(20);
 
         $stats = [
-            'total' => VoiceFile::ownedBy(auth()->user())->count(),
+            'total' => VoiceFile::ownedBy(auth()->user())->where('status', '!=', 'draft')->count(),
             'pending' => VoiceFile::ownedBy(auth()->user())->pending()->count(),
             'approved' => VoiceFile::ownedBy(auth()->user())->approved()->count(),
             'rejected' => VoiceFile::ownedBy(auth()->user())->where('status', 'rejected')->count(),

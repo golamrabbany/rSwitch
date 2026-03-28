@@ -191,6 +191,13 @@
                 View Results
             </a>
         @endif
+
+        @if(in_array($broadcast->status, ['completed', 'cancelled', 'failed']))
+            <button type="button" onclick="document.getElementById('cloneModal').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 bg-white border border-emerald-300 text-emerald-600 text-sm font-medium rounded-lg hover:bg-emerald-50 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                Clone
+            </button>
+        @endif
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -298,4 +305,116 @@
             @endif
         </div>
     </div>
+{{-- Clone Modal --}}
+@if(in_array($broadcast->status, ['completed', 'cancelled', 'failed']))
+<div id="cloneModal" class="hidden fixed inset-0 z-50 overflow-hidden" x-data="{ scheduleType: 'now' }">
+    <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" onclick="document.getElementById('cloneModal').classList.add('hidden')"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-6">
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md" style="max-height: calc(100vh - 3rem);" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Clone Broadcast</h3>
+                        <p class="text-sm text-gray-500">{{ $broadcast->name }}</p>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('cloneModal').classList.add('hidden')" class="rounded-lg p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{{ route('reseller.broadcasts.clone', $broadcast) }}">
+                @csrf
+                <div class="overflow-y-auto px-6 py-4 space-y-4" style="max-height: calc(100vh - 12rem);">
+                    {{-- Summary --}}
+                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:0.5rem;">
+                        <div class="p-2 bg-gray-50 rounded-lg text-center">
+                            <p class="text-sm font-bold text-gray-900">{{ number_format($broadcast->total_numbers) }}</p>
+                            <p class="text-xs text-gray-500">Total</p>
+                        </div>
+                        <div class="p-2 bg-emerald-50 rounded-lg text-center">
+                            <p class="text-sm font-bold text-emerald-700">{{ number_format($broadcast->answered_count) }}</p>
+                            <p class="text-xs text-emerald-600">Answered</p>
+                        </div>
+                        <div class="p-2 bg-red-50 rounded-lg text-center">
+                            <p class="text-sm font-bold text-red-700">{{ number_format($broadcast->failed_count) }}</p>
+                            <p class="text-xs text-red-600">Failed</p>
+                        </div>
+                        <div class="p-2 bg-amber-50 rounded-lg text-center">
+                            <p class="text-sm font-bold text-amber-700">{{ $broadcast->total_numbers > 0 ? round(($broadcast->answered_count / $broadcast->total_numbers) * 100) : 0 }}%</p>
+                            <p class="text-xs text-amber-600">Rate</p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Broadcast Name</label>
+                        <input type="text" name="name" value="{{ $broadcast->name }} (Copy)" required class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Phone Numbers</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="number_option" value="all" checked class="text-emerald-600 focus:ring-emerald-500">
+                                <div><p class="text-sm font-medium text-gray-800">All numbers <span class="text-gray-500">({{ number_format($broadcast->total_numbers) }})</span></p><p class="text-xs text-gray-500">Clone all, reset to pending</p></div>
+                            </label>
+                            @php $failedCount = $broadcast->total_numbers - $broadcast->answered_count; @endphp
+                            <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="number_option" value="failed_only" class="text-emerald-600 focus:ring-emerald-500">
+                                <div><p class="text-sm font-medium text-gray-800">Failed/unanswered only <span class="text-gray-500">({{ number_format($failedCount) }})</span></p><p class="text-xs text-gray-500">Skip already answered</p></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Schedule</label>
+                        <div class="flex gap-3">
+                            <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors" :class="scheduleType === 'now' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
+                                <input type="radio" name="schedule_type" value="now" x-model="scheduleType" class="sr-only"><span class="font-medium text-sm">Start Manually</span>
+                            </label>
+                            <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors" :class="scheduleType === 'scheduled' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
+                                <input type="radio" name="schedule_type" value="scheduled" x-model="scheduleType" class="sr-only"><span class="font-medium text-sm">Schedule</span>
+                            </label>
+                        </div>
+                        <div x-show="scheduleType === 'scheduled'" x-transition class="grid grid-cols-2 gap-3 mt-3">
+                            <input type="date" name="scheduled_date" class="form-input" min="{{ now()->format('Y-m-d') }}">
+                            <input type="time" name="scheduled_time" class="form-input">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="form-group"><label class="form-label">Max Concurrent</label><input type="number" name="max_concurrent" value="{{ $broadcast->max_concurrent }}" min="1" max="50" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Ring Timeout (s)</label><input type="number" name="ring_timeout" value="{{ $broadcast->ring_timeout }}" min="10" max="120" class="form-input"></div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-xl">
+                    <button type="button" onclick="document.getElementById('cloneModal').classList.add('hidden')" class="btn-secondary text-sm">Cancel</button>
+                    <div class="flex items-center gap-2">
+                        <button type="submit" name="clone_action" value="draft" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                            Save Draft
+                        </button>
+                        <template x-if="scheduleType === 'now'">
+                            <button type="submit" name="clone_action" value="start" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg text-white transition-colors" style="background:#059669;">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+                                Clone & Start
+                            </button>
+                        </template>
+                        <template x-if="scheduleType === 'scheduled'">
+                            <button type="submit" name="clone_action" value="schedule" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg text-white transition-colors" style="background:#059669;">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                Clone & Schedule
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 </x-reseller-layout>

@@ -39,7 +39,7 @@
                         <p class="form-card-subtitle">Credentials and account status</p>
                     </div>
                     <div class="form-card-body">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div class="form-group">
                                 <label class="form-label">Account Name</label>
                                 <input type="text" name="name" value="{{ old('name', $client->name) }}" required class="form-input">
@@ -52,14 +52,14 @@
                                 <p class="form-hint">Used as login username</p>
                                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Status</label>
-                            <select name="status" required class="form-input">
-                                <option value="active" {{ old('status', $client->status) === 'active' ? 'selected' : '' }}>Active</option>
-                                <option value="suspended" {{ old('status', $client->status) === 'suspended' ? 'selected' : '' }}>Suspended</option>
-                            </select>
-                            <p class="form-hint">Suspended accounts cannot make calls</p>
+                            <div class="form-group" x-data="{ status: '{{ old('status', $client->status) }}' }">
+                                <label class="form-label">Status</label>
+                                <input type="hidden" name="status" :value="status">
+                                <div class="flex gap-2">
+                                    <button type="button" @click="status = 'active'" class="flex-1 py-2 rounded-lg border-2 text-sm font-medium transition-all" :class="status === 'active' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">Active</button>
+                                    <button type="button" @click="status = 'suspended'" class="flex-1 py-2 rounded-lg border-2 text-sm font-medium transition-all" :class="status === 'suspended' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">Suspended</button>
+                                </div>
+                            </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">

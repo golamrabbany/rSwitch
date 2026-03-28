@@ -196,6 +196,12 @@ update_application() {
     usermod -aG asterisk www-data 2>/dev/null || true
     chown www-data:www-data "$INSTALL_DIR/storage/app/private/voice-files"
 
+    # Ensure PYTHON_API_URL is in .env (added in v2.x for registration status)
+    if ! grep -q 'PYTHON_API_URL' "$INSTALL_DIR/.env" 2>/dev/null; then
+        echo -e "\n# Python Billing API (bare metal = localhost:8001)\nPYTHON_API_URL=http://127.0.0.1:8001" >> "$INSTALL_DIR/.env"
+        log_success "Added PYTHON_API_URL to .env"
+    fi
+
     # Ensure ffmpeg is installed (needed for voice file conversion)
     if ! command -v ffmpeg &>/dev/null; then
         log_info "Installing ffmpeg (required for voice broadcast)..."

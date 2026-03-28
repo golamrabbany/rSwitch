@@ -12,14 +12,28 @@ use Illuminate\Http\Request;
 
 class BroadcastController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $broadcasts = Broadcast::where('user_id', auth()->id())
-            ->with('voiceFile:id,name')
-            ->orderByDesc('created_at')
-            ->paginate(20);
+        $query = Broadcast::where('user_id', auth()->id())
+            ->with('voiceFile:id,name');
 
-        return view('client.broadcasts.index', compact('broadcasts'));
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $broadcasts = $query->orderByDesc('created_at')->paginate(20);
+
+        $baseQuery = Broadcast::where('user_id', auth()->id());
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'draft' => (clone $baseQuery)->where('status', 'draft')->count(),
+            'running' => (clone $baseQuery)->where('status', 'running')->count(),
+            'paused' => (clone $baseQuery)->where('status', 'paused')->count(),
+            'completed' => (clone $baseQuery)->where('status', 'completed')->count(),
+            'cancelled' => (clone $baseQuery)->where('status', 'cancelled')->count(),
+        ];
+
+        return view('client.broadcasts.index', compact('broadcasts', 'stats'));
     }
 
     public function create()
@@ -92,6 +106,30 @@ class BroadcastController extends Controller
             ->pluck('count', 'status');
 
         return view('client.broadcasts.show', compact('broadcast', 'numberStats'));
+    }
+
+    public function edit(Broadcast $broadcast)
+    {
+        abort_unless($broadcast->user_id === auth()->id(), 403);
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled']), 403, 'Only draft or scheduled broadcasts can be edited.');
+
+        return view('client.broadcasts.edit', compact('broadcast'));
+    }
+
+    public function update(Request $request, Broadcast $broadcast)
+    {
+        abort_unless($broadcast->user_id === auth()->id(), 403);
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled']), 403);
+
+        $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:120'],
+        ]);
+
+        $broadcast->update($request->only('name', 'max_concurrent', 'ring_timeout'));
+
+        return redirect()->route('client.broadcasts.show', $broadcast)->with('success', 'Broadcast updated.');
     }
 
     public function start(Broadcast $broadcast, BroadcastService $service)

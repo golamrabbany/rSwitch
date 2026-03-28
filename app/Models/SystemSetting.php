@@ -91,6 +91,18 @@ class SystemSetting extends Model
             ['key' => 'sip_pin_min_length', 'value' => '4', 'type' => 'integer', 'group' => 'sip', 'sort_order' => 5, 'label' => 'SIP PIN Min Length', 'description' => 'Minimum digits after prefix. E.g. prefix "100" + min 4 = total 7 digits (1000001).'],
             ['key' => 'sip_pin_max_length', 'value' => '10', 'type' => 'integer', 'group' => 'sip', 'sort_order' => 6, 'label' => 'SIP PIN Max Length', 'description' => 'Maximum digits after prefix. E.g. prefix "100" + max 10 = total 13 digits.'],
 
+            // Payment Gateways
+            ['key' => 'sslcommerz_enabled', 'value' => '0', 'type' => 'boolean', 'group' => 'payment_gateways', 'sort_order' => 10, 'label' => 'Enable SSLCommerz', 'description' => 'Allow SSLCommerz payments (Bangladesh).'],
+            ['key' => 'sslcommerz_sandbox', 'value' => '1', 'type' => 'boolean', 'group' => 'payment_gateways', 'sort_order' => 11, 'label' => 'SSLCommerz Sandbox Mode', 'description' => 'Use sandbox environment for testing.'],
+            ['key' => 'sslcommerz_store_id', 'value' => '', 'type' => 'string', 'group' => 'payment_gateways', 'sort_order' => 12, 'label' => 'SSLCommerz Store ID', 'description' => 'Your SSLCommerz Store ID.'],
+            ['key' => 'sslcommerz_store_password', 'value' => '', 'type' => 'string', 'group' => 'payment_gateways', 'sort_order' => 13, 'label' => 'SSLCommerz Store Password', 'description' => 'Your SSLCommerz Store Password (secret).'],
+            ['key' => 'bkash_enabled', 'value' => '0', 'type' => 'boolean', 'group' => 'payment_gateways', 'sort_order' => 20, 'label' => 'Enable bKash', 'description' => 'Allow bKash payments (Bangladesh mobile banking).'],
+            ['key' => 'bkash_sandbox', 'value' => '1', 'type' => 'boolean', 'group' => 'payment_gateways', 'sort_order' => 21, 'label' => 'bKash Sandbox Mode', 'description' => 'Use sandbox environment for testing.'],
+            ['key' => 'bkash_app_key', 'value' => '', 'type' => 'string', 'group' => 'payment_gateways', 'sort_order' => 22, 'label' => 'bKash App Key', 'description' => 'bKash Tokenized Checkout App Key.'],
+            ['key' => 'bkash_app_secret', 'value' => '', 'type' => 'string', 'group' => 'payment_gateways', 'sort_order' => 23, 'label' => 'bKash App Secret', 'description' => 'bKash Tokenized Checkout App Secret.'],
+            ['key' => 'bkash_username', 'value' => '', 'type' => 'string', 'group' => 'payment_gateways', 'sort_order' => 24, 'label' => 'bKash Username', 'description' => 'bKash merchant username.'],
+            ['key' => 'bkash_password', 'value' => '', 'type' => 'string', 'group' => 'payment_gateways', 'sort_order' => 25, 'label' => 'bKash Password', 'description' => 'bKash merchant password.'],
+
             ['key' => 'cdr_retention_days', 'value' => '365', 'type' => 'integer', 'group' => 'system', 'sort_order' => 1, 'label' => 'CDR Retention (Days)', 'description' => 'Auto-purge call records older than this.'],
             ['key' => 'audit_retention_days', 'value' => '180', 'type' => 'integer', 'group' => 'system', 'sort_order' => 2, 'label' => 'Audit Log Retention (Days)', 'description' => 'Auto-purge audit logs older than this.'],
             ['key' => 'api_rate_limit', 'value' => '60', 'type' => 'integer', 'group' => 'system', 'sort_order' => 3, 'label' => 'API Rate Limit', 'description' => 'Max API requests per minute per user.'],

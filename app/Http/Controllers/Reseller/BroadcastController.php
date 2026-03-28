@@ -24,9 +24,24 @@ class BroadcastController extends Controller
             $query->where('status', $request->status);
         }
 
+        if ($request->filled('search')) {
+            $query->where('name', 'like', "%{$request->search}%");
+        }
+
         $broadcasts = $query->orderByDesc('created_at')->paginate(20);
 
-        return view('reseller.broadcasts.index', compact('broadcasts'));
+        $baseQuery = Broadcast::whereIn('user_id', $descendantIds);
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'draft' => (clone $baseQuery)->where('status', 'draft')->count(),
+            'scheduled' => (clone $baseQuery)->where('status', 'scheduled')->count(),
+            'running' => (clone $baseQuery)->where('status', 'running')->count(),
+            'paused' => (clone $baseQuery)->where('status', 'paused')->count(),
+            'completed' => (clone $baseQuery)->where('status', 'completed')->count(),
+            'cancelled' => (clone $baseQuery)->where('status', 'cancelled')->count(),
+        ];
+
+        return view('reseller.broadcasts.index', compact('broadcasts', 'stats'));
     }
 
     public function create()
@@ -48,7 +63,15 @@ class BroadcastController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'client_id', 'config']);
 
-        return view('reseller.broadcasts.create', compact('voiceTemplates', 'surveyTemplates'));
+        $voiceTemplatesJson = $voiceTemplates->map(function ($vt) {
+            return ['id' => $vt->id, 'name' => $vt->name, 'client' => $vt->user->name ?? 'Unknown', 'format' => strtoupper($vt->format), 'duration' => $vt->duration];
+        })->values();
+
+        $surveyTemplatesJson = $surveyTemplates->map(function ($st) {
+            return ['id' => $st->id, 'name' => $st->name, 'client' => $st->client->name ?? 'Unknown', 'questions' => $st->getQuestionCount()];
+        })->values();
+
+        return view('reseller.broadcasts.create', compact('voiceTemplates', 'surveyTemplates', 'voiceTemplatesJson', 'surveyTemplatesJson'));
     }
 
     public function store(Request $request, BroadcastService $service)
@@ -341,6 +364,8 @@ class BroadcastController extends Controller
         $this->authorize($broadcast);
         abort_unless(in_array($broadcast->status, ['draft', 'scheduled', 'paused']), 403, 'Pause the broadcast first to edit.');
 
+        $broadcast->load('user', 'voiceFile', 'sipAccount');
+
         return view('reseller.broadcasts.edit', compact('broadcast'));
     }
 
@@ -350,14 +375,97 @@ class BroadcastController extends Controller
         abort_unless(in_array($broadcast->status, ['draft', 'scheduled', 'paused']), 403, 'Pause the broadcast first to edit.');
 
         $request->validate([
-            'name' => ['required', 'string', 'max:150'],
             'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
             'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:120'],
         ]);
 
-        $broadcast->update($request->only('name', 'max_concurrent', 'ring_timeout'));
+        $broadcast->update($request->only('max_concurrent', 'ring_timeout'));
 
-        return redirect()->route('reseller.broadcasts.show', $broadcast)->with('success', 'Broadcast updated.');
+        if ($request->input('edit_action') === 'start' && $broadcast->total_numbers > 0) {
+            app(BroadcastService::class)->start($broadcast);
+            return redirect()->route('reseller.broadcasts.show', $broadcast)->with('success', 'Broadcast updated and started.');
+        }
+
+        return redirect()->route('reseller.broadcasts.show', $broadcast)->with('success', 'Broadcast saved as draft.');
+    }
+
+    public function clone(Request $request, Broadcast $broadcast)
+    {
+        $this->authorize($broadcast);
+
+        $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'clone_action' => ['required', 'in:draft,start,schedule'],
+            'scheduled_date' => ['nullable', 'date'],
+            'scheduled_time' => ['nullable'],
+            'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:120'],
+            'number_option' => ['required', 'in:all,failed_only'],
+        ]);
+
+        $cloneAction = $request->input('clone_action', 'draft');
+        $scheduledAt = null;
+        $status = 'draft';
+        if ($cloneAction === 'schedule' && $request->scheduled_date && $request->scheduled_time) {
+            $scheduledAt = \Carbon\Carbon::parse($request->scheduled_date . ' ' . $request->scheduled_time);
+            $status = 'scheduled';
+        }
+
+        $newBroadcast = Broadcast::create([
+            'user_id' => $broadcast->user_id,
+            'name' => $request->name,
+            'type' => $broadcast->type,
+            'status' => $status,
+            'voice_file_id' => $broadcast->voice_file_id,
+            'sip_account_id' => $broadcast->sip_account_id,
+            'caller_id_name' => $broadcast->caller_id_name,
+            'caller_id_number' => $broadcast->caller_id_number,
+            'max_concurrent' => $request->max_concurrent ?? $broadcast->max_concurrent,
+            'ring_timeout' => $request->ring_timeout ?? $broadcast->ring_timeout,
+            'survey_config' => $broadcast->survey_config,
+            'survey_template_id' => $broadcast->survey_template_id,
+            'scheduled_at' => $scheduledAt,
+            'total_numbers' => 0,
+            'dialed_count' => 0,
+            'answered_count' => 0,
+            'failed_count' => 0,
+            'total_cost' => 0,
+            'created_by' => auth()->id(),
+        ]);
+
+        $query = $broadcast->numbers();
+        if ($request->number_option === 'failed_only') {
+            $query->whereIn('status', ['failed', 'no_answer', 'busy', 'pending']);
+        }
+
+        $numbers = $query->get(['phone_number']);
+        $insert = $numbers->map(function ($n) use ($newBroadcast) {
+            return [
+                'broadcast_id' => $newBroadcast->id,
+                'phone_number' => $n->phone_number,
+                'status' => 'pending',
+                'attempts' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        })->toArray();
+
+        if (!empty($insert)) {
+            \App\Models\BroadcastNumber::insert($insert);
+            $newBroadcast->update(['total_numbers' => count($insert)]);
+        }
+
+        if ($cloneAction === 'start' && $newBroadcast->total_numbers > 0) {
+            app(BroadcastService::class)->start($newBroadcast);
+            return redirect()->route('reseller.broadcasts.show', $newBroadcast)
+                ->with('success', "Broadcast cloned and started with {$newBroadcast->total_numbers} numbers.");
+        }
+
+        $msg = $status === 'scheduled'
+            ? "Broadcast cloned and scheduled for {$scheduledAt->format('M d, Y g:i A')}."
+            : "Broadcast cloned as draft with {$newBroadcast->total_numbers} numbers.";
+
+        return redirect()->route('reseller.broadcasts.show', $newBroadcast)->with('success', $msg);
     }
 
     private function authorize(Broadcast $broadcast): void

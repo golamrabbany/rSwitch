@@ -152,6 +152,175 @@
                 </div>
             </div>
 
+            {{-- Contact --}}
+            @if($client->phone || $client->contact_email || $client->address)
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Contact</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-6">
+                        @if($client->contact_email)
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Contact Email</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ $client->contact_email }}</p>
+                            </div>
+                        @endif
+                        @if($client->phone)
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Phone</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ $client->phone }}</p>
+                            </div>
+                        @endif
+                        @if($client->alt_phone)
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Alt Phone</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ $client->alt_phone }}</p>
+                            </div>
+                        @endif
+                    </div>
+                    @if($client->address)
+                        <div class="mt-4 pt-3 border-t border-gray-100">
+                            <p class="text-xs text-gray-400 uppercase tracking-wide">Address</p>
+                            <p class="text-sm font-medium text-gray-900 mt-1">
+                                {{ $client->address }}
+                                @if($client->city || $client->state)
+                                    <br>{{ collect([$client->city, $client->state])->filter()->implode(', ') }}
+                                @endif
+                                @if($client->country || $client->zip_code)
+                                    <br>{{ collect([$client->country, $client->zip_code])->filter()->implode(' ') }}
+                                @endif
+                            </p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
+            {{-- Company Details --}}
+            @if($client->company_name || $client->company_email || $client->company_website)
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Company Details</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="grid grid-cols-2 gap-y-4 gap-x-6">
+                        @if($client->company_name)
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Company Name</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ $client->company_name }}</p>
+                            </div>
+                        @endif
+                        @if($client->company_email)
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Company Email</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ $client->company_email }}</p>
+                            </div>
+                        @endif
+                        @if($client->company_website)
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Website</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1"><a href="{{ $client->company_website }}" target="_blank" class="text-emerald-600 hover:text-emerald-700">{{ $client->company_website }}</a></p>
+                            </div>
+                        @endif
+                        @if($client->notes)
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Notes</p>
+                                <p class="text-sm text-gray-700 mt-1">{{ $client->notes }}</p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            {{-- KYC Information --}}
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">KYC Information</h3>
+                </div>
+                <div class="detail-card-body">
+                    @if($client->kycProfile)
+                        @php $kyc = $client->kycProfile; @endphp
+                        {{-- Status --}}
+                        <div class="p-3 rounded-lg mb-4 {{ $client->kyc_status === 'approved' ? 'bg-emerald-50' : ($client->kyc_status === 'pending' ? 'bg-amber-50' : ($client->kyc_status === 'rejected' ? 'bg-red-50' : 'bg-gray-50')) }}">
+                            <div class="flex items-center gap-2">
+                                @if($client->kyc_status === 'approved')
+                                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    <span class="text-sm font-semibold text-emerald-700">Approved</span>
+                                @elseif($client->kyc_status === 'pending')
+                                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    <span class="text-sm font-semibold text-amber-700">Pending Review</span>
+                                @elseif($client->kyc_status === 'rejected')
+                                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    <span class="text-sm font-semibold text-red-700">Rejected</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- Details --}}
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-6">
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Account Type</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ ucfirst($kyc->account_type ?? '—') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Full Name</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ $kyc->full_name ?? '—' }}</p>
+                            </div>
+                            @if($kyc->contact_person)
+                                <div>
+                                    <p class="text-xs text-gray-400 uppercase tracking-wide">Contact Person</p>
+                                    <p class="text-sm font-medium text-gray-900 mt-1">{{ $kyc->contact_person }}</p>
+                                </div>
+                            @endif
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">Phone</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ $kyc->phone ?? '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">ID Type</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">{{ $kyc->id_type ? ucfirst(str_replace('_', ' ', $kyc->id_type)) : '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">ID Number</p>
+                                <p class="text-sm font-mono font-medium text-gray-900 mt-1">{{ $kyc->id_number ?? '—' }}</p>
+                            </div>
+                        </div>
+
+                        {{-- Address --}}
+                        @if($kyc->address_line1)
+                            <div class="mt-4 pt-3 border-t border-gray-100">
+                                <p class="text-xs text-gray-400 uppercase tracking-wide">KYC Address</p>
+                                <p class="text-sm font-medium text-gray-900 mt-1">
+                                    {{ $kyc->address_line1 }}
+                                    @if($kyc->address_line2) <br>{{ $kyc->address_line2 }} @endif
+                                    @if($kyc->city || $kyc->state)
+                                        <br>{{ collect([$kyc->city, $kyc->state])->filter()->implode(', ') }}
+                                    @endif
+                                    @if($kyc->country || $kyc->postal_code)
+                                        <br>{{ collect([$kyc->country, $kyc->postal_code])->filter()->implode(' ') }}
+                                    @endif
+                                </p>
+                            </div>
+                        @endif
+
+                        {{-- Rejection reason --}}
+                        @if($client->kyc_status === 'rejected' && $client->kyc_rejected_reason)
+                            <div class="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                                <p class="text-xs font-medium text-red-700">Rejection Reason</p>
+                                <p class="text-sm text-red-600 mt-1">{{ $client->kyc_rejected_reason }}</p>
+                            </div>
+                        @endif
+                    @else
+                        <div class="text-center py-6">
+                            <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <p class="text-sm text-gray-500">KYC not submitted yet</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
             {{-- SIP Accounts --}}
             <div class="detail-card">
                 <div class="detail-card-header flex items-center justify-between">

@@ -20,6 +20,10 @@
         <a href="{{ route('reseller.survey-templates.index') }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ !request('status') ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
             All <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ !request('status') ? 'bg-emerald-100' : 'bg-gray-100' }}">{{ $stats['total'] }}</span>
         </a>
+        <a href="{{ route('reseller.survey-templates.index', ['status' => 'draft']) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ request('status') === 'draft' ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
+            <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+            Draft <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ request('status') === 'draft' ? 'bg-gray-200' : 'bg-gray-100' }}">{{ $stats['draft'] ?? 0 }}</span>
+        </a>
         <a href="{{ route('reseller.survey-templates.index', ['status' => 'pending']) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ request('status') === 'pending' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
             <span class="w-2 h-2 rounded-full bg-amber-500"></span>
             Pending <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ request('status') === 'pending' ? 'bg-amber-100' : 'bg-gray-100' }}">{{ $stats['pending'] }}</span>
@@ -83,7 +87,8 @@
                             @endif
                         </td>
                         <td class="px-3 py-2">
-                            <p class="text-sm text-gray-800">{{ $template->client?->name ?? '—' }}</p>
+                            <p class="text-sm font-medium text-gray-800">{{ $template->client?->name ?? '—' }}</p>
+                            <p class="text-xs text-gray-400">{{ $template->client?->email ?? '' }}</p>
                         </td>
                         <td class="px-3 py-2 text-gray-700 tabular-nums">{{ $template->getQuestionCount() }}</td>
                         <td class="px-3 py-2">
@@ -108,12 +113,12 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                     </svg>
                                 </a>
-                                @if($template->status === 'pending')
+                                @if(in_array($template->status, ['draft', 'pending']))
                                     <a href="{{ route('reseller.survey-templates.edit', $template) }}" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                     </a>
-                                @elseif($template->status === 'approved')
-                                    <span class="p-1.5 rounded-lg text-gray-300 cursor-not-allowed" title="Approved — cannot edit">
+                                @else
+                                    <span class="p-1.5 rounded-lg text-gray-300 cursor-not-allowed" title="{{ ucfirst($template->status) }} — cannot edit">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                     </span>
                                 @endif

@@ -14,7 +14,7 @@ class SystemSettingController extends Controller
         // Ensure defaults exist
         SystemSetting::seedDefaults();
 
-        $groupOrder = ['general', 'system', 'sip', 'billing'];
+        $groupOrder = ['general', 'system', 'sip', 'billing', 'payment_gateways'];
         $settings = SystemSetting::orderBy('sort_order')->get()
             ->groupBy('group')
             ->sortBy(fn($items, $group) => array_search($group, $groupOrder));
@@ -33,9 +33,14 @@ class SystemSettingController extends Controller
 
         foreach ($request->settings as $key => $value) {
             $setting = SystemSetting::find($key);
+            if (!$setting) continue;
 
-            if ($setting && $setting->value !== $value) {
-                $changes[$key] = ['old' => $setting->value, 'new' => $value];
+            // Skip empty password/secret fields (keep existing value)
+            $isSecret = \Str::contains($key, ['password', 'secret']);
+            if ($isSecret && ($value === null || $value === '')) continue;
+
+            if ($setting->value !== $value) {
+                $changes[$key] = ['old' => $isSecret ? '***' : $setting->value, 'new' => $isSecret ? '***' : $value];
                 $setting->update(['value' => $value]);
                 \Illuminate\Support\Facades\Cache::forget("setting:{$key}");
             }

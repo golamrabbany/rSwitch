@@ -35,6 +35,7 @@ class VoiceFileController extends Controller
         $baseQuery = VoiceFile::whereIn('user_id', $descendantIds);
         $stats = [
             'total' => (clone $baseQuery)->count(),
+            'draft' => (clone $baseQuery)->where('status', 'draft')->count(),
             'pending' => (clone $baseQuery)->where('status', 'pending')->count(),
             'approved' => (clone $baseQuery)->where('status', 'approved')->count(),
             'rejected' => (clone $baseQuery)->where('status', 'rejected')->count(),
@@ -75,11 +76,15 @@ class VoiceFileController extends Controller
             $request->name
         );
 
-        // Reseller uploads are always pending approval
-        $voiceFile->update(['status' => 'pending']);
+        // Draft or submit for review
+        $status = $request->input('action') === 'draft' ? 'draft' : 'pending';
+        $voiceFile->update(['status' => $status]);
 
-        return redirect()->route('reseller.voice-files.index')
-            ->with('success', 'Voice template uploaded for ' . $client->name . '. Pending admin approval.');
+        $msg = $status === 'draft'
+            ? "Voice template saved as draft."
+            : "Voice template submitted for approval.";
+
+        return redirect()->route('reseller.voice-files.index')->with('success', $msg);
     }
 
     public function show(VoiceFile $voiceFile)
@@ -96,7 +101,7 @@ class VoiceFileController extends Controller
     {
         $descendantIds = auth()->user()->descendantIds();
         abort_unless(in_array($voiceFile->user_id, $descendantIds), 403);
-        abort_unless($voiceFile->status === 'pending', 403, 'Only pending templates can be edited.');
+        abort_unless(in_array($voiceFile->status, ['draft', 'pending']), 403, 'Only draft or pending templates can be edited.');
 
         $voiceFile->load('user');
 
@@ -107,7 +112,7 @@ class VoiceFileController extends Controller
     {
         $descendantIds = auth()->user()->descendantIds();
         abort_unless(in_array($voiceFile->user_id, $descendantIds), 403);
-        abort_unless($voiceFile->status === 'pending', 403, 'Only pending templates can be edited.');
+        abort_unless(in_array($voiceFile->status, ['draft', 'pending']), 403, 'Only draft or pending templates can be edited.');
 
         $request->validate([
             'name' => ['required', 'string', 'max:100'],

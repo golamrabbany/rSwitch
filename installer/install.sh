@@ -1175,6 +1175,9 @@ AMI_USER=rswitch
 AMI_SECRET=${AMI_SECRET_FOR_ENV}
 
 BROADCAST_VOICE_PATH=/var/spool/asterisk/voicebroadcast
+
+# Python Billing API (bare metal = localhost:8001)
+PYTHON_API_URL=http://127.0.0.1:8001
 EOF
 
     # Generate application key

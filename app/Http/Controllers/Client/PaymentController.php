@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
-use App\Services\AuditService;
-use App\Services\BalanceService;
+use App\Models\SystemSetting;
+use App\Services\BkashService;
+use App\Services\PaymentCreditService;
+use App\Services\SslCommerzService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -13,72 +15,150 @@ class PaymentController extends Controller
 {
     public function create()
     {
-        return view('client.payments.create');
+        $gateways = collect([
+            'sslcommerz' => (new SslCommerzService)->isEnabled(),
+            'bkash' => (new BkashService)->isEnabled(),
+        ])->filter()->keys();
+
+        return view('client.payments.create', compact('gateways'));
     }
 
     /**
-     * Create a Stripe Checkout session for balance top-up.
+     * SSLCommerz Checkout.
      */
-    public function checkout(Request $request)
+    public function checkoutSslCommerz(Request $request, SslCommerzService $sslcommerz)
     {
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:5', 'max:10000'],
         ]);
 
         $user = auth()->user();
-        $amount = $validated['amount'];
-        $amountCents = (int) round($amount * 100);
 
-        $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
-
-        $session = $stripe->checkout->sessions->create([
-            'payment_method_types' => ['card'],
-            'line_items' => [[
-                'price_data' => [
-                    'currency' => strtolower($user->currency ?? 'usd'),
-                    'unit_amount' => $amountCents,
-                    'product_data' => [
-                        'name' => 'Balance Top-Up',
-                        'description' => "Add \${$amount} to your rSwitch account",
-                    ],
-                ],
-                'quantity' => 1,
-            ]],
-            'mode' => 'payment',
-            'success_url' => route('client.payments.success') . '?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url' => route('client.payments.create'),
-            'client_reference_id' => (string) $user->id,
-            'metadata' => [
-                'user_id' => $user->id,
-                'amount' => $amount,
-                'type' => 'balance_topup',
-            ],
-        ]);
-
-        // Create pending payment record
-        Payment::create([
+        $payment = Payment::create([
             'user_id' => $user->id,
-            'amount' => $amount,
-            'currency' => $user->currency ?? 'USD',
-            'payment_method' => 'online_stripe',
-            'gateway_transaction_id' => $session->id,
+            'amount' => $validated['amount'],
+            'currency' => $user->currency ?? 'BDT',
+            'payment_method' => 'online_sslcommerz',
             'status' => 'pending',
-            'notes' => 'Stripe Checkout session created',
         ]);
 
-        return redirect($session->url);
+        $payment->update(['gateway_transaction_id' => 'PAY-' . $payment->id]);
+
+        $result = $sslcommerz->initiatePayment(
+            $payment,
+            $user,
+            successUrl: route('webhook.sslcommerz.return', ['payment' => $payment->id, 'type' => 'success']),
+            failUrl: route('webhook.sslcommerz.return', ['payment' => $payment->id, 'type' => 'fail']),
+            cancelUrl: route('webhook.sslcommerz.return', ['payment' => $payment->id, 'type' => 'cancel']),
+            ipnUrl: route('webhook.sslcommerz'),
+        );
+
+        if (($result['status'] ?? '') === 'SUCCESS' && !empty($result['GatewayPageURL'])) {
+            return redirect($result['GatewayPageURL']);
+        }
+
+        $payment->update(['status' => 'failed', 'notes' => 'SSLCommerz init failed: ' . ($result['failedreason'] ?? 'unknown')]);
+        return back()->with('error', 'Payment gateway error. Please try again.');
     }
 
     /**
-     * Success return from Stripe (display only — actual crediting happens via webhook).
+     * bKash Checkout.
+     */
+    public function checkoutBkash(Request $request, BkashService $bkash)
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:5', 'max:10000'],
+        ]);
+
+        $user = auth()->user();
+
+        $payment = Payment::create([
+            'user_id' => $user->id,
+            'amount' => $validated['amount'],
+            'currency' => $user->currency ?? 'BDT',
+            'payment_method' => 'online_bkash',
+            'status' => 'pending',
+        ]);
+
+        $invoiceNumber = 'PAY-' . $payment->id;
+        $payment->update(['gateway_transaction_id' => $invoiceNumber]);
+
+        try {
+            $result = $bkash->createPayment(
+                (string) $validated['amount'],
+                $user->currency ?? 'BDT',
+                $invoiceNumber,
+                route('client.payments.bkash-callback'),
+            );
+
+            if (!empty($result['bkashURL'])) {
+                $payment->update([
+                    'gateway_transaction_id' => $result['paymentID'],
+                    'gateway_response' => $result,
+                ]);
+                return redirect($result['bkashURL']);
+            }
+
+            $payment->update(['status' => 'failed', 'notes' => 'bKash create failed: ' . ($result['statusMessage'] ?? 'unknown')]);
+        } catch (\Throwable $e) {
+            Log::error('bKash checkout error', ['error' => $e->getMessage()]);
+            $payment->update(['status' => 'failed', 'notes' => 'bKash error: ' . $e->getMessage()]);
+        }
+
+        return back()->with('error', 'bKash payment error. Please try again.');
+    }
+
+    /**
+     * bKash callback — execute payment and credit balance.
+     */
+    public function bkashCallback(Request $request, BkashService $bkash, PaymentCreditService $creditService)
+    {
+        $paymentId = $request->query('paymentID');
+        $status = $request->query('status');
+
+        $payment = Payment::where('gateway_transaction_id', $paymentId)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (!$payment) {
+            return redirect()->route('client.payments.create')->with('error', 'Payment not found.');
+        }
+
+        if ($payment->status === 'completed') {
+            return view('client.payments.success', compact('payment'));
+        }
+
+        if ($status !== 'success') {
+            $payment->update(['status' => 'failed', 'notes' => "bKash status: {$status}"]);
+            return redirect()->route('client.payments.create')->with('error', 'Payment was cancelled or failed.');
+        }
+
+        try {
+            $result = $bkash->executePayment($paymentId);
+
+            if (($result['transactionStatus'] ?? '') === 'Completed' && (float) $result['amount'] == (float) $payment->amount) {
+                $creditService->creditPayment($payment, $result);
+                return view('client.payments.success', compact('payment'));
+            }
+
+            $payment->update(['status' => 'failed', 'gateway_response' => $result, 'notes' => 'bKash execute failed']);
+        } catch (\Throwable $e) {
+            Log::error('bKash execute error', ['error' => $e->getMessage()]);
+            $payment->update(['status' => 'failed', 'notes' => 'bKash execute error']);
+        }
+
+        return redirect()->route('client.payments.create')->with('error', 'Payment verification failed.');
+    }
+
+    /**
+     * Success return page.
      */
     public function success(Request $request)
     {
-        $sessionId = $request->query('session_id');
-
-        $payment = Payment::where('gateway_transaction_id', $sessionId)
-            ->where('user_id', auth()->id())
-            ->first();
+        $paymentId = $request->query('payment');
+        $payment = $paymentId
+            ? Payment::where('id', $paymentId)->where('user_id', auth()->id())->first()
+            : null;
 
         return view('client.payments.success', compact('payment'));
     }

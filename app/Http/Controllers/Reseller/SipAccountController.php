@@ -129,9 +129,10 @@ class SipAccountController extends Controller
             }
         }
 
-        // Auto-set caller_id_number to username, max_channels to system default
+        // Auto-set caller_id_number to username
         $validated['caller_id_number'] = $validated['caller_id_number'] ?: $validated['username'];
-        $validated['max_channels'] = $validated['max_channels'] ?: (int) \App\Models\SystemSetting::get('default_max_channels', 10);
+        // Always set max_channels from system setting (not from form — security)
+        $validated['max_channels'] = (int) \App\Models\SystemSetting::get('default_max_channels', 10);
 
         // Channel pool check — SIP channels cannot exceed client's max_channels
         $clientMaxChannels = $client->max_channels;
@@ -266,7 +267,7 @@ class SipAccountController extends Controller
         $contacts = [];
         try {
             $response = \Illuminate\Support\Facades\Http::timeout(3)
-                ->post('http://127.0.0.1:8001/api/contacts/status', [
+                ->post(rtrim(env('PYTHON_API_URL', 'http://python-api:8000'), '/') . '/api/contacts/status', [
                     'usernames' => $usernames,
                 ]);
 

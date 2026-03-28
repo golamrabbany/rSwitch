@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Reseller;
+namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\DncNumber;
@@ -10,18 +10,16 @@ class DncController extends Controller
 {
     public function index(Request $request)
     {
-        $authUser = auth()->user();
-
-        $query = DncNumber::where('added_by', $authUser->id);
+        $query = DncNumber::where('added_by', auth()->id());
 
         if ($request->filled('search')) {
             $query->where('phone_number', 'like', "%{$request->search}%");
         }
 
         $numbers = $query->orderByDesc('created_at')->paginate(50);
-        $totalCount = DncNumber::where('added_by', $authUser->id)->count();
+        $totalCount = DncNumber::where('added_by', auth()->id())->count();
 
-        return view('reseller.dnc.index', compact('numbers', 'totalCount'));
+        return view('client.dnc.index', compact('numbers', 'totalCount'));
     }
 
     public function store(Request $request)
@@ -70,9 +68,7 @@ class DncController extends Controller
     public function destroy(DncNumber $dncNumber)
     {
         abort_unless($dncNumber->added_by === auth()->id(), 403);
-
         $dncNumber->delete();
-
         return back()->with('success', "Number '{$dncNumber->phone_number}' removed from DNC list.");
     }
 

@@ -4,23 +4,16 @@
     <div x-data="pageData()" x-cloak>
         {{-- Page Header --}}
         <div class="page-header-row">
-            <div class="flex items-center gap-4">
-                <div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center">
-                    <svg class="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h2 class="page-title">{{ $tariff->name }}</h2>
-                    <div class="flex items-center gap-2 mt-1">
-                        @if($isBaseTariff)
-                            <span class="badge badge-success">Base Tariff</span>
-                        @else
-                            <span class="badge badge-purple">Reseller</span>
-                        @endif
-                        <span class="text-sm text-gray-500">{{ $tariff->description ?: 'No description' }}</span>
-                    </div>
-                </div>
+            <div>
+                <h2 class="page-title">{{ $tariff->name }}</h2>
+                <p class="page-subtitle">
+                    @if($isBaseTariff)
+                        <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Base Rate Group</span>
+                    @else
+                        <span class="inline-flex items-center gap-1 text-xs font-medium text-purple-700"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>Reseller</span>
+                    @endif
+                    &middot; {{ $tariff->description ?: 'No description' }}
+                </p>
             </div>
             <div class="page-actions">
                 <a href="{{ route('reseller.tariffs.index') }}" class="btn-action-secondary">
@@ -40,190 +33,157 @@
             </div>
         </div>
 
-        {{-- Stats Cards --}}
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card">
-                <div class="stat-icon bg-emerald-100">
-                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                    </svg>
-                </div>
-                <div class="stat-content">
-                    <p class="stat-value">{{ number_format($rates->total()) }}</p>
-                    <p class="stat-label">Total Rates</p>
-                </div>
+        {{-- Rates Section Header --}}
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-500">{{ number_format($rates->total()) }} rates &middot; {{ $tariff->users()->count() }} clients &middot; {{ $isBaseTariff ? 'Base' : 'Reseller' }} &middot; Created {{ $tariff->created_at?->format('M d, Y') }}</span>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon bg-blue-100">
-                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                </div>
-                <div class="stat-content">
-                    <p class="stat-value">{{ $tariff->users()->count() }}</p>
-                    <p class="stat-label">Assigned Clients</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon bg-purple-100">
-                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-                    </svg>
-                </div>
-                <div class="stat-content">
-                    <p class="stat-value">{{ $isBaseTariff ? 'Base' : 'Reseller' }}</p>
-                    <p class="stat-label">Type</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon bg-gray-100">
-                    <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                    </svg>
-                </div>
-                <div class="stat-content">
-                    <p class="stat-value text-base">{{ $tariff->created_at?->format('M d, Y') }}</p>
-                    <p class="stat-label">Created</p>
-                </div>
+            <div class="flex items-center gap-2">
+                @if(!$isBaseTariff)
+                    <button @click="importModal = true" type="button" class="btn-action-secondary">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        Import
+                    </button>
+                    <a href="{{ route('reseller.tariffs.export', $tariff) }}" class="btn-action-secondary">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Export
+                    </a>
+                    <button @click="openAdd()" type="button" class="btn-action-primary-reseller">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Add Rate
+                    </button>
+                @else
+                    <a href="{{ route('reseller.tariffs.export', $tariff) }}" class="btn-action-secondary">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Export
+                    </a>
+                @endif
             </div>
         </div>
 
-        {{-- Rates Section --}}
-        <div class="detail-card">
-            <div class="detail-card-header flex items-center justify-between">
-                <h3 class="detail-card-title">Rates ({{ number_format($rates->total()) }})</h3>
-                <div class="flex items-center gap-2">
-                    @if(!$isBaseTariff)
-                        <button @click="importModal = true" type="button" class="btn-action-secondary">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                            </svg>
-                            Import
-                        </button>
-                        <a href="{{ route('reseller.tariffs.export', $tariff) }}" class="btn-action-secondary">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                            </svg>
-                            Export
-                        </a>
-                        <button @click="openAdd()" type="button" class="btn-action-primary-reseller">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                            </svg>
-                            Add Rate
-                        </button>
-                    @endif
+        {{-- Filter --}}
+        <div class="filter-card mb-3">
+            <form method="GET" class="filter-row">
+                <div class="filter-search-box">
+                    <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search prefix or destination..." class="filter-input">
                 </div>
-            </div>
+                <button type="submit" class="btn-search-reseller">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    Search
+                </button>
+                @if(request('search'))
+                    <a href="{{ route('reseller.tariffs.show', $tariff) }}" class="btn-clear">Clear</a>
+                @endif
+            </form>
+        </div>
 
-            {{-- Rates Filter --}}
-            <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
-                <form method="GET" class="flex items-center gap-3 flex-wrap">
-                    <div class="filter-search-box flex-1 max-w-xs">
-                        <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                        <input type="text" name="search" value="{{ request('search') }}" placeholder="Search prefix or destination..." class="filter-input">
-                    </div>
-                    <button type="submit" class="btn-search-reseller">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                        Filter
-                    </button>
-                    @if(request('search'))
-                        <a href="{{ route('reseller.tariffs.show', $tariff) }}" class="btn-clear">Clear</a>
-                    @endif
-                </form>
-            </div>
-
-            {{-- Rates Table --}}
-            <div class="overflow-x-auto">
-                <table class="data-table data-table-compact">
-                    <thead>
-                        <tr>
-                            <th>Prefix</th>
-                            <th>Destination</th>
-                            <th class="text-right">Rate/Min</th>
-                            <th class="text-right">Conn. Fee</th>
-                            <th class="text-right">Min Dur.</th>
-                            <th class="text-right">Increment</th>
-                            <th>Effective</th>
-                            <th>Status</th>
-                            <th>Rate Type</th>
+        {{-- Rates Table --}}
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            @if($rates->total() > 0)
+                <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                        Rates Total : {{ number_format($rates->total()) }} &middot; Showing {{ $rates->firstItem() }} to {{ $rates->lastItem() }}
+                    </span>
+                </div>
+            @endif
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-200">
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Prefix</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Destination</th>
+                        <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Rate/Min</th>
+                        <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Conn. Fee</th>
+                        <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Min Dur.</th>
+                        <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Increment</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Effective</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                        @if(!$isBaseTariff)
+                            <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                        @endif
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($rates as $rate)
+                        <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-emerald-50/50 transition-all border-b border-gray-100 group">
+                            <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $rates->firstItem() + $loop->index }}</td>
+                            <td class="px-3 py-2 font-mono font-semibold text-gray-900">{{ $rate->prefix }}</td>
+                            <td class="px-3 py-2 text-gray-700">{{ $rate->destination }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums font-medium text-gray-900 font-mono">{{ format_currency($rate->rate_per_minute, 4) }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums text-gray-500 font-mono">{{ format_currency($rate->connection_fee, 4) }}</td>
+                            <td class="px-3 py-2 text-right text-gray-500">{{ $rate->min_duration }}s</td>
+                            <td class="px-3 py-2 text-right text-gray-500">{{ $rate->billing_increment }}s</td>
+                            <td class="px-3 py-2 text-gray-500 whitespace-nowrap">{{ \Carbon\Carbon::parse($rate->effective_date)->format('M d, Y') }}</td>
+                            <td class="px-3 py-2">
+                                @if($rate->status === 'active')
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active</span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Disabled</span>
+                                @endif
+                            </td>
+                            <td class="px-3 py-2">
+                                @if($rate->rate_type === 'broadcast')
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-purple-700"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>Broadcast</span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Regular</span>
+                                @endif
+                            </td>
                             @if(!$isBaseTariff)
-                                <th class="text-center">Actions</th>
-                            @endif
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($rates as $rate)
-                            <tr>
-                                <td><span class="font-mono font-semibold text-emerald-600">{{ $rate->prefix }}</span></td>
-                                <td>{{ $rate->destination }}</td>
-                                <td class="text-right font-mono">{{ format_currency($rate->rate_per_minute, 4) }}</td>
-                                <td class="text-right font-mono text-gray-500">{{ format_currency($rate->connection_fee, 4) }}</td>
-                                <td class="text-right text-gray-500">{{ $rate->min_duration }}s</td>
-                                <td class="text-right text-gray-500">{{ $rate->billing_increment }}s</td>
-                                <td class="whitespace-nowrap text-gray-500">{{ \Carbon\Carbon::parse($rate->effective_date)->format('M d, Y h:i A') }}</td>
-                                <td>
-                                    @if($rate->status === 'active')
-                                        <span class="badge badge-success">Active</span>
-                                    @else
-                                        <span class="badge badge-gray">Disabled</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    @if($rate->rate_type === 'broadcast')
-                                        <span class="badge badge-purple">Broadcast</span>
-                                    @else
-                                        <span class="badge badge-gray">Regular</span>
-                                    @endif
-                                </td>
-                                @if(!$isBaseTariff)
-                                    <td>
-                                        <div class="flex items-center justify-center gap-1">
-                                            <button @click="openEdit({{ json_encode(['id' => $rate->id, 'prefix' => $rate->prefix, 'destination' => $rate->destination, 'rate_per_minute' => number_format($rate->rate_per_minute, 6, '.', ''), 'connection_fee' => number_format($rate->connection_fee, 6, '.', ''), 'min_duration' => $rate->min_duration, 'billing_increment' => $rate->billing_increment, 'rate_type' => $rate->rate_type ?? 'regular']) }})" class="action-icon" title="Edit">
+                                <td class="px-3 py-2 text-center">
+                                    <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                        <button @click="openEdit({{ json_encode(['id' => $rate->id, 'prefix' => $rate->prefix, 'destination' => $rate->destination, 'rate_per_minute' => number_format($rate->rate_per_minute, 6, '.', ''), 'connection_fee' => number_format($rate->connection_fee, 6, '.', ''), 'min_duration' => $rate->min_duration, 'billing_increment' => $rate->billing_increment, 'rate_type' => $rate->rate_type ?? 'regular']) }})" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </button>
+                                        @if($rate->status === 'active')
+                                            <button @click="deletePrefix = '{{ $rate->prefix }} — {{ addslashes($rate->destination) }}'; deleteAction = '{{ route('reseller.tariffs.delete-rate', [$tariff, $rate]) }}'; deleteModal = true" class="p-1.5 rounded-lg text-red-400 hover:text-red-700 hover:bg-red-50 transition-colors" title="Disable">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
                                                 </svg>
                                             </button>
-                                            @if($rate->status === 'active')
-                                                <button @click="deletePrefix = '{{ $rate->prefix }} — {{ addslashes($rate->destination) }}'; deleteAction = '{{ route('reseller.tariffs.delete-rate', [$tariff, $rate]) }}'; deleteModal = true" class="action-icon text-red-500 hover:text-red-600 hover:bg-red-50" title="Disable">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                                                    </svg>
-                                                </button>
-                                            @endif
-                                        </div>
-                                    </td>
-                                @endif
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="{{ $isBaseTariff ? 9 : 10 }}" class="text-center py-12">
-                                    <div class="empty-state">
-                                        <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                        </svg>
-                                        <p class="empty-text">{{ request('search') ? 'No rates found for "' . request('search') . '"' : 'No rates in this group' }}</p>
-                                        @if(!$isBaseTariff && !request('search'))
-                                            <button @click="openAdd()" class="empty-link-reseller">Add a rate</button>
                                         @endif
                                     </div>
                                 </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            @if($rates->hasPages())
-                <div class="px-5 py-4 border-t border-gray-100">
-                    {{ $rates->withQueryString()->links() }}
-                </div>
-            @endif
+                            @endif
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="{{ $isBaseTariff ? 10 : 11 }}" class="px-4 py-12 text-center">
+                                <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <p class="text-sm text-gray-400">{{ request('search') ? 'No rates found for "' . request('search') . '"' : 'No rates in this group' }}</p>
+                                @if(!$isBaseTariff && !request('search'))
+                                    <button @click="openAdd()" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium mt-1">Add a rate</button>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
+
+        @if($rates->hasPages())
+            <div class="mt-4 flex justify-end">
+                {{ $rates->withQueryString()->links() }}
+            </div>
+        @endif
 
         {{-- Add/Edit Rate Modal --}}
         @if(!$isBaseTariff)

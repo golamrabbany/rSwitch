@@ -59,8 +59,28 @@
                         <a href="{{ route('client.sip-accounts.index') }}" class="nav-child {{ request()->routeIs('client.sip-accounts.*') ? 'active' : 'text-gray-500' }}">SIP Accounts</a>
                         <a href="{{ route('client.dids.index') }}" class="nav-child {{ request()->routeIs('client.dids.*') ? 'active' : 'text-gray-500' }}">DIDs</a>
                         <a href="{{ route('client.cdr.index') }}" class="nav-child {{ request()->routeIs('client.cdr.*') ? 'active' : 'text-gray-500' }}">CDR / Reports</a>
-                        <a href="{{ route('client.voice-files.index') }}" class="nav-child {{ request()->routeIs('client.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Files</a>
+                    </div>
+                </div>
+
+                <!-- Voice Broadcast Menu -->
+                @php $broadcastActive = request()->routeIs('client.voice-files.*', 'client.survey-templates.*', 'client.broadcasts.*', 'client.dnc.*'); @endphp
+                <div x-data="{ open: {{ $broadcastActive ? 'true' : 'false' }} }" class="mb-1">
+                    <button @click="open = !open" class="nav-parent {{ $broadcastActive ? 'has-active' : 'text-gray-600' }}">
+                        <div class="flex items-center">
+                            <svg class="nav-icon {{ $broadcastActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                            </svg>
+                            <span class="nav-text">Voice Broadcast</span>
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-collapse class="nav-children">
+                        <a href="{{ route('client.voice-files.index') }}" class="nav-child {{ request()->routeIs('client.voice-files.*') ? 'active' : 'text-gray-500' }}">Voice Templates</a>
+                        <a href="{{ route('client.survey-templates.index') }}" class="nav-child {{ request()->routeIs('client.survey-templates.*') ? 'active' : 'text-gray-500' }}">Survey Templates</a>
                         <a href="{{ route('client.broadcasts.index') }}" class="nav-child {{ request()->routeIs('client.broadcasts.*') ? 'active' : 'text-gray-500' }}">Broadcasts</a>
+                        <a href="{{ route('client.dnc.index') }}" class="nav-child {{ request()->routeIs('client.dnc.*') ? 'active' : 'text-gray-500' }}">DNC List</a>
                     </div>
                 </div>
 
@@ -124,6 +144,12 @@
 
                     <!-- Right Side -->
                     <div class="flex items-center space-x-3">
+                        <!-- Recharge Button -->
+                        <a href="{{ route('client.payments.create') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                            Recharge
+                        </a>
+
                         <!-- User Dropdown -->
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">

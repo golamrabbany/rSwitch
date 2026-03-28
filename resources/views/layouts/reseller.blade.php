@@ -185,6 +185,12 @@
 
                     <!-- Right Side -->
                     <div class="flex items-center space-x-3">
+                        <!-- Recharge Button -->
+                        <a href="{{ route('reseller.payments.create') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors" style="background: #ecfdf5; color: #059669;" onmouseover="this.style.background='#d1fae5'" onmouseout="this.style.background='#ecfdf5'">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                            Recharge
+                        </a>
+
                         <!-- User Dropdown -->
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">

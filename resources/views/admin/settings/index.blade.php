@@ -57,6 +57,13 @@
                                             </svg>
                                         </div>
                                         @break
+                                    @case('payment_gateways')
+                                        <div class="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                                            </svg>
+                                        </div>
+                                        @break
                                     @default
                                         <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
                                             <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,7 +72,7 @@
                                         </div>
                                 @endswitch
                                 <div>
-                                    <h3 class="form-card-title">{{ ucfirst($group) }} Settings</h3>
+                                    <h3 class="form-card-title">{{ $group === 'payment_gateways' ? 'Payment Gateways' : ucfirst($group) . ' Settings' }}</h3>
                                     <p class="form-card-subtitle">
                                         @switch($group)
                                             @case('general')
@@ -80,6 +87,9 @@
                                             @case('system')
                                                 Data retention and system policies
                                                 @break
+                                            @case('payment_gateways')
+                                                SSLCommerz and bKash gateway configuration
+                                                @break
                                             @default
                                                 {{ ucfirst($group) }} configuration options
                                         @endswitch
@@ -87,6 +97,9 @@
                                 </div>
                             </div>
                         </div>
+                        @if($group === 'payment_gateways')
+                            @include('admin.settings._payment-gateways', ['items' => $items])
+                        @else
                         <div class="form-card-body">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 @foreach ($items as $setting)
@@ -235,11 +248,14 @@
                                                       rows="2"
                                                       class="form-input">{{ old("settings.{$setting->key}", $setting->value) }}</textarea>
                                         @else
-                                            <input type="text"
+                                            @php $isSecret = Str::contains($setting->key, ['password', 'secret']); @endphp
+                                            <input type="{{ $isSecret ? 'password' : 'text' }}"
                                                    id="setting_{{ $setting->key }}"
                                                    name="settings[{{ $setting->key }}]"
                                                    value="{{ old("settings.{$setting->key}", $setting->value) }}"
-                                                   class="form-input {{ in_array($setting->key, ['codec_allow', 'invoice_prefix']) ? 'font-mono' : '' }}">
+                                                   {!! $isSecret && $setting->value ? 'placeholder="••••••••  (leave blank to keep current)"' : '' !!}
+                                                   class="form-input {{ in_array($setting->key, ['codec_allow', 'invoice_prefix']) ? 'font-mono' : '' }} {{ $isSecret ? 'font-mono' : '' }}"
+                                                   autocomplete="off">
                                         @endif
 
                                         @if ($setting->description)
@@ -249,6 +265,7 @@
                                 @endforeach
                             </div>
                         </div>
+                        @endif
                     </div>
                 @endforeach
 

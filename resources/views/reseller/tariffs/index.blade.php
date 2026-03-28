@@ -19,7 +19,7 @@
         </div>
 
         {{-- Filter Card --}}
-        <div class="filter-card">
+        <div class="filter-card mb-3">
             <form method="GET" class="filter-row flex-wrap">
                 <div class="filter-search-box">
                     <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -40,66 +40,67 @@
         </div>
 
         {{-- Data Table --}}
-        <div class="data-table-container">
-            <table class="data-table">
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            @if($rateGroups->total() > 0)
+                <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                        Rate Groups Total : {{ number_format($rateGroups->total()) }} &middot; Showing {{ $rateGroups->firstItem() }} to {{ $rateGroups->lastItem() }}
+                    </span>
+                </div>
+            @endif
+            <table class="w-full text-sm">
                 <thead>
-                    <tr>
-                        <th>Rate Group</th>
-                        <th>Parent (Base)</th>
-                        <th class="text-center">Rates</th>
-                        <th class="text-center">Clients</th>
-                        <th>Created</th>
-                        <th style="text-align: center">Actions</th>
+                    <tr class="border-b border-gray-200">
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Rate Group</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Parent (Base)</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Rates</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Clients</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($rateGroups as $group)
-                        <tr>
-                            <td>
-                                <div class="user-cell">
-                                    <div class="avatar avatar-emerald">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <div class="user-name">{{ $group->name }}</div>
-                                        @if($group->description)
-                                            <div class="user-email">{{ Str::limit($group->description, 40) }}</div>
-                                        @endif
-                                    </div>
+                        <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-emerald-50/50 transition-all border-b border-gray-100 group">
+                            <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $rateGroups->firstItem() + $loop->index }}</td>
+                            <td class="px-3 py-2">
+                                <div>
+                                    <div class="font-medium text-gray-900">{{ $group->name }}</div>
+                                    @if($group->description)
+                                        <div class="text-xs text-gray-500">{{ Str::limit($group->description, 40) }}</div>
+                                    @endif
                                 </div>
                             </td>
-                            <td>
+                            <td class="px-3 py-2">
                                 @if($group->parentRateGroup)
                                     <span class="text-gray-700">{{ $group->parentRateGroup->name }}</span>
                                 @else
-                                    <span class="text-gray-400">—</span>
+                                    <span class="text-gray-400">&mdash;</span>
                                 @endif
                             </td>
-                            <td class="text-center">
+                            <td class="px-3 py-2 text-center">
                                 <span class="font-semibold text-gray-900">{{ number_format($group->rates_count) }}</span>
                             </td>
-                            <td class="text-center">
+                            <td class="px-3 py-2 text-center">
                                 <span class="font-semibold text-gray-900">{{ number_format($group->users_count) }}</span>
                             </td>
-                            <td>
-                                <span class="text-gray-500">{{ $group->created_at?->format('M d, Y') }}</span>
-                            </td>
-                            <td>
-                                <div class="flex items-center justify-center gap-1">
-                                    <a href="{{ route('reseller.tariffs.show', $group) }}" class="action-icon" title="View">
+                            <td class="px-3 py-2 text-gray-500">{{ $group->created_at?->format('M d, Y') }}</td>
+                            <td class="px-3 py-2 text-center">
+                                <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                    <a href="{{ route('reseller.tariffs.show', $group) }}" class="p-1.5 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors" title="View">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
                                     </a>
-                                    <button @click="openEdit({{ json_encode(['id' => $group->id, 'name' => $group->name, 'description' => $group->description]) }})" class="action-icon" title="Edit">
+                                    <button @click="openEdit({{ json_encode(['id' => $group->id, 'name' => $group->name, 'description' => $group->description]) }})" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                         </svg>
                                     </button>
-                                    <button @click="openDelete({{ $group->id }}, '{{ addslashes($group->name) }}', {{ $group->users_count }})" class="action-icon text-red-500 hover:text-red-600 hover:bg-red-50" title="Delete">
+                                    <button @click="openDelete({{ $group->id }}, '{{ addslashes($group->name) }}', {{ $group->users_count }})" class="p-1.5 rounded-lg text-red-400 hover:text-red-700 hover:bg-red-50 transition-colors" title="Delete">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                         </svg>
@@ -109,14 +110,12 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center py-12">
-                                <div class="empty-state">
-                                    <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                    <p class="empty-text">No rate groups found</p>
-                                    <button @click="openCreate()" class="empty-link-reseller">Create your first rate group</button>
-                                </div>
+                            <td colspan="7" class="px-4 py-12 text-center">
+                                <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                <p class="text-sm text-gray-400">No rate groups found</p>
+                                <button @click="openCreate()" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium mt-1">Create your first rate group</button>
                             </td>
                         </tr>
                     @endforelse
@@ -125,7 +124,7 @@
         </div>
 
         @if($rateGroups->hasPages())
-            <div class="mt-6">
+            <div class="mt-4 flex justify-end">
                 {{ $rateGroups->withQueryString()->links() }}
             </div>
         @endif

@@ -496,6 +496,85 @@ class BroadcastController extends Controller
         return redirect()->route('admin.broadcasts.index')->with('success', "Broadcast '{$broadcast->name}' deleted.");
     }
 
+    public function clone(Request $request, Broadcast $broadcast)
+    {
+        $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'clone_action' => ['required', 'in:draft,start,schedule'],
+            'scheduled_date' => ['nullable', 'date'],
+            'scheduled_time' => ['nullable'],
+            'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:120'],
+            'number_option' => ['required', 'in:all,failed_only'],
+        ]);
+
+        $cloneAction = $request->input('clone_action', 'draft'); // draft, start, schedule
+        $scheduledAt = null;
+        $status = 'draft';
+        if ($cloneAction === 'schedule' && $request->scheduled_date && $request->scheduled_time) {
+            $scheduledAt = \Carbon\Carbon::parse($request->scheduled_date . ' ' . $request->scheduled_time);
+            $status = 'scheduled';
+        }
+
+        $newBroadcast = Broadcast::create([
+            'user_id' => $broadcast->user_id,
+            'name' => $request->name,
+            'type' => $broadcast->type,
+            'status' => $status,
+            'voice_file_id' => $broadcast->voice_file_id,
+            'sip_account_id' => $broadcast->sip_account_id,
+            'caller_id_name' => $broadcast->caller_id_name,
+            'caller_id_number' => $broadcast->caller_id_number,
+            'max_concurrent' => $request->max_concurrent ?? $broadcast->max_concurrent,
+            'ring_timeout' => $request->ring_timeout ?? $broadcast->ring_timeout,
+            'survey_config' => $broadcast->survey_config,
+            'survey_template_id' => $broadcast->survey_template_id,
+            'scheduled_at' => $scheduledAt,
+            'total_numbers' => 0,
+            'dialed_count' => 0,
+            'answered_count' => 0,
+            'failed_count' => 0,
+            'total_cost' => 0,
+            'created_by' => auth()->id(),
+        ]);
+
+        // Copy phone numbers
+        $query = $broadcast->numbers();
+        if ($request->number_option === 'failed_only') {
+            $query->whereIn('status', ['failed', 'no_answer', 'busy', 'pending']);
+        }
+
+        $numbers = $query->get(['phone_number']);
+        $insert = $numbers->map(function ($n) use ($newBroadcast) {
+            return [
+                'broadcast_id' => $newBroadcast->id,
+                'phone_number' => $n->phone_number,
+                'status' => 'pending',
+                'attempts' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        })->toArray();
+
+        if (!empty($insert)) {
+            \App\Models\BroadcastNumber::insert($insert);
+            $newBroadcast->update(['total_numbers' => count($insert)]);
+        }
+
+        // Auto-start if requested
+        if ($cloneAction === 'start' && $newBroadcast->total_numbers > 0) {
+            app(BroadcastService::class)->start($newBroadcast);
+            return redirect()->route('admin.broadcasts.show', $newBroadcast)
+                ->with('success', "Broadcast cloned and started with {$newBroadcast->total_numbers} numbers.");
+        }
+
+        $msg = $status === 'scheduled'
+            ? "Broadcast cloned and scheduled for {$scheduledAt->format('M d, Y g:i A')}."
+            : "Broadcast cloned as draft with {$newBroadcast->total_numbers} numbers.";
+
+        return redirect()->route('admin.broadcasts.show', $newBroadcast)->with('success', $msg);
+    }
+
     /**
      * AJAX: Get client info + SIP accounts for a template.
      */

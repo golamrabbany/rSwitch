@@ -201,6 +201,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::get('broadcasts/{broadcast}/edit', [Admin\BroadcastController::class, 'edit'])->name('broadcasts.edit');
     Route::put('broadcasts/{broadcast}', [Admin\BroadcastController::class, 'update'])->name('broadcasts.update');
     Route::post('broadcasts/{broadcast}/suspend', [Admin\BroadcastController::class, 'suspend'])->name('broadcasts.suspend');
+    Route::post('broadcasts/{broadcast}/clone', [Admin\BroadcastController::class, 'clone'])->name('broadcasts.clone');
     Route::delete('broadcasts/{broadcast}', [Admin\BroadcastController::class, 'destroy'])->name('broadcasts.destroy');
 
     // Voice Broadcast — DNC List
@@ -295,6 +296,7 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::get('survey-templates/{surveyTemplate}', [Reseller\SurveyTemplateController::class, 'show'])->name('survey-templates.show');
         Route::get('survey-templates/{surveyTemplate}/edit', [Reseller\SurveyTemplateController::class, 'edit'])->name('survey-templates.edit');
         Route::put('survey-templates/{surveyTemplate}', [Reseller\SurveyTemplateController::class, 'update'])->name('survey-templates.update');
+        Route::post('survey-templates/upload-voice-file', [Reseller\SurveyTemplateController::class, 'uploadVoiceFile'])->name('survey-templates.upload-voice-file');
 
         // Voice Broadcast — Broadcasts
         Route::get('broadcasts', [Reseller\BroadcastController::class, 'index'])->name('broadcasts.index');
@@ -311,16 +313,23 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
         Route::get('broadcasts/{broadcast}/stats', [Reseller\BroadcastController::class, 'stats'])->name('broadcasts.stats');
         Route::get('broadcasts/{broadcast}/edit', [Reseller\BroadcastController::class, 'edit'])->name('broadcasts.edit');
         Route::put('broadcasts/{broadcast}', [Reseller\BroadcastController::class, 'update'])->name('broadcasts.update');
+        Route::post('broadcasts/{broadcast}/clone', [Reseller\BroadcastController::class, 'clone'])->name('broadcasts.clone');
 
         // DNC List
         Route::get('dnc', [Reseller\DncController::class, 'index'])->name('dnc.index');
         Route::post('dnc', [Reseller\DncController::class, 'store'])->name('dnc.store');
         Route::delete('dnc/{dncNumber}', [Reseller\DncController::class, 'destroy'])->name('dnc.destroy');
+        Route::post('dnc/bulk-destroy', [Reseller\DncController::class, 'bulkDestroy'])->name('dnc.bulk-destroy');
 
         // Financial
         Route::get('transactions', [Reseller\TransactionController::class, 'index'])->name('transactions.index');
         Route::get('transactions/export', [Reseller\TransactionController::class, 'export'])->name('transactions.export');
         Route::get('payments', [Reseller\PaymentController::class, 'index'])->name('payments.index');
+        Route::get('payments/create', [Reseller\PaymentController::class, 'create'])->name('payments.create');
+        Route::post('payments/checkout-sslcommerz', [Reseller\PaymentController::class, 'checkoutSslCommerz'])->middleware('throttle:10,1')->name('payments.checkout-sslcommerz');
+        Route::post('payments/checkout-bkash', [Reseller\PaymentController::class, 'checkoutBkash'])->middleware('throttle:10,1')->name('payments.checkout-bkash');
+        Route::get('payments/success', [Reseller\PaymentController::class, 'success'])->name('payments.success');
+        Route::get('payments/bkash-callback', [Reseller\PaymentController::class, 'bkashCallback'])->name('payments.bkash-callback');
 
         Route::get('balance/create', [Reseller\BalanceController::class, 'create'])->name('balance.create');
         Route::post('balance', [Reseller\BalanceController::class, 'store'])->name('balance.store');
@@ -360,6 +369,15 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::get('voice-files/{voiceFile}/play', [Client\VoiceFileController::class, 'play'])->name('voice-files.play');
         Route::delete('voice-files/{voiceFile}', [Client\VoiceFileController::class, 'destroy'])->name('voice-files.destroy');
 
+        // Survey Templates
+        Route::get('survey-templates', [Client\SurveyTemplateController::class, 'index'])->name('survey-templates.index');
+        Route::get('survey-templates/create', [Client\SurveyTemplateController::class, 'create'])->name('survey-templates.create');
+        Route::post('survey-templates', [Client\SurveyTemplateController::class, 'store'])->name('survey-templates.store');
+        Route::get('survey-templates/{surveyTemplate}', [Client\SurveyTemplateController::class, 'show'])->name('survey-templates.show');
+        Route::get('survey-templates/{surveyTemplate}/edit', [Client\SurveyTemplateController::class, 'edit'])->name('survey-templates.edit');
+        Route::put('survey-templates/{surveyTemplate}', [Client\SurveyTemplateController::class, 'update'])->name('survey-templates.update');
+        Route::post('survey-templates/upload-voice-file', [Client\SurveyTemplateController::class, 'uploadVoiceFile'])->name('survey-templates.upload-voice-file');
+
         // Voice Broadcast — Broadcasts
         Route::get('broadcasts', [Client\BroadcastController::class, 'index'])->name('broadcasts.index');
         Route::get('broadcasts/create', [Client\BroadcastController::class, 'create'])->name('broadcasts.create');
@@ -372,6 +390,14 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::get('broadcasts/{broadcast}/results', [Client\BroadcastController::class, 'results'])->name('broadcasts.results');
         Route::get('broadcasts/{broadcast}/export-results', [Client\BroadcastController::class, 'exportResults'])->name('broadcasts.export-results');
         Route::get('broadcasts/{broadcast}/stats', [Client\BroadcastController::class, 'stats'])->name('broadcasts.stats');
+        Route::get('broadcasts/{broadcast}/edit', [Client\BroadcastController::class, 'edit'])->name('broadcasts.edit');
+        Route::put('broadcasts/{broadcast}', [Client\BroadcastController::class, 'update'])->name('broadcasts.update');
+
+        // DNC List
+        Route::get('dnc', [Client\DncController::class, 'index'])->name('dnc.index');
+        Route::post('dnc', [Client\DncController::class, 'store'])->name('dnc.store');
+        Route::delete('dnc/{dncNumber}', [Client\DncController::class, 'destroy'])->name('dnc.destroy');
+        Route::post('dnc/bulk-destroy', [Client\DncController::class, 'bulkDestroy'])->name('dnc.bulk-destroy');
 
         Route::get('transactions', [Client\TransactionController::class, 'index'])->name('transactions.index');
 
@@ -379,10 +405,12 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::get('invoices/{invoice}', [Client\InvoiceController::class, 'show'])->name('invoices.show');
         Route::get('invoices/{invoice}/pdf', [Client\InvoiceController::class, 'pdf'])->name('invoices.pdf');
 
-        // Payments / Stripe top-up
+        // Payments / Top-up
         Route::get('payments/create', [Client\PaymentController::class, 'create'])->name('payments.create');
-        Route::post('payments/checkout', [Client\PaymentController::class, 'checkout'])->middleware('throttle:10,1')->name('payments.checkout');
+        Route::post('payments/checkout-sslcommerz', [Client\PaymentController::class, 'checkoutSslCommerz'])->middleware('throttle:10,1')->name('payments.checkout-sslcommerz');
+        Route::post('payments/checkout-bkash', [Client\PaymentController::class, 'checkoutBkash'])->middleware('throttle:10,1')->name('payments.checkout-bkash');
         Route::get('payments/success', [Client\PaymentController::class, 'success'])->name('payments.success');
+        Route::get('payments/bkash-callback', [Client\PaymentController::class, 'bkashCallback'])->name('payments.bkash-callback');
     });
 
     Route::get('profile', [Client\ProfileController::class, 'index'])->name('profile');
@@ -408,7 +436,9 @@ Route::middleware(['auth', 'role:reseller,client'])->group(function () {
     Route::post('kyc/upload', [KycSubmissionController::class, 'uploadDocument'])->name('kyc.upload');
 });
 
-// Stripe webhook (no CSRF, signature verified in controller)
+// Payment webhooks (no CSRF, signature/validation verified in controllers)
 Route::post('webhook/stripe', [Webhook\StripeWebhookController::class, 'handle'])->name('webhook.stripe');
+Route::post('webhook/sslcommerz', [Webhook\SslCommerzWebhookController::class, 'handle'])->name('webhook.sslcommerz');
+Route::post('webhook/sslcommerz/return/{payment}/{type}', [Webhook\SslCommerzWebhookController::class, 'returnUrl'])->name('webhook.sslcommerz.return');
 
 require __DIR__.'/auth.php';

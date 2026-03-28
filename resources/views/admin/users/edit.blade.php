@@ -50,7 +50,7 @@
                         <p class="form-card-subtitle">Credentials and account status</p>
                     </div>
                     <div class="form-card-body">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div class="form-group">
                                 <label class="form-label">Account Name</label>
                                 <input type="text" name="name" value="{{ old('name', $user->name) }}" required class="form-input" placeholder="Enter full name">
@@ -63,16 +63,15 @@
                                 <p class="form-hint">Used as login username</p>
                                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Status</label>
-                            <select name="status" required class="form-input">
-                                <option value="active" {{ old('status', $user->status) === 'active' ? 'selected' : '' }}>Active</option>
-                                <option value="suspended" {{ old('status', $user->status) === 'suspended' ? 'selected' : '' }}>Suspended</option>
-                                <option value="disabled" {{ old('status', $user->status) === 'disabled' ? 'selected' : '' }}>Disabled</option>
-                            </select>
-                            <p class="form-hint">Disabled accounts cannot make calls or login</p>
-                            <x-input-error :messages="$errors->get('status')" class="mt-2" />
+                            <div class="form-group" x-data="{ status: '{{ old('status', $user->status) }}' }">
+                                <label class="form-label">Status</label>
+                                <input type="hidden" name="status" :value="status">
+                                <div class="flex gap-1.5">
+                                    <button type="button" @click="status = 'active'" class="flex-1 py-2 rounded-lg border-2 text-xs font-medium transition-all" :class="status === 'active' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">Active</button>
+                                    <button type="button" @click="status = 'suspended'" class="flex-1 py-2 rounded-lg border-2 text-xs font-medium transition-all" :class="status === 'suspended' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">Suspended</button>
+                                    <button type="button" @click="status = 'disabled'" class="flex-1 py-2 rounded-lg border-2 text-xs font-medium transition-all" :class="status === 'disabled' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">Disabled</button>
+                                </div>
+                            </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">

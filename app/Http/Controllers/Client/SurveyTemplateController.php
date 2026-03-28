@@ -1,10 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Reseller;
+namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\SurveyTemplate;
-use App\Models\User;
 use App\Models\VoiceFile;
 use App\Services\VoiceFileService;
 use Illuminate\Http\Request;
@@ -13,10 +12,7 @@ class SurveyTemplateController extends Controller
 {
     public function index(Request $request)
     {
-        $authUser = auth()->user();
-
-        $query = SurveyTemplate::with(['user', 'client'])
-            ->visibleTo($authUser);
+        $query = SurveyTemplate::where('client_id', auth()->id());
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -27,61 +23,42 @@ class SurveyTemplateController extends Controller
 
         $templates = $query->orderByDesc('created_at')->paginate(20);
 
-        $baseQuery = SurveyTemplate::visibleTo($authUser);
+        $baseQuery = SurveyTemplate::where('client_id', auth()->id());
         $stats = [
             'total' => (clone $baseQuery)->count(),
-            'draft' => (clone $baseQuery)->where('status', 'draft')->count(),
             'pending' => (clone $baseQuery)->where('status', 'pending')->count(),
             'approved' => (clone $baseQuery)->where('status', 'approved')->count(),
             'rejected' => (clone $baseQuery)->where('status', 'rejected')->count(),
         ];
 
-        return view('reseller.survey-templates.index', compact('templates', 'stats'));
+        return view('client.survey-templates.index', compact('templates', 'stats'));
     }
 
     public function create()
     {
-        $clients = User::whereIn('id', auth()->user()->descendantIds())
-            ->where('role', 'client')
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'balance']);
-
-        $clientsJson = $clients->map(function ($c) {
-            return ['id' => $c->id, 'name' => $c->name, 'email' => $c->email, 'balance' => (float) $c->balance];
-        })->values();
-
-        return view('reseller.survey-templates.create', compact('clients', 'clientsJson'));
+        return view('client.survey-templates.create');
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'client_id' => 'required|exists:users,id',
             'name' => 'required|string|max:150',
             'description' => 'nullable|string|max:500',
         ]);
 
         $authUser = auth()->user();
-        $client = User::findOrFail($request->client_id);
-        abort_unless(in_array((int) $client->id, $authUser->descendantIds()), 403);
 
-        // Build config from survey_questions
         $questions = [];
         $qNum = 0;
-        foreach ($request->input('survey_questions', []) as $idx => $sq) {
+        foreach ($request->input('survey_questions', []) as $sq) {
             $type = $sq['type'] ?? 'question';
             $key = $type === 'intro' ? 'intro' : 'q' . (++$qNum);
 
-            $q = [
-                'key' => $key,
-                'type' => $type,
-                'label' => $sq['label'] ?? '',
-            ];
+            $q = ['key' => $key, 'type' => $type, 'label' => $sq['label'] ?? ''];
 
-            // Voice file (AJAX-uploaded)
             if (!empty($sq['voice_file_id'])) {
                 $vf = VoiceFile::find($sq['voice_file_id']);
-                if ($vf) {
+                if ($vf && $vf->user_id === $authUser->id) {
                     $q['voice_file_id'] = $vf->id;
                     $q['voice_file_path'] = $vf->file_path_asterisk;
                 }
@@ -105,7 +82,7 @@ class SurveyTemplateController extends Controller
 
         $template = SurveyTemplate::create([
             'user_id' => $authUser->id,
-            'client_id' => $client->id,
+            'client_id' => $authUser->id,
             'name' => $request->name,
             'description' => $request->description,
             'status' => $request->input('action') === 'draft' ? 'draft' : 'pending',
@@ -117,53 +94,42 @@ class SurveyTemplateController extends Controller
             ? "Survey template saved as draft."
             : "Survey template submitted for approval.";
 
-        return redirect()->route('reseller.survey-templates.index')->with('success', $msg);
+        return redirect()->route('client.survey-templates.index')->with('success', $msg);
     }
 
     public function show(SurveyTemplate $surveyTemplate)
     {
-        $authUser = auth()->user();
-        abort_unless($surveyTemplate->user_id === $authUser->id || in_array($surveyTemplate->client_id, $authUser->descendantIds()), 403);
+        abort_unless($surveyTemplate->client_id === auth()->id(), 403);
+        $surveyTemplate->load(['user', 'approvedBy']);
 
-        $surveyTemplate->load(['user', 'client', 'approvedBy']);
-
-        return view('reseller.survey-templates.show', compact('surveyTemplate'));
+        return view('client.survey-templates.show', compact('surveyTemplate'));
     }
 
     public function edit(SurveyTemplate $surveyTemplate)
     {
-        $authUser = auth()->user();
-        abort_unless($surveyTemplate->user_id === $authUser->id || in_array($surveyTemplate->client_id, $authUser->descendantIds()), 403);
+        abort_unless($surveyTemplate->client_id === auth()->id(), 403);
         abort_unless(in_array($surveyTemplate->status, ['draft', 'pending']), 403, 'Only draft or pending templates can be edited.');
 
-        $surveyTemplate->load('client');
-
-        return view('reseller.survey-templates.edit', compact('surveyTemplate'));
+        return view('client.survey-templates.edit', compact('surveyTemplate'));
     }
 
     public function update(Request $request, SurveyTemplate $surveyTemplate)
     {
-        $authUser = auth()->user();
-        abort_unless($surveyTemplate->user_id === $authUser->id || in_array($surveyTemplate->client_id, $authUser->descendantIds()), 403);
-        abort_unless(in_array($surveyTemplate->status, ['draft', 'pending']), 403, 'Only draft or pending templates can be edited.');
+        abort_unless($surveyTemplate->client_id === auth()->id(), 403);
+        abort_unless(in_array($surveyTemplate->status, ['draft', 'pending']), 403);
 
         $request->validate([
             'name' => 'required|string|max:150',
             'description' => 'nullable|string|max:500',
         ]);
 
-        // Build config from survey_questions
         $questions = [];
         $qNum = 0;
-        foreach ($request->input('survey_questions', []) as $idx => $sq) {
+        foreach ($request->input('survey_questions', []) as $sq) {
             $type = $sq['type'] ?? 'question';
             $key = $type === 'intro' ? 'intro' : 'q' . (++$qNum);
 
-            $q = [
-                'key' => $key,
-                'type' => $type,
-                'label' => $sq['label'] ?? '',
-            ];
+            $q = ['key' => $key, 'type' => $type, 'label' => $sq['label'] ?? ''];
 
             if (!empty($sq['voice_file_id'])) {
                 $vf = VoiceFile::find($sq['voice_file_id']);
@@ -189,17 +155,14 @@ class SurveyTemplateController extends Controller
             $questions[] = $q;
         }
 
-        $status = $request->input('action') === 'draft' ? 'draft' : $surveyTemplate->status;
-
         $surveyTemplate->update([
             'name' => $request->name,
             'description' => $request->description,
             'config' => !empty($questions) ? ['version' => 2, 'questions' => $questions] : $surveyTemplate->config,
-            'status' => $status,
+            'status' => $request->input('action') === 'draft' ? 'draft' : $surveyTemplate->status,
         ]);
 
-        return redirect()->route('reseller.survey-templates.show', $surveyTemplate)
-            ->with('success', 'Survey template updated.');
+        return redirect()->route('client.survey-templates.show', $surveyTemplate)->with('success', 'Survey template updated.');
     }
 
     public function uploadVoiceFile(Request $request)
@@ -209,18 +172,13 @@ class SurveyTemplateController extends Controller
             'label' => 'nullable|string|max:200',
         ]);
 
-        $voiceFileService = app(VoiceFileService::class);
-        $vf = $voiceFileService->upload($request->file('voice_file'), auth()->user(), $request->input('label', 'Survey Audio'));
-
-        // Reseller uploads are always pending
-        $vf->update(['status' => 'pending']);
+        $vf = app(VoiceFileService::class)->upload($request->file('voice_file'), auth()->user(), $request->input('label', 'Survey Audio'));
 
         return response()->json([
             'id' => $vf->id,
             'name' => $vf->name,
             'duration' => $vf->duration,
             'format' => $vf->format,
-            'status' => $vf->status,
             'file_path_asterisk' => $vf->file_path_asterisk,
         ]);
     }

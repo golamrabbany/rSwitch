@@ -487,14 +487,13 @@
             <div x-show="show" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
                  x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                  class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm"></div>
-            <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
-                <div class="flex min-h-full items-center justify-center p-4" @click="show = false">
+            <div class="fixed inset-0 z-10 flex items-center justify-center p-4" @click="show = false">
                     <div x-show="show" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
                          x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                         class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg" @click.stop>
+                         class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col" @click.stop>
 
-                        {{-- Header --}}
-                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                        {{-- Header (fixed) --}}
+                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
                                     <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -509,85 +508,120 @@
                             </button>
                         </div>
 
-                        {{-- Content --}}
-                        <div x-show="data" class="px-6 py-4 space-y-4 max-h-[28rem] overflow-y-auto">
-                            {{-- Status --}}
-                            <div class="p-3 rounded-lg"
+                        {{-- Content (scrollable) --}}
+                        <div x-show="data" class="overflow-y-auto flex-1 min-h-0">
+                            {{-- Status Banner --}}
+                            <div class="px-6 py-3"
                                  :class="data?.kyc_status === 'approved' ? 'bg-emerald-50' : (data?.kyc_status === 'pending' ? 'bg-amber-50' : (data?.kyc_status === 'rejected' ? 'bg-red-50' : 'bg-gray-50'))">
-                                <span class="text-sm font-medium" :class="data?.kyc_status === 'approved' ? 'text-emerald-700' : (data?.kyc_status === 'pending' ? 'text-amber-700' : (data?.kyc_status === 'rejected' ? 'text-red-700' : 'text-gray-700'))" x-text="'Status: ' + (data?.kyc_status ? data.kyc_status.charAt(0).toUpperCase() + data.kyc_status.slice(1) : 'N/A')"></span>
-                            </div>
-
-                            {{-- Personal Info --}}
-                            <div class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                                <div>
-                                    <p class="text-xs text-gray-500">Account Type</p>
-                                    <p class="font-medium text-gray-900" x-text="data?.account_type || '—'"></p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Full Name</p>
-                                    <p class="font-medium text-gray-900" x-text="data?.full_name || '—'"></p>
-                                </div>
-                                <div x-show="data?.contact_person">
-                                    <p class="text-xs text-gray-500">Contact Person</p>
-                                    <p class="font-medium text-gray-900" x-text="data?.contact_person"></p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Phone</p>
-                                    <p class="font-medium text-gray-900" x-text="data?.phone || '—'"></p>
-                                </div>
-                                <div x-show="data?.alt_phone">
-                                    <p class="text-xs text-gray-500">Alt Phone</p>
-                                    <p class="font-medium text-gray-900" x-text="data?.alt_phone"></p>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <template x-if="data?.kyc_status === 'approved'">
+                                            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        </template>
+                                        <template x-if="data?.kyc_status === 'pending'">
+                                            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        </template>
+                                        <template x-if="data?.kyc_status === 'rejected'">
+                                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        </template>
+                                        <span class="text-sm font-semibold" :class="data?.kyc_status === 'approved' ? 'text-emerald-700' : (data?.kyc_status === 'pending' ? 'text-amber-700' : 'text-red-700')" x-text="data?.kyc_status ? data.kyc_status.charAt(0).toUpperCase() + data.kyc_status.slice(1) : 'N/A'"></span>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                                          :class="data?.kyc_status === 'approved' ? 'bg-emerald-100 text-emerald-700' : (data?.kyc_status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700')"
+                                          x-text="data?.account_type || 'N/A'"></span>
                                 </div>
                             </div>
 
-                            {{-- ID Info --}}
-                            <div class="border-t border-gray-100 pt-3">
+                            {{-- Personal Details --}}
+                            <div class="px-6 py-4">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Personal Details</h4>
+                                </div>
                                 <div class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                                     <div>
-                                        <p class="text-xs text-gray-500">ID Type</p>
+                                        <p class="text-xs text-gray-400">Full Name</p>
+                                        <p class="font-medium text-gray-900" x-text="data?.full_name || '—'"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-400">Phone</p>
+                                        <p class="font-medium text-gray-900" x-text="data?.phone || '—'"></p>
+                                    </div>
+                                    <div x-show="data?.contact_person">
+                                        <p class="text-xs text-gray-400">Contact Person</p>
+                                        <p class="font-medium text-gray-900" x-text="data?.contact_person"></p>
+                                    </div>
+                                    <div x-show="data?.alt_phone">
+                                        <p class="text-xs text-gray-400">Alt Phone</p>
+                                        <p class="font-medium text-gray-900" x-text="data?.alt_phone"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Identification --}}
+                            <div class="px-6 py-4 border-t border-gray-100">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/></svg>
+                                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Identification</h4>
+                                </div>
+                                <div class="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
+                                    <div>
+                                        <p class="text-xs text-gray-400">ID Type</p>
                                         <p class="font-medium text-gray-900" x-text="data?.id_type || '—'"></p>
                                     </div>
                                     <div>
-                                        <p class="text-xs text-gray-500">ID Number</p>
+                                        <p class="text-xs text-gray-400">ID Number</p>
                                         <p class="font-medium font-mono text-gray-900" x-text="data?.id_number || '—'"></p>
                                     </div>
                                     <div x-show="data?.id_expiry">
-                                        <p class="text-xs text-gray-500">ID Expiry</p>
+                                        <p class="text-xs text-gray-400">Expiry</p>
                                         <p class="font-medium text-gray-900" x-text="data?.id_expiry"></p>
                                     </div>
                                 </div>
                             </div>
 
                             {{-- Address --}}
-                            <div x-show="data?.address" class="border-t border-gray-100 pt-3 text-sm">
-                                <p class="text-xs text-gray-500">Address</p>
-                                <p class="font-medium text-gray-900" x-text="data?.address"></p>
+                            <div x-show="data?.address" class="px-6 py-4 border-t border-gray-100">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Address</h4>
+                                </div>
+                                <p class="text-sm font-medium text-gray-900" x-text="data?.address"></p>
                             </div>
 
                             {{-- Timeline --}}
-                            <div class="border-t border-gray-100 pt-3">
+                            <div class="px-6 py-4 border-t border-gray-100">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Timeline</h4>
+                                </div>
                                 <div class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                                     <div>
-                                        <p class="text-xs text-gray-500">Submitted</p>
+                                        <p class="text-xs text-gray-400">Submitted</p>
                                         <p class="font-medium text-gray-900" x-text="data?.submitted_at || '—'"></p>
                                     </div>
                                     <div x-show="data?.reviewed_at">
-                                        <p class="text-xs text-gray-500">Reviewed</p>
-                                        <p class="font-medium text-gray-900"><span x-text="data?.reviewed_at"></span> <span x-show="data?.reviewer" class="text-gray-500">by <span x-text="data?.reviewer"></span></span></p>
+                                        <p class="text-xs text-gray-400">Reviewed</p>
+                                        <p class="font-medium text-gray-900"><span x-text="data?.reviewed_at"></span></p>
+                                        <p x-show="data?.reviewer" class="text-xs text-gray-400">by <span x-text="data?.reviewer"></span></p>
                                     </div>
                                 </div>
                             </div>
 
                             {{-- Rejection Reason --}}
-                            <div x-show="data?.kyc_status === 'rejected' && data?.rejected_reason" class="p-3 bg-red-50 rounded-lg border border-red-200">
-                                <p class="text-xs font-medium text-red-700">Rejection Reason</p>
-                                <p class="text-sm text-red-600 mt-0.5" x-text="data?.rejected_reason"></p>
+                            <div x-show="data?.kyc_status === 'rejected' && data?.rejected_reason" class="px-6 py-4 border-t border-gray-100">
+                                <div class="p-3 bg-red-50 rounded-lg border border-red-200">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                        <p class="text-xs font-semibold text-red-700">Rejection Reason</p>
+                                    </div>
+                                    <p class="text-sm text-red-600" x-text="data?.rejected_reason"></p>
+                                </div>
                             </div>
                         </div>
 
-                        {{-- Actions --}}
-                        <div x-show="data" class="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-xl">
+                        {{-- Actions (fixed footer) --}}
+                        <div x-show="data" class="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-xl flex-shrink-0">
                             <div class="flex items-center justify-between">
                                 <button @click="show = false" type="button" class="btn-secondary text-sm">Close</button>
                                 <div class="flex items-center gap-2">
@@ -619,13 +653,13 @@
                                         </form>
                                     </template>
                                     <a :href="'/admin/kyc/' + data?.kyc_profile_id" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                         View Full KYC
                                     </a>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
             </div>
         </div>
     </div>

@@ -12,7 +12,8 @@ class SurveyTemplateController extends Controller
 {
     public function index(Request $request)
     {
-        $query = SurveyTemplate::with(['user', 'client', 'approvedBy']);
+        $query = SurveyTemplate::with(['user', 'client', 'approvedBy'])
+            ->where('status', '!=', 'draft');
 
         if (!auth()->user()->isSuperAdmin()) {
             $query->visibleTo(auth()->user());
@@ -27,7 +28,7 @@ class SurveyTemplateController extends Controller
 
         $templates = $query->orderByDesc('created_at')->paginate(20);
 
-        $baseQuery = SurveyTemplate::query();
+        $baseQuery = SurveyTemplate::where('status', '!=', 'draft');
         if (!auth()->user()->isSuperAdmin()) {
             $baseQuery->visibleTo(auth()->user());
         }
