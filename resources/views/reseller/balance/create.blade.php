@@ -165,21 +165,26 @@
                                 <label for="amount" class="form-label">Amount</label>
                                 <div class="input-with-prefix">
                                     <span class="input-prefix">{{ currency_symbol() }}</span>
-                                    <input type="number" id="amount" name="amount" x-model="amount" step="0.01" min="0.01" max="999999.99" required
+                                    <input type="number" id="amount" name="amount" x-model="amount" step="0.01" min="0.01" max="{{ auth()->user()->balance > 0 ? auth()->user()->balance : 0 }}" required
                                            class="form-input pl-8 font-mono text-lg"
-                                           placeholder="0.00">
+                                           placeholder="0.00"
+                                           {{ auth()->user()->balance <= 0 ? 'disabled' : '' }}>
                                 </div>
-                                <p class="form-hint">Enter amount between 0.01 and 999,999.99</p>
+                                <p class="form-hint">Amount will be deducted from your balance and credited to client</p>
                                 <x-input-error :messages="$errors->get('amount')" class="mt-2" />
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label">New Balance (Preview)</label>
-                                <div class="balance-preview balance-preview-credit">
-                                    <span class="balance-preview-label">After topup:</span>
-                                    <span class="balance-preview-value">
-                                        {{ currency_symbol() }}<span x-text="formatBalance(parseFloat(selectedClient?.balance || 0) + parseFloat(amount || 0))"></span>
-                                    </span>
+                                <label class="form-label">Balance Preview</label>
+                                <div class="space-y-1.5">
+                                    <div class="flex items-center justify-between p-2 bg-emerald-50 rounded-lg text-sm">
+                                        <span class="text-emerald-700">Client after:</span>
+                                        <span class="font-mono font-semibold text-emerald-700">{{ currency_symbol() }}<span x-text="formatBalance(parseFloat(selectedClient?.balance || 0) + parseFloat(amount || 0))"></span></span>
+                                    </div>
+                                    <div class="flex items-center justify-between p-2 bg-amber-50 rounded-lg text-sm">
+                                        <span class="text-amber-700">Your balance after:</span>
+                                        <span class="font-mono font-semibold text-amber-700">{{ currency_symbol() }}<span x-text="formatBalance({{ auth()->user()->balance }} - parseFloat(amount || 0))"></span></span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -217,11 +222,11 @@
                 {{-- Form Actions --}}
                 <div class="flex items-center justify-end gap-3">
                     <a href="{{ route('reseller.transactions.index') }}" class="btn-secondary">Cancel</a>
-                    <button type="submit" class="btn-primary-reseller">
+                    <button type="submit" class="btn-primary-reseller" {{ auth()->user()->balance <= 0 ? 'disabled style=opacity:0.5;cursor:not-allowed;' : '' }}>
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        Top Up Client
+                        Transfer to Client
                     </button>
                 </div>
             </div>
@@ -306,39 +311,43 @@
                         <h3 class="detail-card-title">Your Balance</h3>
                     </div>
                     <div class="detail-card-body">
-                        <div class="text-center">
-                            <span class="text-2xl font-bold text-gray-900">{{ format_currency(auth()->user()->balance) }}</span>
-                            <p class="text-xs text-gray-500 mt-1">Available in your account</p>
+                        <div class="text-center p-3 rounded-lg {{ auth()->user()->balance > 0 ? 'bg-emerald-50' : 'bg-red-50' }}">
+                            <span class="text-2xl font-bold {{ auth()->user()->balance > 0 ? 'text-emerald-700' : 'text-red-700' }}">{{ format_currency(auth()->user()->balance) }}</span>
+                            <p class="text-xs {{ auth()->user()->balance > 0 ? 'text-emerald-600' : 'text-red-600' }} mt-1">Available for transfer</p>
                         </div>
+                        @if(auth()->user()->balance <= 0)
+                            <div class="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-lg">
+                                <p class="text-xs text-red-700 flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                    Contact admin to recharge your account before transferring to clients.
+                                </p>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
-                {{-- Tips --}}
+                {{-- How It Works --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
-                        <h3 class="detail-card-title">Tips</h3>
+                        <h3 class="detail-card-title">How It Works</h3>
                     </div>
-                    <div class="detail-card-body">
-                        <ul class="text-xs text-gray-600 space-y-2">
-                            <li class="flex items-start gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span>Record payment source for tracking</span>
-                            </li>
-                            <li class="flex items-start gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span>Add remarks for reference</span>
-                            </li>
-                            <li class="flex items-start gap-2">
-                                <svg class="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span>Client will see topup in history</span>
-                            </li>
-                        </ul>
+                    <div class="detail-card-body text-xs text-gray-500 space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                            <span>Amount is <strong>deducted from your balance</strong></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                            <span>And <strong>credited to the client</strong> instantly</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                            <span>Both transactions are <strong>logged</strong> for records</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span>
+                            <span>You <strong>cannot transfer more</strong> than your available balance</span>
+                        </div>
                     </div>
                 </div>
             </div>

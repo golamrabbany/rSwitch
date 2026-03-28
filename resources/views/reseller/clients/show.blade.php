@@ -531,6 +531,23 @@
                         </button>
                     </div>
 
+                    {{-- Reseller Balance Info --}}
+                    <div class="px-6 pt-4">
+                        <div class="flex items-center justify-between p-3 rounded-lg {{ auth()->user()->balance > 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200' }}">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 {{ auth()->user()->balance > 0 ? 'text-emerald-500' : 'text-red-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                <span class="text-sm {{ auth()->user()->balance > 0 ? 'text-emerald-700' : 'text-red-700' }}">Your Available Balance</span>
+                            </div>
+                            <span class="text-sm font-mono font-bold {{ auth()->user()->balance > 0 ? 'text-emerald-700' : 'text-red-700' }}">{{ format_currency(auth()->user()->balance) }}</span>
+                        </div>
+                        @if(auth()->user()->balance <= 0)
+                            <p class="text-xs text-red-600 mt-2 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                Insufficient balance. Please contact admin to recharge your account.
+                            </p>
+                        @endif
+                    </div>
+
                     <form method="POST" action="{{ route('reseller.balance.store') }}">
                         @csrf
                         <input type="hidden" name="user_id" value="{{ $client->id }}">
@@ -538,8 +555,8 @@
                         <div class="px-6 py-5 space-y-4">
                             <div>
                                 <label class="form-label">Amount ({{ currency_symbol() }})</label>
-                                <input type="number" name="amount" required step="0.01" min="0.01" max="999999.99" placeholder="0.00" class="form-input font-mono text-lg">
-                                <p class="text-xs text-gray-400 mt-1">Amount to credit</p>
+                                <input type="number" name="amount" required step="0.01" min="0.01" max="{{ auth()->user()->balance > 0 ? auth()->user()->balance : 0 }}" placeholder="0.00" class="form-input font-mono text-lg" {{ auth()->user()->balance <= 0 ? 'disabled' : '' }}>
+                                <p class="text-xs text-gray-400 mt-1">Amount will be deducted from your balance and credited to client</p>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
@@ -570,11 +587,11 @@
 
                         <div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100 rounded-b-xl">
                             <button type="button" @click="topupModal = false" class="btn-secondary">Cancel</button>
-                            <button type="submit" class="btn-primary-reseller">
+                            <button type="submit" class="btn-primary-reseller" {{ auth()->user()->balance <= 0 ? 'disabled' : '' }} style="{{ auth()->user()->balance <= 0 ? 'opacity: 0.5; cursor: not-allowed;' : '' }}">
                                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                 </svg>
-                                Top Up
+                                Transfer to Client
                             </button>
                         </div>
                     </form>

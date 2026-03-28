@@ -36,9 +36,10 @@ class BalanceController extends Controller
         ]);
 
         $client = User::findOrFail($validated['user_id']);
+        $reseller = auth()->user();
 
         // Ensure this is the reseller's own client
-        if ($client->parent_id !== auth()->id() || $client->role !== 'client') {
+        if ($client->parent_id !== $reseller->id || $client->role !== 'client') {
             abort(403);
         }
 
@@ -47,13 +48,34 @@ class BalanceController extends Controller
         $source = $validated['source'] ?? null;
         $remarks = $validated['remarks'] ?? null;
 
+        // Check reseller has sufficient balance
+        $reseller->refresh(); // Get fresh balance
+        if (bccomp($reseller->balance, $amount, 4) < 0) {
+            return back()->withErrors([
+                'amount' => 'Insufficient balance. Your available balance is ' . format_currency($reseller->balance) . '. Please recharge your account first.',
+            ])->withInput();
+        }
+
+        // Debit reseller first
+        $this->balanceService->debit(
+            user: $reseller,
+            amount: $amount,
+            type: 'transfer_out',
+            referenceType: 'client_topup',
+            description: "Transfer to client: {$client->name}",
+            createdBy: $reseller->id,
+            source: $source,
+            remarks: "Client topup → {$client->name}",
+        );
+
+        // Credit client
         $transaction = $this->balanceService->credit(
             user: $client,
             amount: $amount,
             type: 'topup',
-            referenceType: 'manual_reseller',
-            description: $notes ?: "Reseller topup by " . auth()->user()->name,
-            createdBy: auth()->id(),
+            referenceType: 'reseller_transfer',
+            description: $notes ?: "Top-up from reseller: {$reseller->name}",
+            createdBy: $reseller->id,
             source: $source,
             remarks: $remarks,
         );
@@ -62,22 +84,25 @@ class BalanceController extends Controller
             'user_id' => $client->id,
             'amount' => $amount,
             'currency' => 'USD',
-            'payment_method' => 'manual_reseller',
-            'recharged_by' => auth()->id(),
-            'notes' => $notes ?: 'Reseller manual topup',
+            'payment_method' => 'reseller_transfer',
+            'recharged_by' => $reseller->id,
+            'notes' => $notes ?: 'Reseller balance transfer',
             'status' => 'completed',
             'completed_at' => now(),
             'transaction_id' => $transaction->id,
         ]);
 
-        AuditService::logAction('balance.credit', $client, [
+        AuditService::logAction('balance.transfer', $client, [
             'amount' => $amount,
-            'notes' => $notes,
-            'by_reseller' => auth()->id(),
+            'from_reseller' => $reseller->id,
+            'reseller_balance_after' => $reseller->fresh()->balance,
+            'client_balance_after' => $client->fresh()->balance,
             'transaction_id' => $transaction->id,
         ]);
 
-        return redirect()->route('reseller.transactions.index', ['user_id' => $client->id])
-            ->with('success', "Credited \${$amount} to {$client->name}.");
+        $resellerBalanceAfter = format_currency($reseller->fresh()->balance);
+
+        return redirect()->route('reseller.clients.show', $client)
+            ->with('success', "Transferred {$amount} to {$client->name}. Your remaining balance: {$resellerBalanceAfter}");
     }
 }
