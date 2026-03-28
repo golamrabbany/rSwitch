@@ -447,8 +447,9 @@
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label class="form-label">Max Channels</label>
-                                    <input type="number" name="max_channels" required value="5" min="1" max="100" class="form-input">
-                                    <p class="text-xs text-gray-400 mt-1">Concurrent calls</p>
+                                    <input type="number" name="max_channels" required value="{{ min(5, $sipChannelAvailable) }}" min="1" max="{{ $sipChannelAvailable }}" class="form-input" {{ $sipChannelAvailable <= 0 ? 'disabled' : '' }}>
+                                    <p class="text-xs text-gray-400 mt-1">Available: {{ $sipChannelAvailable }} of {{ $client->max_channels }}</p>
+                                    <x-input-error :messages="$errors->get('max_channels')" class="mt-1" />
                                 </div>
                                 <div x-data="{
                                     codecs: ['ulaw', 'alaw', 'g729'],

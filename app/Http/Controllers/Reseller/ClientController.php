@@ -50,7 +50,9 @@ class ClientController extends Controller
               });
         })->get();
 
-        return view('reseller.clients.create', compact('rateGroups'));
+        $channelInfo = $this->getChannelInfo();
+
+        return view('reseller.clients.create', compact('rateGroups', 'channelInfo'));
     }
 
     public function store(Request $request)
@@ -77,10 +79,32 @@ class ClientController extends Controller
             'id_type' => ['required', Rule::in(['national_id', 'passport', 'driving_license', 'business_license'])],
             'id_number' => ['required', 'string', 'max:50'],
             'id_expiry_date' => ['nullable', 'date'],
+            // Contact
+            'contact_email' => ['nullable', 'email', 'max:255'],
+            'alt_phone' => ['nullable', 'string', 'max:20'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'user_city' => ['nullable', 'string', 'max:100'],
+            'user_state' => ['nullable', 'string', 'max:100'],
+            'user_country' => ['nullable', 'string', 'max:100'],
+            'zip_code' => ['nullable', 'string', 'max:20'],
+            // Company
+            'company_name' => ['nullable', 'string', 'max:200'],
+            'company_email' => ['nullable', 'email', 'max:255'],
+            'company_website' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:1000'],
             // Documents
             'id_front' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,pdf'],
             'id_back' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,pdf'],
         ]);
+
+        // Validate max_channels against reseller's pool
+        $channelInfo = $this->getChannelInfo();
+        $requestedChannels = (int) ($validated['max_channels'] ?? 10);
+        if ($requestedChannels > $channelInfo['available']) {
+            return back()->withErrors([
+                'max_channels' => "Exceeds available channels. You have {$channelInfo['available']} of {$channelInfo['total']} channels available.",
+            ])->withInput();
+        }
 
         $user = User::create([
             'name' => $validated['name'],
@@ -95,6 +119,18 @@ class ClientController extends Controller
             'max_channels' => $validated['max_channels'] ?? 10,
             'status' => 'active',
             'kyc_status' => 'pending',
+            'phone' => $validated['phone'],
+            'alt_phone' => $validated['alt_phone'] ?? null,
+            'contact_email' => $validated['contact_email'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'city' => $validated['user_city'] ?? null,
+            'state' => $validated['user_state'] ?? null,
+            'country' => $validated['user_country'] ?? null,
+            'zip_code' => $validated['zip_code'] ?? null,
+            'company_name' => $validated['company_name'] ?? null,
+            'company_email' => $validated['company_email'] ?? null,
+            'company_website' => $validated['company_website'] ?? null,
+            'notes' => $validated['notes'] ?? null,
         ]);
 
         $user->assignRole('client');
@@ -150,7 +186,11 @@ class ClientController extends Controller
             ->limit(20)
             ->get();
 
-        return view('reseller.clients.show', compact('client', 'recentTopups'));
+        // SIP channel pool info
+        $sipChannelUsed = $client->sipAccounts->sum('max_channels');
+        $sipChannelAvailable = max(0, $client->max_channels - $sipChannelUsed);
+
+        return view('reseller.clients.show', compact('client', 'recentTopups', 'sipChannelAvailable'));
     }
 
     public function edit(User $client)
@@ -167,7 +207,9 @@ class ClientController extends Controller
               });
         })->get();
 
-        return view('reseller.clients.edit', compact('client', 'rateGroups'));
+        $channelInfo = $this->getChannelInfo($client->id);
+
+        return view('reseller.clients.edit', compact('client', 'rateGroups', 'channelInfo'));
     }
 
     public function update(Request $request, User $client)
@@ -183,7 +225,28 @@ class ClientController extends Controller
             'rate_group_id' => ['nullable', 'exists:rate_groups,id'],
             'credit_limit' => ['nullable', 'numeric', 'min:0'],
             'max_channels' => ['nullable', 'integer', 'min:1'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'alt_phone' => ['nullable', 'string', 'max:20'],
+            'contact_email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'zip_code' => ['nullable', 'string', 'max:20'],
+            'company_name' => ['nullable', 'string', 'max:200'],
+            'company_email' => ['nullable', 'email', 'max:255'],
+            'company_website' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        // Validate max_channels against reseller's pool (exclude current client)
+        $channelInfo = $this->getChannelInfo($client->id);
+        $requestedChannels = (int) ($validated['max_channels'] ?? 10);
+        if ($requestedChannels > $channelInfo['available']) {
+            return back()->withErrors([
+                'max_channels' => "Exceeds available channels. You have {$channelInfo['available']} of {$channelInfo['total']} channels available.",
+            ])->withInput();
+        }
 
         $original = $client->getAttributes();
 
@@ -195,6 +258,18 @@ class ClientController extends Controller
             'rate_group_id' => $validated['rate_group_id'],
             'credit_limit' => $validated['credit_limit'] ?? 0,
             'max_channels' => $validated['max_channels'] ?? 10,
+            'phone' => $validated['phone'],
+            'alt_phone' => $validated['alt_phone'],
+            'contact_email' => $validated['contact_email'],
+            'address' => $validated['address'],
+            'city' => $validated['city'],
+            'state' => $validated['state'],
+            'country' => $validated['country'],
+            'zip_code' => $validated['zip_code'],
+            'company_name' => $validated['company_name'],
+            'company_email' => $validated['company_email'],
+            'company_website' => $validated['company_website'],
+            'notes' => $validated['notes'],
         ]);
 
         if (! empty($validated['password'])) {
@@ -220,5 +295,26 @@ class ClientController extends Controller
         AuditService::logUpdated($client, $original, 'reseller.client.status_toggled');
 
         return back()->with('success', "Client {$client->status}.");
+    }
+
+    /**
+     * Get available channels from reseller's pool.
+     */
+    private function getChannelInfo(?int $excludeClientId = null): array
+    {
+        $reseller = auth()->user();
+        $totalChannels = $reseller->max_channels;
+
+        $usedQuery = User::where('parent_id', $reseller->id)->where('role', 'client');
+        if ($excludeClientId) {
+            $usedQuery->where('id', '!=', $excludeClientId);
+        }
+        $usedChannels = $usedQuery->sum('max_channels');
+
+        return [
+            'total' => $totalChannels,
+            'used' => (int) $usedChannels,
+            'available' => max(0, $totalChannels - $usedChannels),
+        ];
     }
 }

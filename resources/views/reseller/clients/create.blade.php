@@ -31,69 +31,171 @@
             {{-- Main Form (2/3) --}}
             <div class="lg:col-span-2 space-y-6">
 
-                {{-- Account Details --}}
+                {{-- Login Information --}}
                 <div class="form-card">
                     <div class="form-card-header">
-                        <h3 class="form-card-title">Account Details</h3>
-                        <p class="form-card-subtitle">Login credentials and billing configuration</p>
+                        <h3 class="form-card-title">Login Information</h3>
+                        <p class="form-card-subtitle">Credentials and account setup</p>
                     </div>
                     <div class="form-card-body">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
-                                <label for="name" class="form-label">Full Name</label>
-                                <input type="text" id="name" name="name" value="{{ old('name') }}" required class="form-input" placeholder="Enter full name">
+                                <label class="form-label">Account Name</label>
+                                <input type="text" name="name" value="{{ old('name') }}" required class="form-input" placeholder="Enter account name">
+                                <p class="form-hint">Display name for this account</p>
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
                             <div class="form-group">
-                                <label for="email" class="form-label">Email Address</label>
-                                <input type="email" id="email" name="email" value="{{ old('email') }}" required class="form-input" placeholder="Enter email address">
+                                <label class="form-label">Username / Email</label>
+                                <input type="email" name="email" value="{{ old('email') }}" required class="form-input" placeholder="Enter email address">
+                                <p class="form-hint">Used as login username and for notifications</p>
                                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
                             </div>
                             <div class="form-group">
-                                <label for="password" class="form-label">Password</label>
-                                <input type="password" id="password" name="password" required class="form-input" placeholder="Min 8 characters">
+                                <label class="form-label">Password</label>
+                                <input type="password" name="password" required class="form-input" placeholder="Min 8 characters">
+                                <p class="form-hint">Minimum 8 characters</p>
                                 <x-input-error :messages="$errors->get('password')" class="mt-2" />
                             </div>
                             <div class="form-group">
-                                <label for="password_confirmation" class="form-label">Confirm Password</label>
-                                <input type="password" id="password_confirmation" name="password_confirmation" required class="form-input" placeholder="Confirm password">
+                                <label class="form-label">Confirm Password</label>
+                                <input type="password" name="password_confirmation" required class="form-input" placeholder="Confirm password">
+                                <p class="form-hint">Re-enter password to confirm</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {{-- Billing & Limits --}}
+                {{-- Billing Info --}}
                 <div class="form-card">
                     <div class="form-card-header">
-                        <h3 class="form-card-title">Billing & Limits</h3>
-                        <p class="form-card-subtitle">Rate plan and usage limits</p>
+                        <h3 class="form-card-title">Billing Info</h3>
+                        <p class="form-card-subtitle">Rate plan, balance and usage limits</p>
                     </div>
                     <div class="form-card-body">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
-                                <label for="billing_type" class="form-label">Billing Type</label>
-                                <select id="billing_type" name="billing_type" required class="form-input">
+                                <label class="form-label">Billing Type</label>
+                                <select name="billing_type" required class="form-input">
                                     <option value="prepaid" {{ old('billing_type') === 'prepaid' ? 'selected' : '' }}>Prepaid</option>
                                     <option value="postpaid" {{ old('billing_type') === 'postpaid' ? 'selected' : '' }}>Postpaid</option>
                                 </select>
+                                <p class="form-hint">Prepaid deducts in real-time</p>
                             </div>
                             <div class="form-group">
-                                <label for="rate_group_id" class="form-label">Rate Group</label>
-                                <select id="rate_group_id" name="rate_group_id" class="form-input">
+                                <label class="form-label">Rate Group</label>
+                                <select name="rate_group_id" class="form-input">
                                     <option value="">Select Rate Group</option>
                                     @foreach ($rateGroups as $rateGroup)
                                         <option value="{{ $rateGroup->id }}" {{ old('rate_group_id') == $rateGroup->id ? 'selected' : '' }}>{{ $rateGroup->name }}</option>
                                     @endforeach
                                 </select>
+                                <p class="form-hint">Defines call pricing</p>
                             </div>
                             <div class="form-group">
-                                <label for="credit_limit" class="form-label">Credit Limit ({{ currency_symbol() }})</label>
-                                <input type="number" id="credit_limit" name="credit_limit" value="{{ old('credit_limit', '0') }}" step="0.01" min="0" class="form-input">
+                                <label class="form-label">Credit Limit</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
+                                    <input type="number" name="credit_limit" value="{{ old('credit_limit', '0') }}" step="0.01" min="0" class="form-input pl-8">
+                                </div>
+                                <p class="form-hint">For postpaid accounts only</p>
                             </div>
                             <div class="form-group">
-                                <label for="max_channels" class="form-label">Max Channels</label>
-                                <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', '10') }}" min="1" class="form-input">
-                                <p class="form-hint">Maximum concurrent calls</p>
+                                <label class="form-label">Max Channels</label>
+                                <input type="number" name="max_channels" value="{{ old('max_channels', min(10, $channelInfo['available'])) }}" min="1" max="{{ $channelInfo['available'] }}" class="form-input" placeholder="{{ $channelInfo['available'] }}">
+                                <p class="form-hint">Available: {{ $channelInfo['available'] }} of {{ $channelInfo['total'] }} channels ({{ $channelInfo['used'] }} used)</p>
+                                <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Contact --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Contact</h3>
+                        <p class="form-card-subtitle">Phone numbers and address</p>
+                    </div>
+                    <div class="form-card-body space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Contact Email</label>
+                                <input type="email" name="contact_email" value="{{ old('contact_email') }}" class="form-input" placeholder="contact@example.com">
+                                <p class="form-hint">Separate from login email</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Phone</label>
+                                <input type="text" name="phone" value="{{ old('phone') }}" required class="form-input" placeholder="e.g. +8801712345678">
+                                <p class="form-hint">Primary contact number</p>
+                                <x-input-error :messages="$errors->get('phone')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Alternative Phone</label>
+                                <input type="text" name="alt_phone" value="{{ old('alt_phone') }}" class="form-input" placeholder="Optional">
+                                <p class="form-hint">Secondary number</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Address</label>
+                                <input type="text" name="address" value="{{ old('address') }}" class="form-input" placeholder="Street address">
+                                <p class="form-hint">Street address, building, floor</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">City</label>
+                                <input type="text" name="user_city" value="{{ old('user_city') }}" class="form-input" placeholder="City">
+                                <p class="form-hint">City or district</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">State</label>
+                                <input type="text" name="user_state" value="{{ old('user_state') }}" class="form-input" placeholder="State / Division">
+                                <p class="form-hint">State, province or division</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Country</label>
+                                <input type="text" name="user_country" value="{{ old('user_country') }}" class="form-input" placeholder="Country">
+                                <p class="form-hint">Full country name</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Zip Code</label>
+                                <input type="text" name="zip_code" value="{{ old('zip_code') }}" class="form-input" placeholder="Zip / Postal">
+                                <p class="form-hint">Postal or zip code</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Company Details --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Company Details</h3>
+                        <p class="form-card-subtitle">Business information (optional)</p>
+                    </div>
+                    <div class="form-card-body space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Company Name</label>
+                                <input type="text" name="company_name" value="{{ old('company_name') }}" class="form-input" placeholder="e.g. ABC Telecom Ltd">
+                                <p class="form-hint">Registered business or trading name</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Company Email</label>
+                                <input type="email" name="company_email" value="{{ old('company_email') }}" class="form-input" placeholder="info@company.com">
+                                <p class="form-hint">Official business email</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Website</label>
+                                <input type="text" name="company_website" value="{{ old('company_website') }}" class="form-input" placeholder="e.g. https://example.com">
+                                <p class="form-hint">Company website URL</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Notes</label>
+                                <input type="text" name="notes" value="{{ old('notes') }}" class="form-input" placeholder="Internal notes...">
+                                <p class="form-hint">Internal remarks, not visible to client</p>
                             </div>
                         </div>
                     </div>

@@ -133,6 +133,17 @@ class SipAccountController extends Controller
         $validated['caller_id_number'] = $validated['caller_id_number'] ?: $validated['username'];
         $validated['max_channels'] = $validated['max_channels'] ?: 1;
 
+        // Channel pool check — SIP channels cannot exceed client's max_channels
+        $clientMaxChannels = $client->max_channels;
+        $usedChannels = SipAccount::where('user_id', $client->id)->sum('max_channels');
+        $availableChannels = max(0, $clientMaxChannels - $usedChannels);
+
+        if ($validated['max_channels'] > $availableChannels) {
+            return back()->withInput()->withErrors([
+                'max_channels' => "Exceeds available channels. Client has {$availableChannels} of {$clientMaxChannels} channels available ({$usedChannels} used by other SIP accounts).",
+            ]);
+        }
+
         $sip = SipAccount::create($validated);
 
         $this->provisioning->provision($sip);
@@ -168,7 +179,12 @@ class SipAccountController extends Controller
 
         $availableCodecs = SystemSetting::get('default_codec_allow', 'ulaw,alaw,g729');
 
-        return view('reseller.sip-accounts.edit', compact('sipAccount', 'users', 'availableCodecs'));
+        // Channel pool info
+        $client = User::find($sipAccount->user_id);
+        $usedChannels = SipAccount::where('user_id', $client->id)->where('id', '!=', $sipAccount->id)->sum('max_channels');
+        $sipChannelAvailable = max(0, $client->max_channels - $usedChannels);
+
+        return view('reseller.sip-accounts.edit', compact('sipAccount', 'users', 'availableCodecs', 'sipChannelAvailable', 'client'));
     }
 
     public function update(Request $request, SipAccount $sipAccount)
@@ -187,6 +203,18 @@ class SipAccountController extends Controller
             'codec_allow' => ['required', 'string', 'max:100'],
             'status' => ['required', Rule::in(['active', 'suspended', 'disabled'])],
         ]);
+
+        // Channel pool check — exclude current SIP account from used count
+        $client = User::find($validated['user_id']);
+        $clientMaxChannels = $client->max_channels;
+        $usedChannels = SipAccount::where('user_id', $client->id)->where('id', '!=', $sipAccount->id)->sum('max_channels');
+        $availableChannels = max(0, $clientMaxChannels - $usedChannels);
+
+        if ($validated['max_channels'] > $availableChannels) {
+            return back()->withInput()->withErrors([
+                'max_channels' => "Exceeds available channels. Client has {$availableChannels} of {$clientMaxChannels} channels available ({$usedChannels} used by other SIP accounts).",
+            ]);
+        }
 
         $original = $sipAccount->getAttributes();
 

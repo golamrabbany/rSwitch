@@ -87,8 +87,9 @@
                 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
                         <label for="max_channels" class="block text-sm font-medium text-gray-700">Max Channels</label>
-                        <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', $sipAccount->max_channels) }}" required min="1" max="100"
+                        <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', $sipAccount->max_channels) }}" required min="1" max="{{ $sipChannelAvailable + $sipAccount->max_channels }}"
                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <p class="mt-1 text-xs text-gray-500">Available: {{ $sipChannelAvailable }} of {{ $client->max_channels }} ({{ $client->max_channels - $sipChannelAvailable - $sipAccount->max_channels }} used by other SIP accounts)</p>
                         <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                     </div>
                     <div x-data="{
