@@ -18,7 +18,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $authUser = auth()->user();
-        $query = User::with('parent', 'rateGroup')
+        $query = User::with('parent', 'rateGroup', 'kycProfile.reviewer')
             ->withCount(['children', 'sipAccounts']);
 
         // Apply scoping for non-super admins
@@ -74,7 +74,41 @@ class UserController extends Controller
 
         $rateGroups = RateGroup::where('type', 'admin')->orderBy('name')->get(['id', 'name']);
 
-        return view('admin.users.index', compact('users', 'resellers', 'rateGroups'));
+        // Build KYC data for modal (client list only)
+        $kycDataJson = [];
+        if ($request->role === 'client') {
+            foreach ($users as $u) {
+                if ($u->kycProfile) {
+                    $kyc = $u->kycProfile;
+                    $addressParts = array_filter([
+                        $kyc->address_line1,
+                        $kyc->address_line2,
+                        implode(', ', array_filter([$kyc->city, $kyc->state])),
+                        implode(' ', array_filter([$kyc->country, $kyc->postal_code])),
+                    ]);
+                    $kycDataJson[$u->id] = [
+                        'name' => $u->name,
+                        'kyc_status' => $u->kyc_status,
+                        'kyc_profile_id' => $kyc->id,
+                        'account_type' => ucfirst($kyc->account_type ?? ''),
+                        'full_name' => $kyc->full_name,
+                        'contact_person' => $kyc->contact_person,
+                        'phone' => $kyc->phone,
+                        'alt_phone' => $kyc->alt_phone,
+                        'id_type' => $kyc->id_type ? ucfirst(str_replace('_', ' ', $kyc->id_type)) : null,
+                        'id_number' => $kyc->id_number,
+                        'id_expiry' => $kyc->id_expiry_date?->format('d M Y'),
+                        'submitted_at' => $kyc->submitted_at?->format('d M Y, g:i A'),
+                        'reviewed_at' => $kyc->reviewed_at?->format('d M Y'),
+                        'reviewer' => $kyc->reviewer?->name,
+                        'address' => implode(', ', $addressParts),
+                        'rejected_reason' => $u->kyc_rejected_reason,
+                    ];
+                }
+            }
+        }
+
+        return view('admin.users.index', compact('users', 'resellers', 'rateGroups', 'kycDataJson'));
     }
 
     public function create()
