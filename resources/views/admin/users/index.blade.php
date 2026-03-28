@@ -41,11 +41,11 @@
                 <input type="hidden" name="role" value="{{ $roleFilter }}">
             @endif
 
-            <div class="filter-search-box">
+            <div class="filter-search-box" style="flex: 1 1 0%;">
                 <svg class="filter-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by name, email..." class="filter-input">
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name, email..." class="filter-input">
             </div>
 
             @unless($roleFilter)
@@ -58,7 +58,7 @@
             @endunless
 
             @if($roleFilter === 'client' && $resellers->count() > 0)
-                <div class="relative" x-data="{
+                <div class="relative" @click.outside="open = false" x-data="{
                     open: false,
                     search: '{{ $resellers->firstWhere('id', request('parent_id'))?->name ?? '' }}',
                     selectedId: '{{ request('parent_id') }}',
@@ -101,7 +101,6 @@
                         </button>
                     </div>
                     <div x-show="open && filtered.length > 0"
-                         @click.away="open = false"
                          x-transition
                          class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                         <template x-for="reseller in filtered" :key="reseller.id">
@@ -120,6 +119,39 @@
                 </div>
             @endif
 
+            {{-- Rate Group auto-suggest --}}
+            <div class="relative" style="flex: 1 1 0%;" x-data="tariffFilter()" @click.outside="open = false">
+                <input type="hidden" name="rate_group_id" :value="selectedId">
+                <div class="relative">
+                    <input type="text" x-model="search"
+                           @focus="open = true"
+                           @input="open = true; selectedId = ''"
+                           @keydown.escape="open = false"
+                           class="filter-input pr-8"
+                           placeholder="Rate" autocomplete="off">
+                    <button type="button" x-show="search" x-cloak @click="search = ''; selectedId = ''"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div x-show="open && filtered.length > 0" x-cloak
+                     class="absolute z-50 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-auto">
+                    <template x-for="g in filtered" :key="g.id">
+                        <div @click="selectedId = g.id; search = g.name; open = false"
+                             class="px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50"
+                             :class="{ 'bg-indigo-50 font-medium': selectedId == g.id }">
+                            <span x-text="g.name"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <select name="billing_type" class="filter-select">
+                <option value="">Bill Type</option>
+                <option value="prepaid" {{ request('billing_type') === 'prepaid' ? 'selected' : '' }}>Prepaid</option>
+                <option value="postpaid" {{ request('billing_type') === 'postpaid' ? 'selected' : '' }}>Postpaid</option>
+            </select>
+
             <select name="status" class="filter-select">
                 <option value="">All Statuses</option>
                 <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
@@ -134,7 +166,7 @@
                 Search
             </button>
 
-            @if(request()->hasAny(['status', 'search', 'parent_id']))
+            @if(request()->hasAny(['status', 'search', 'parent_id', 'billing_type', 'rate_group_id']))
                 <a href="{{ route('admin.users.index', $roleFilter ? ['role' => $roleFilter] : []) }}" class="btn-clear">Clear</a>
             @endif
         </form>
@@ -160,6 +192,9 @@
                 <tr class="border-b border-gray-200">
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" width="40">SL</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Account</th>
+                    @if($roleFilter === 'reseller')
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Company</th>
+                    @endif
                     @if($roleFilter === 'client')
                         <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Reseller</th>
                     @endif
@@ -186,6 +221,16 @@
                                 <p class="text-xs text-gray-400 mt-0.5">{{ $user->email }}</p>
                             </a>
                         </td>
+                        @if($roleFilter === 'reseller')
+                            <td class="px-3 py-2">
+                                @if($user->company_name)
+                                    <p class="text-sm font-medium text-gray-800">{{ $user->company_name }}</p>
+                                    <p class="text-xs text-gray-400">{{ $user->phone ?? '' }}</p>
+                                @else
+                                    <span class="text-gray-300">—</span>
+                                @endif
+                            </td>
+                        @endif
                         @if($roleFilter === 'client')
                             <td class="px-3 py-2">
                                 @if($user->parent && $user->parent->isSuperAdmin())
@@ -259,7 +304,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $roleFilter === 'client' ? 9 : 8 }}" class="px-4 py-12 text-center">
+                        <td colspan="{{ $roleFilter === 'client' ? 9 : ($roleFilter === 'reseller' ? 9 : 8) }}" class="px-4 py-12 text-center">
                             <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
                             </svg>
@@ -276,4 +321,22 @@
             {{ $users->withQueryString()->onEachSide(1)->links('pagination::simple-tailwind') }}
         </div>
     @endif
+
+    @push('scripts')
+    <script>
+    var _rateGroups = @json($rateGroups);
+    function tariffFilter() {
+        return {
+            open: false,
+            search: '{{ $rateGroups->firstWhere("id", request("rate_group_id"))?->name ?? "" }}',
+            selectedId: '{{ request("rate_group_id", "") }}',
+            get filtered() {
+                if (!this.search) return _rateGroups;
+                var q = this.search.toLowerCase();
+                return _rateGroups.filter(function(g) { return g.name.toLowerCase().indexOf(q) > -1; });
+            }
+        }
+    }
+    </script>
+    @endpush
 </x-admin-layout>

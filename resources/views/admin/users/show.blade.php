@@ -486,6 +486,212 @@
                 </div>
             </div>
 
+            {{-- Contact --}}
+            @if($user->phone || $user->contact_email || $user->address)
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Contact</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="detail-grid">
+                        @if($user->contact_email)
+                            <div class="detail-item">
+                                <span class="detail-label">Contact Email</span>
+                                <span class="detail-value">{{ $user->contact_email }}</span>
+                            </div>
+                        @endif
+                        @if($user->phone)
+                            <div class="detail-item">
+                                <span class="detail-label">Phone</span>
+                                <span class="detail-value">{{ $user->phone }}</span>
+                            </div>
+                        @endif
+                        @if($user->alt_phone)
+                            <div class="detail-item">
+                                <span class="detail-label">Alternative Phone</span>
+                                <span class="detail-value">{{ $user->alt_phone }}</span>
+                            </div>
+                        @endif
+                        @if($user->address)
+                            <div class="detail-item">
+                                <span class="detail-label">Address</span>
+                                <span class="detail-value">
+                                    {{ $user->address }}
+                                    @if($user->city || $user->state)
+                                        <br>{{ collect([$user->city, $user->state])->filter()->implode(', ') }}
+                                    @endif
+                                    @if($user->country || $user->zip_code)
+                                        <br>{{ collect([$user->country, $user->zip_code])->filter()->implode(' ') }}
+                                    @endif
+                                </span>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            {{-- Company Details --}}
+            @if($user->company_name || $user->company_email || $user->company_website)
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Company Details</h3>
+                </div>
+                <div class="detail-card-body">
+                    <div class="detail-grid">
+                        @if($user->company_name)
+                            <div class="detail-item">
+                                <span class="detail-label">Company Name</span>
+                                <span class="detail-value">{{ $user->company_name }}</span>
+                            </div>
+                        @endif
+                        @if($user->company_email)
+                            <div class="detail-item">
+                                <span class="detail-label">Company Email</span>
+                                <span class="detail-value">{{ $user->company_email }}</span>
+                            </div>
+                        @endif
+                        @if($user->company_website)
+                            <div class="detail-item">
+                                <span class="detail-label">Website</span>
+                                <span class="detail-value"><a href="{{ $user->company_website }}" target="_blank" class="text-indigo-600 hover:text-indigo-700">{{ $user->company_website }}</a></span>
+                            </div>
+                        @endif
+                        @if($user->notes)
+                            <div class="detail-item" style="grid-column: span 2;">
+                                <span class="detail-label">Notes</span>
+                                <span class="detail-value">{{ $user->notes }}</span>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            {{-- KYC Information (Client only) --}}
+            @if($isClient)
+            <div class="detail-card">
+                <div class="detail-card-header flex items-center justify-between">
+                    <h3 class="detail-card-title">KYC Information</h3>
+                    @if($user->kycProfile)
+                        <a href="{{ route('admin.kyc.show', $user->kycProfile) }}" class="text-xs text-indigo-600 hover:text-indigo-500 font-medium">View Full KYC</a>
+                    @endif
+                </div>
+                <div class="detail-card-body">
+                    @if($user->kycProfile)
+                        @php $kyc = $user->kycProfile; @endphp
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">KYC Status</span>
+                                <span class="detail-value">
+                                    @if($user->kyc_status === 'approved')
+                                        <span class="badge badge-success">Approved</span>
+                                    @elseif($user->kyc_status === 'pending')
+                                        <span class="badge badge-warning">Pending</span>
+                                    @elseif($user->kyc_status === 'rejected')
+                                        <span class="badge badge-danger">Rejected</span>
+                                    @else
+                                        <span class="badge badge-gray">{{ ucfirst($user->kyc_status ?? 'Not Submitted') }}</span>
+                                    @endif
+                                </span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Account Type</span>
+                                <span class="detail-value">{{ ucfirst($kyc->account_type ?? '—') }}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Full Name</span>
+                                <span class="detail-value">{{ $kyc->full_name ?? '—' }}</span>
+                            </div>
+                            @if($kyc->contact_person)
+                                <div class="detail-item">
+                                    <span class="detail-label">Contact Person</span>
+                                    <span class="detail-value">{{ $kyc->contact_person }}</span>
+                                </div>
+                            @endif
+                            <div class="detail-item">
+                                <span class="detail-label">Phone</span>
+                                <span class="detail-value">{{ $kyc->phone ?? '—' }}</span>
+                            </div>
+                            @if($kyc->alt_phone)
+                                <div class="detail-item">
+                                    <span class="detail-label">Alt Phone</span>
+                                    <span class="detail-value">{{ $kyc->alt_phone }}</span>
+                                </div>
+                            @endif
+                            <div class="detail-item">
+                                <span class="detail-label">Address</span>
+                                <span class="detail-value">
+                                    {{ $kyc->address_line1 ?? '' }}
+                                    @if($kyc->address_line2) <br>{{ $kyc->address_line2 }} @endif
+                                    @if($kyc->city || $kyc->state)
+                                        <br>{{ collect([$kyc->city, $kyc->state])->filter()->implode(', ') }}
+                                    @endif
+                                    @if($kyc->country || $kyc->postal_code)
+                                        <br>{{ collect([$kyc->country, $kyc->postal_code])->filter()->implode(' ') }}
+                                    @endif
+                                </span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">ID Type</span>
+                                <span class="detail-value">{{ $kyc->id_type ? ucfirst(str_replace('_', ' ', $kyc->id_type)) : '—' }}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">ID Number</span>
+                                <span class="detail-value font-mono">{{ $kyc->id_number ?? '—' }}</span>
+                            </div>
+                            @if($kyc->id_expiry_date)
+                                <div class="detail-item">
+                                    <span class="detail-label">ID Expiry</span>
+                                    <span class="detail-value">{{ $kyc->id_expiry_date->format('d M Y') }}</span>
+                                </div>
+                            @endif
+                            @if($kyc->submitted_at)
+                                <div class="detail-item">
+                                    <span class="detail-label">Submitted</span>
+                                    <span class="detail-value">{{ $kyc->submitted_at->format('d M Y, g:i A') }}</span>
+                                </div>
+                            @endif
+                            @if($kyc->reviewed_at)
+                                <div class="detail-item">
+                                    <span class="detail-label">Reviewed</span>
+                                    <span class="detail-value">{{ $kyc->reviewed_at->format('d M Y') }} by {{ $kyc->reviewer?->name ?? '—' }}</span>
+                                </div>
+                            @endif
+                        </div>
+
+                        {{-- KYC Documents --}}
+                        @if($kyc->documents->count() > 0)
+                            <div class="mt-4 pt-4 border-t border-gray-100">
+                                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Documents</p>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    @foreach($kyc->documents as $doc)
+                                        <a href="{{ route('admin.kyc.show', $kyc) }}" class="block p-3 bg-gray-50 rounded-lg hover:bg-indigo-50 transition-colors text-center group">
+                                            <svg class="w-8 h-8 text-gray-400 group-hover:text-indigo-500 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                            <p class="text-xs text-gray-600 group-hover:text-indigo-700 font-medium">{{ ucfirst(str_replace('_', ' ', $doc->document_type)) }}</p>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Rejection reason --}}
+                        @if($user->kyc_status === 'rejected' && $user->kyc_rejected_reason)
+                            <div class="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                                <p class="text-xs font-medium text-red-700">Rejection Reason</p>
+                                <p class="text-sm text-red-600 mt-1">{{ $user->kyc_rejected_reason }}</p>
+                            </div>
+                        @endif
+                    @else
+                        <div class="text-center py-6">
+                            <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <p class="text-sm text-gray-500">KYC not submitted yet</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
             {{-- SIP Account Ranges (Reseller only) --}}
             @if($user->role === 'reseller')
             <div class="detail-card">
@@ -521,58 +727,56 @@
             </div>
             @endif
 
+        </div>
+
+        {{-- Right Column --}}
+        <div class="space-y-6">
             {{-- SIP Accounts --}}
             <div class="detail-card">
                 <div class="detail-card-header flex items-center justify-between">
                     <h3 class="detail-card-title">SIP Accounts</h3>
-                    <span class="badge badge-gray">{{ $user->sipAccounts->count() }} accounts</span>
+                    <span class="badge badge-gray">{{ $user->sipAccounts->count() }}</span>
                 </div>
                 @if($user->sipAccounts->isEmpty())
-                    <div class="p-8 text-center">
-                        <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="p-6 text-center">
+                        <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                         </svg>
-                        <p class="text-gray-500">No SIP accounts yet</p>
+                        <p class="text-sm text-gray-500">No SIP accounts</p>
                     </div>
                 @else
                     <div class="divide-y divide-gray-100">
                         @foreach($user->sipAccounts->take(5) as $sip)
-                            <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                                        <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="px-4 py-2.5 flex items-center justify-between hover:bg-gray-50">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                        <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                                         </svg>
                                     </div>
                                     <div>
-                                        <a href="{{ route('admin.sip-accounts.show', $sip) }}" class="font-medium text-gray-900 hover:text-indigo-600">{{ $sip->username }}</a>
-                                        <p class="text-xs text-gray-500">{{ $sip->caller_id_number ?? 'No Caller ID' }}</p>
+                                        <a href="{{ route('admin.sip-accounts.show', $sip) }}" class="text-sm font-medium text-gray-900 hover:text-indigo-600">{{ $sip->username }}</a>
+                                        <p class="text-xs text-gray-400">{{ $sip->caller_id_number ?? 'No Caller ID' }}</p>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-3">
-                                    <span class="badge badge-gray">{{ ucfirst($sip->auth_type) }}</span>
-                                    @if($sip->status === 'active')
-                                        <span class="badge badge-success">Active</span>
-                                    @else
-                                        <span class="badge badge-warning">{{ ucfirst($sip->status) }}</span>
-                                    @endif
-                                </div>
+                                @if($sip->status === 'active')
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500" title="Active"></span>
+                                @else
+                                    <span class="w-2 h-2 rounded-full bg-gray-300" title="{{ ucfirst($sip->status) }}"></span>
+                                @endif
                             </div>
                         @endforeach
                     </div>
                     @if($user->sipAccounts->count() > 5)
-                        <div class="px-5 py-3 bg-gray-50 text-center">
-                            <a href="{{ route('admin.sip-accounts.index', ['user_id' => $user->id]) }}" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
-                                View all {{ $user->sipAccounts->count() }} SIP accounts →
+                        <div class="px-4 py-2.5 bg-gray-50 text-center border-t border-gray-100">
+                            <a href="{{ route('admin.sip-accounts.index', ['user_id' => $user->id]) }}" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                                View all {{ $user->sipAccounts->count() }} accounts →
                             </a>
                         </div>
                     @endif
                 @endif
             </div>
-        </div>
 
-        {{-- Right Column --}}
-        <div class="space-y-6">
             {{-- Quick Actions --}}
             <div class="detail-card">
                 <div class="detail-card-header">

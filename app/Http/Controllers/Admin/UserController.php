@@ -45,8 +45,18 @@ class UserController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('company_name', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
             });
+        }
+
+        if ($request->filled('billing_type')) {
+            $query->where('billing_type', $request->billing_type);
+        }
+
+        if ($request->filled('rate_group_id')) {
+            $query->where('rate_group_id', $request->rate_group_id);
         }
 
         $users = $query->orderBy('created_at', 'desc')->paginate(20);
@@ -62,7 +72,9 @@ class UserController extends Controller
             $resellers = collect();
         }
 
-        return view('admin.users.index', compact('users', 'resellers'));
+        $rateGroups = RateGroup::where('type', 'admin')->orderBy('name')->get(['id', 'name']);
+
+        return view('admin.users.index', compact('users', 'resellers', 'rateGroups'));
     }
 
     public function create()
@@ -95,6 +107,18 @@ class UserController extends Controller
             'balance' => ['nullable', 'numeric', 'min:0'],
             'credit_limit' => ['nullable', 'numeric', 'min:0'],
             'max_channels' => ['nullable', 'integer', 'min:1'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'alt_phone' => ['nullable', 'string', 'max:20'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'zip_code' => ['nullable', 'string', 'max:20'],
+            'company_name' => ['nullable', 'string', 'max:200'],
+            'contact_email' => ['nullable', 'email', 'max:255'],
+            'company_website' => ['nullable', 'string', 'max:255'],
+            'company_email' => ['nullable', 'email', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
         // For non-super admins (Regular Admin): enforce scoping rules
@@ -133,6 +157,18 @@ class UserController extends Controller
             'max_channels' => $validated['max_channels'] ?? 10,
             'sip_ranges' => $this->parseSipRanges($request->input('sip_ranges')),
             'status' => 'active',
+            'phone' => $validated['phone'] ?? null,
+            'alt_phone' => $validated['alt_phone'] ?? null,
+            'contact_email' => $validated['contact_email'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'city' => $validated['city'] ?? null,
+            'state' => $validated['state'] ?? null,
+            'country' => $validated['country'] ?? null,
+            'zip_code' => $validated['zip_code'] ?? null,
+            'company_name' => $validated['company_name'] ?? null,
+            'company_email' => $validated['company_email'] ?? null,
+            'company_website' => $validated['company_website'] ?? null,
+            'notes' => $validated['notes'] ?? null,
         ]);
 
         $user->assignRole($validated['role']);
@@ -154,7 +190,7 @@ class UserController extends Controller
         // Check authorization for non-super admins
         abort_unless(auth()->user()->canManage($user), 403);
 
-        $user->load('parent', 'rateGroup', 'children', 'sipAccounts', 'kycProfile', 'dids');
+        $user->load('parent', 'rateGroup', 'children', 'sipAccounts', 'kycProfile.documents', 'kycProfile.reviewer', 'dids');
 
         // Get last 15 transactions for balance history
         $recentTransactions = Transaction::where('user_id', $user->id)
@@ -327,6 +363,16 @@ class UserController extends Controller
             'max_channels' => ['nullable', 'integer', 'min:1'],
             'daily_spend_limit' => ['nullable', 'numeric', 'min:0'],
             'daily_call_limit' => ['nullable', 'integer', 'min:0'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'alt_phone' => ['nullable', 'string', 'max:20'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'zip_code' => ['nullable', 'string', 'max:20'],
+            'company_name' => ['nullable', 'string', 'max:200'],
+            'company_website' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $original = $user->getAttributes();
@@ -342,6 +388,18 @@ class UserController extends Controller
             'sip_ranges' => $this->parseSipRanges($request->input('sip_ranges')),
             'daily_spend_limit' => $validated['daily_spend_limit'],
             'daily_call_limit' => $validated['daily_call_limit'],
+            'phone' => $validated['phone'],
+            'alt_phone' => $validated['alt_phone'],
+            'contact_email' => $validated['contact_email'],
+            'address' => $validated['address'],
+            'city' => $validated['city'],
+            'state' => $validated['state'],
+            'country' => $validated['country'],
+            'zip_code' => $validated['zip_code'],
+            'company_name' => $validated['company_name'],
+            'company_email' => $validated['company_email'],
+            'company_website' => $validated['company_website'],
+            'notes' => $validated['notes'],
         ]);
 
         if (! empty($validated['password'])) {

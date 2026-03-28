@@ -29,6 +29,8 @@ class User extends Authenticatable
         'destination_whitelist_enabled',
         'two_fa_enabled', 'two_fa_secret', 'two_fa_recovery_codes', 'two_fa_confirmed_at',
         'otp_code', 'otp_expires_at',
+        'phone', 'alt_phone', 'contact_email', 'address', 'city', 'state', 'country', 'zip_code',
+        'company_name', 'company_email', 'company_website', 'notes',
     ];
 
     protected $hidden = [

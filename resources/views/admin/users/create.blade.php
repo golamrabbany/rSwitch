@@ -45,11 +45,11 @@
             {{-- Main Form (2/3) --}}
             <div class="lg:col-span-2 space-y-6">
 
-                {{-- Account Details --}}
+                {{-- Login Information --}}
                 <div class="form-card">
                     <div class="form-card-header">
-                        <h3 class="form-card-title">Account Details</h3>
-                        <p class="form-card-subtitle">Login credentials and account type</p>
+                        <h3 class="form-card-title">Login Information</h3>
+                        <p class="form-card-subtitle">Credentials and account type</p>
                     </div>
                     <div class="form-card-body">
                         @unless($roleParam)
@@ -110,9 +110,9 @@
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Email Address</label>
+                                <label class="form-label">Username / Email</label>
                                 <input type="email" name="email" value="{{ old('email') }}" required class="form-input" placeholder="Enter email address">
-                                <p class="form-hint">Used for login and notifications</p>
+                                <p class="form-hint">Used as login username and for notifications</p>
                                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
                             </div>
                             <div class="form-group">
@@ -124,71 +124,13 @@
                             <div class="form-group">
                                 <label class="form-label">Confirm Password</label>
                                 <input type="password" name="password_confirmation" required class="form-input" placeholder="Confirm password">
-                                <p class="form-hint">Must match password</p>
+                                <p class="form-hint">Re-enter password to confirm</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {{-- Billing & Limits --}}
-                <div class="form-card">
-                    <div class="form-card-header">
-                        <h3 class="form-card-title">Billing & Limits</h3>
-                        <p class="form-card-subtitle">Rate plan, balance and usage limits</p>
-                    </div>
-                    <div class="form-card-body">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="form-group">
-                                <label class="form-label">Billing Type</label>
-                                <select name="billing_type" required class="form-input">
-                                    <option value="prepaid" {{ old('billing_type') === 'prepaid' ? 'selected' : '' }}>Prepaid</option>
-                                    <option value="postpaid" {{ old('billing_type') === 'postpaid' ? 'selected' : '' }}>Postpaid</option>
-                                </select>
-                                <p class="form-hint">Prepaid deducts in real-time</p>
-                                <x-input-error :messages="$errors->get('billing_type')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Rate Group</label>
-                                <select name="rate_group_id" class="form-input">
-                                    <option value="">Select Rate Group</option>
-                                    @foreach ($rateGroups as $rateGroup)
-                                        <option value="{{ $rateGroup->id }}" {{ old('rate_group_id') == $rateGroup->id ? 'selected' : '' }}>
-                                            {{ $rateGroup->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <p class="form-hint">Defines call pricing</p>
-                                <x-input-error :messages="$errors->get('rate_group_id')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Initial Balance</label>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
-                                    <input type="number" name="balance" value="{{ old('balance', '0') }}" step="0.01" min="0" class="form-input pl-8">
-                                </div>
-                                <p class="form-hint">Starting account balance</p>
-                                <x-input-error :messages="$errors->get('balance')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Credit Limit</label>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
-                                    <input type="number" name="credit_limit" value="{{ old('credit_limit', '0') }}" step="0.01" min="0" class="form-input pl-8">
-                                </div>
-                                <p class="form-hint">For postpaid accounts only</p>
-                                <x-input-error :messages="$errors->get('credit_limit')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Max Channels</label>
-                                <input type="number" name="max_channels" value="{{ old('max_channels', '10') }}" min="1" class="form-input" placeholder="10">
-                                <p class="form-hint">Maximum concurrent calls</p>
-                                <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- SIP Ranges (Reseller only) --}}
+                {{-- SIP Account Ranges (Reseller only) --}}
                 @php $sipPrefix = \App\Models\SystemSetting::get('sip_pin_prefix', ''); @endphp
                 <div class="form-card" x-show="role === 'reseller'" x-cloak x-data="{ ranges: [{ start: '', end: '' }] }">
                     <div class="form-card-header">
@@ -228,7 +170,165 @@
                                 </button>
                             </div>
                         </template>
-                        <p class="text-xs text-gray-400">Leave empty to allow any PIN. Start and end must be valid numbers. Reseller can only create SIP accounts within these ranges.</p>
+                        <p class="text-xs text-gray-400">Leave empty to allow any PIN. Reseller can only create SIP accounts within these ranges.</p>
+                    </div>
+                </div>
+
+                {{-- Billing Info --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Billing Info</h3>
+                        <p class="form-card-subtitle">Rate plan, balance and usage limits</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Billing Type</label>
+                                <select name="billing_type" required class="form-input">
+                                    <option value="prepaid" {{ old('billing_type') === 'prepaid' ? 'selected' : '' }}>Prepaid</option>
+                                    <option value="postpaid" {{ old('billing_type') === 'postpaid' ? 'selected' : '' }}>Postpaid</option>
+                                </select>
+                                <p class="form-hint">Prepaid deducts in real-time</p>
+                                <x-input-error :messages="$errors->get('billing_type')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Rate Group</label>
+                                <select name="rate_group_id" class="form-input">
+                                    <option value="">Select Rate Group</option>
+                                    @foreach ($rateGroups as $rateGroup)
+                                        <option value="{{ $rateGroup->id }}" {{ old('rate_group_id') == $rateGroup->id ? 'selected' : '' }}>{{ $rateGroup->name }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="form-hint">Defines call pricing</p>
+                                <x-input-error :messages="$errors->get('rate_group_id')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Initial Balance</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
+                                    <input type="number" name="balance" value="{{ old('balance', '0') }}" step="0.01" min="0" class="form-input pl-8">
+                                </div>
+                                <p class="form-hint">Starting account balance</p>
+                                <x-input-error :messages="$errors->get('balance')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Credit Limit</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
+                                    <input type="number" name="credit_limit" value="{{ old('credit_limit', '0') }}" step="0.01" min="0" class="form-input pl-8">
+                                </div>
+                                <p class="form-hint">For postpaid accounts only</p>
+                                <x-input-error :messages="$errors->get('credit_limit')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Max Channels</label>
+                                <input type="number" name="max_channels" value="{{ old('max_channels', '10') }}" min="1" class="form-input" placeholder="10">
+                                <p class="form-hint">Maximum concurrent calls</p>
+                                <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Contact --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Contact</h3>
+                        <p class="form-card-subtitle">Phone numbers and address</p>
+                    </div>
+                    <div class="form-card-body space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Contact Email</label>
+                                <input type="email" name="contact_email" value="{{ old('contact_email') }}" class="form-input" placeholder="contact@example.com">
+                                <p class="form-hint">Separate from login email, for correspondence</p>
+                                <x-input-error :messages="$errors->get('contact_email')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Phone</label>
+                                <input type="text" name="phone" value="{{ old('phone') }}" class="form-input" placeholder="e.g. +8801712345678">
+                                <p class="form-hint">Primary contact number with country code</p>
+                                <x-input-error :messages="$errors->get('phone')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Alternative Phone</label>
+                                <input type="text" name="alt_phone" value="{{ old('alt_phone') }}" class="form-input" placeholder="Optional">
+                                <p class="form-hint">Secondary or mobile number</p>
+                                <x-input-error :messages="$errors->get('alt_phone')" class="mt-2" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Address</label>
+                                <input type="text" name="address" value="{{ old('address') }}" class="form-input" placeholder="Street address">
+                                <p class="form-hint">Street address, building, floor</p>
+                                <x-input-error :messages="$errors->get('address')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">City</label>
+                                <input type="text" name="city" value="{{ old('city') }}" class="form-input" placeholder="City">
+                                <p class="form-hint">City or district</p>
+                                <x-input-error :messages="$errors->get('city')" class="mt-2" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">State</label>
+                                <input type="text" name="state" value="{{ old('state') }}" class="form-input" placeholder="State / Division">
+                                <p class="form-hint">State, province or division</p>
+                                <x-input-error :messages="$errors->get('state')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Country</label>
+                                <input type="text" name="country" value="{{ old('country') }}" class="form-input" placeholder="Country">
+                                <p class="form-hint">Full country name</p>
+                                <x-input-error :messages="$errors->get('country')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Zip Code</label>
+                                <input type="text" name="zip_code" value="{{ old('zip_code') }}" class="form-input" placeholder="Zip / Postal">
+                                <p class="form-hint">Postal or zip code</p>
+                                <x-input-error :messages="$errors->get('zip_code')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Company Details --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Company Details</h3>
+                        <p class="form-card-subtitle">Business information (optional)</p>
+                    </div>
+                    <div class="form-card-body space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Company Name</label>
+                                <input type="text" name="company_name" value="{{ old('company_name') }}" class="form-input" placeholder="e.g. ABC Telecom Ltd">
+                                <p class="form-hint">Registered business or trading name</p>
+                                <x-input-error :messages="$errors->get('company_name')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Company Email</label>
+                                <input type="email" name="company_email" value="{{ old('company_email') }}" class="form-input" placeholder="info@company.com">
+                                <p class="form-hint">Official business email address</p>
+                                <x-input-error :messages="$errors->get('company_email')" class="mt-2" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Website</label>
+                                <input type="text" name="company_website" value="{{ old('company_website') }}" class="form-input" placeholder="e.g. https://example.com">
+                                <p class="form-hint">Company website URL</p>
+                                <x-input-error :messages="$errors->get('company_website')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Notes</label>
+                                <input type="text" name="notes" value="{{ old('notes') }}" class="form-input" placeholder="Internal notes...">
+                                <p class="form-hint">Internal remarks, not visible to user</p>
+                                <x-input-error :messages="$errors->get('notes')" class="mt-2" />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -246,7 +346,6 @@
 
             {{-- Sidebar (1/3) --}}
             <div class="space-y-6">
-                {{-- Quick Info --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
                         <h3 class="detail-card-title">Quick Info</h3>
@@ -271,7 +370,7 @@
                             </div>
                             <div class="flex items-center gap-2 text-gray-600">
                                 <svg class="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                <span>KYC submission required</span>
+                                <span>Email is used as login username</span>
                             </div>
                             <div class="flex items-center gap-2 text-gray-600">
                                 <svg class="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -281,7 +380,6 @@
                     </div>
                 </div>
 
-                {{-- Account Types --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
                         <h3 class="detail-card-title">Account Types</h3>
@@ -289,7 +387,7 @@
                     <div class="detail-card-body space-y-4">
                         <div>
                             <span class="badge badge-purple">Reseller</span>
-                            <p class="text-xs text-gray-500 mt-1">Can manage their own clients, set rates, and resell services.</p>
+                            <p class="text-xs text-gray-500 mt-1">Manages clients, sets rates, resells services. Gets SIP ranges.</p>
                         </div>
                         <div>
                             <span class="badge badge-blue">Client</span>
@@ -298,18 +396,30 @@
                     </div>
                 </div>
 
-                {{-- Tips --}}
-                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <div class="flex items-start gap-3">
-                        <svg class="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                        <div>
-                            <p class="text-sm font-medium text-amber-800">Important</p>
-                            <ul class="text-xs text-amber-700 mt-1 space-y-1">
-                                <li>Clients must have a parent reseller</li>
-                                <li>KYC must be approved for full access</li>
-                            </ul>
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Form Sections</h3>
+                    </div>
+                    <div class="detail-card-body text-xs text-gray-500 space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span><strong>Login Info</strong> — email as username + password</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span><strong>SIP Ranges</strong> — reseller only, number allocation</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span><strong>Billing</strong> — rate plan, balance, limits</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span><strong>Contact</strong> — phone, address</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0"></span>
+                            <span><strong>Company</strong> — business info (optional)</span>
                         </div>
                     </div>
                 </div>

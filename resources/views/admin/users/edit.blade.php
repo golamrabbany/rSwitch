@@ -14,7 +14,6 @@
 <x-admin-layout>
     <x-slot name="header">{{ $pageTitle }}</x-slot>
 
-    {{-- Page Header --}}
     <div class="page-header-row">
         <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
@@ -42,14 +41,13 @@
         @method('PUT')
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {{-- Main Form (2/3) --}}
             <div class="lg:col-span-2 space-y-6">
 
-                {{-- Account Details --}}
+                {{-- Login Information --}}
                 <div class="form-card">
                     <div class="form-card-header">
-                        <h3 class="form-card-title">Account Details</h3>
-                        <p class="form-card-subtitle">Basic account information</p>
+                        <h3 class="form-card-title">Login Information</h3>
+                        <p class="form-card-subtitle">Credentials and account status</p>
                     </div>
                     <div class="form-card-body">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -60,9 +58,9 @@
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Email Address</label>
+                                <label class="form-label">Username / Email</label>
                                 <input type="email" name="email" value="{{ old('email', $user->email) }}" required class="form-input" placeholder="Enter email address">
-                                <p class="form-hint">Used for login and notifications</p>
+                                <p class="form-hint">Used as login username</p>
                                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
                             </div>
                         </div>
@@ -76,100 +74,23 @@
                             <p class="form-hint">Disabled accounts cannot make calls or login</p>
                             <x-input-error :messages="$errors->get('status')" class="mt-2" />
                         </div>
-                    </div>
-                </div>
-
-                {{-- Security --}}
-                <div class="form-card">
-                    <div class="form-card-header">
-                        <h3 class="form-card-title">Security</h3>
-                        <p class="form-card-subtitle">Update account password</p>
-                    </div>
-                    <div class="form-card-body">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
                                 <label class="form-label">New Password</label>
-                                <input type="password" name="password" class="form-input" placeholder="Enter new password">
-                                <p class="form-hint">Leave blank to keep current</p>
+                                <input type="password" name="password" class="form-input" placeholder="Leave blank to keep current">
+                                <p class="form-hint">Minimum 8 characters</p>
                                 <x-input-error :messages="$errors->get('password')" class="mt-2" />
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Confirm Password</label>
                                 <input type="password" name="password_confirmation" class="form-input" placeholder="Confirm new password">
-                                <p class="form-hint">Must match new password</p>
+                                <p class="form-hint">Re-enter to confirm new password</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {{-- Billing & Limits --}}
-                <div class="form-card">
-                    <div class="form-card-header">
-                        <h3 class="form-card-title">Billing & Limits</h3>
-                        <p class="form-card-subtitle">Rate plan, balance and usage limits</p>
-                    </div>
-                    <div class="form-card-body">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="form-group">
-                                <label class="form-label">Billing Type</label>
-                                <select name="billing_type" required class="form-input">
-                                    <option value="prepaid" {{ old('billing_type', $user->billing_type) === 'prepaid' ? 'selected' : '' }}>Prepaid</option>
-                                    <option value="postpaid" {{ old('billing_type', $user->billing_type) === 'postpaid' ? 'selected' : '' }}>Postpaid</option>
-                                </select>
-                                <p class="form-hint">Prepaid deducts in real-time</p>
-                                <x-input-error :messages="$errors->get('billing_type')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Rate Group</label>
-                                <select name="rate_group_id" class="form-input">
-                                    <option value="">Select Rate Group</option>
-                                    @foreach ($rateGroups as $rateGroup)
-                                        <option value="{{ $rateGroup->id }}" {{ old('rate_group_id', $user->rate_group_id) == $rateGroup->id ? 'selected' : '' }}>
-                                            {{ $rateGroup->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <p class="form-hint">Defines call pricing</p>
-                                <x-input-error :messages="$errors->get('rate_group_id')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Balance</label>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
-                                    <input type="number" name="balance" value="{{ old('balance', $user->balance) }}" step="0.01" class="form-input pl-8">
-                                </div>
-                                <p class="form-hint">Current account balance</p>
-                                <x-input-error :messages="$errors->get('balance')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Credit Limit</label>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
-                                    <input type="number" name="credit_limit" value="{{ old('credit_limit', $user->credit_limit) }}" step="0.01" min="0" class="form-input pl-8">
-                                </div>
-                                <p class="form-hint">For postpaid accounts only</p>
-                                <x-input-error :messages="$errors->get('credit_limit')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Max Channels</label>
-                                <input type="number" name="max_channels" value="{{ old('max_channels', $user->max_channels) }}" min="1" class="form-input">
-                                <p class="form-hint">Maximum concurrent calls</p>
-                                <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Daily Spend Limit</label>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
-                                    <input type="number" name="daily_spend_limit" value="{{ old('daily_spend_limit', $user->daily_spend_limit) }}" step="0.01" min="0" class="form-input pl-8">
-                                </div>
-                                <p class="form-hint">Empty = unlimited</p>
-                                <x-input-error :messages="$errors->get('daily_spend_limit')" class="mt-2" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- SIP Ranges (Reseller only) --}}
+                {{-- SIP Account Ranges (Reseller only) --}}
                 @if($user->role === 'reseller')
                 @php
                     $sipPrefix = \App\Models\SystemSetting::get('sip_pin_prefix', '');
@@ -180,7 +101,7 @@
                         <div class="flex items-center justify-between w-full">
                             <div>
                                 <h3 class="form-card-title">SIP Account Ranges</h3>
-                                <p class="form-card-subtitle">Allowed number ranges for this reseller's SIP accounts</p>
+                                <p class="form-card-subtitle">Allowed number ranges for SIP accounts</p>
                             </div>
                             <button type="button" @click="ranges.push({ start: '', end: '' })" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
                                 <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -213,10 +134,179 @@
                                 </button>
                             </div>
                         </template>
-                        <p class="text-xs text-gray-400">Leave empty to allow any PIN. Start and end must be valid numbers.</p>
+                        <p class="text-xs text-gray-400">Leave empty to allow any PIN.</p>
                     </div>
                 </div>
                 @endif
+
+                {{-- Billing Info --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Billing Info</h3>
+                        <p class="form-card-subtitle">Rate plan, balance and usage limits</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Billing Type</label>
+                                <select name="billing_type" required class="form-input">
+                                    <option value="prepaid" {{ old('billing_type', $user->billing_type) === 'prepaid' ? 'selected' : '' }}>Prepaid</option>
+                                    <option value="postpaid" {{ old('billing_type', $user->billing_type) === 'postpaid' ? 'selected' : '' }}>Postpaid</option>
+                                </select>
+                                <p class="form-hint">Prepaid deducts in real-time, postpaid uses credit</p>
+                                <x-input-error :messages="$errors->get('billing_type')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Rate Group</label>
+                                <select name="rate_group_id" class="form-input">
+                                    <option value="">Select Rate Group</option>
+                                    @foreach ($rateGroups as $rateGroup)
+                                        <option value="{{ $rateGroup->id }}" {{ old('rate_group_id', $user->rate_group_id) == $rateGroup->id ? 'selected' : '' }}>{{ $rateGroup->name }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="form-hint">Defines per-minute call pricing</p>
+                                <x-input-error :messages="$errors->get('rate_group_id')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Balance</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
+                                    <input type="number" name="balance" value="{{ old('balance', $user->balance) }}" step="0.01" class="form-input pl-8">
+                                </div>
+                                <p class="form-hint">Current account balance (use Adjust Balance for tracked changes)</p>
+                                <x-input-error :messages="$errors->get('balance')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Credit Limit</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
+                                    <input type="number" name="credit_limit" value="{{ old('credit_limit', $user->credit_limit) }}" step="0.01" min="0" class="form-input pl-8">
+                                </div>
+                                <p class="form-hint">Maximum negative balance allowed for postpaid</p>
+                                <x-input-error :messages="$errors->get('credit_limit')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Max Channels</label>
+                                <input type="number" name="max_channels" value="{{ old('max_channels', $user->max_channels) }}" min="1" class="form-input">
+                                <p class="form-hint">Maximum simultaneous calls allowed</p>
+                                <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Daily Spend Limit</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
+                                    <input type="number" name="daily_spend_limit" value="{{ old('daily_spend_limit', $user->daily_spend_limit) }}" step="0.01" min="0" class="form-input pl-8">
+                                </div>
+                                <p class="form-hint">Empty = unlimited</p>
+                                <x-input-error :messages="$errors->get('daily_spend_limit')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Daily Call Limit</label>
+                                <input type="number" name="daily_call_limit" value="{{ old('daily_call_limit', $user->daily_call_limit) }}" min="0" class="form-input">
+                                <p class="form-hint">Empty = unlimited</p>
+                                <x-input-error :messages="$errors->get('daily_call_limit')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Contact --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Contact</h3>
+                        <p class="form-card-subtitle">Phone numbers and address</p>
+                    </div>
+                    <div class="form-card-body space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Contact Email</label>
+                                <input type="email" name="contact_email" value="{{ old('contact_email', $user->contact_email) }}" class="form-input" placeholder="contact@example.com">
+                                <p class="form-hint">Separate from login email, for correspondence</p>
+                                <x-input-error :messages="$errors->get('contact_email')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Phone</label>
+                                <input type="text" name="phone" value="{{ old('phone', $user->phone) }}" class="form-input" placeholder="e.g. +8801712345678">
+                                <p class="form-hint">Primary contact number with country code</p>
+                                <x-input-error :messages="$errors->get('phone')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Alternative Phone</label>
+                                <input type="text" name="alt_phone" value="{{ old('alt_phone', $user->alt_phone) }}" class="form-input" placeholder="Optional">
+                                <p class="form-hint">Secondary or mobile number</p>
+                                <x-input-error :messages="$errors->get('alt_phone')" class="mt-2" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Address</label>
+                                <input type="text" name="address" value="{{ old('address', $user->address) }}" class="form-input" placeholder="Street address">
+                                <p class="form-hint">Street address, building, floor</p>
+                                <x-input-error :messages="$errors->get('address')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">City</label>
+                                <input type="text" name="city" value="{{ old('city', $user->city) }}" class="form-input" placeholder="City">
+                                <p class="form-hint">City or district</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">State</label>
+                                <input type="text" name="state" value="{{ old('state', $user->state) }}" class="form-input" placeholder="State / Division">
+                                <p class="form-hint">State, province or division</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Country</label>
+                                <input type="text" name="country" value="{{ old('country', $user->country) }}" class="form-input" placeholder="Country">
+                                <p class="form-hint">Full country name</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Zip Code</label>
+                                <input type="text" name="zip_code" value="{{ old('zip_code', $user->zip_code) }}" class="form-input" placeholder="Zip / Postal">
+                                <p class="form-hint">Postal or zip code</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Company Details --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Company Details</h3>
+                        <p class="form-card-subtitle">Business information (optional)</p>
+                    </div>
+                    <div class="form-card-body space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Company Name</label>
+                                <input type="text" name="company_name" value="{{ old('company_name', $user->company_name) }}" class="form-input" placeholder="e.g. ABC Telecom Ltd">
+                                <p class="form-hint">Registered business or trading name</p>
+                                <x-input-error :messages="$errors->get('company_name')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Company Email</label>
+                                <input type="email" name="company_email" value="{{ old('company_email', $user->company_email) }}" class="form-input" placeholder="info@company.com">
+                                <p class="form-hint">Official business email address</p>
+                                <x-input-error :messages="$errors->get('company_email')" class="mt-2" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Website</label>
+                                <input type="text" name="company_website" value="{{ old('company_website', $user->company_website) }}" class="form-input" placeholder="e.g. https://example.com">
+                                <p class="form-hint">Company website URL</p>
+                                <x-input-error :messages="$errors->get('company_website')" class="mt-2" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Notes</label>
+                                <input type="text" name="notes" value="{{ old('notes', $user->notes) }}" class="form-input" placeholder="Internal notes...">
+                                <p class="form-hint">Internal remarks, not visible to user</p>
+                                <x-input-error :messages="$errors->get('notes')" class="mt-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 {{-- Form Actions --}}
                 <div class="flex items-center justify-end gap-3">
@@ -230,9 +320,8 @@
                 </div>
             </div>
 
-            {{-- Sidebar (1/3) --}}
+            {{-- Sidebar --}}
             <div class="space-y-6">
-                {{-- Account Info --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
                         <h3 class="detail-card-title">Account Info</h3>
@@ -256,10 +345,6 @@
                                 @endswitch
                             </div>
                             <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-500">2FA</span>
-                                <span class="badge {{ $user->two_fa_enabled ? 'badge-success' : 'badge-gray' }}">{{ $user->two_fa_enabled ? 'Enabled' : 'Disabled' }}</span>
-                            </div>
-                            <div class="flex items-center justify-between">
                                 <span class="text-sm text-gray-500">Created</span>
                                 <span class="text-sm text-gray-900">{{ $user->created_at->format('M d, Y') }}</span>
                             </div>
@@ -273,7 +358,6 @@
                     </div>
                 </div>
 
-                {{-- Activity --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
                         <h3 class="detail-card-title">Activity</h3>
@@ -298,7 +382,6 @@
                     </div>
                 </div>
 
-                {{-- Quick Links --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
                         <h3 class="detail-card-title">Quick Links</h3>
@@ -322,23 +405,6 @@
                             </div>
                             <span class="text-sm text-gray-700 group-hover:text-gray-900">Call Records</span>
                         </a>
-                    </div>
-                </div>
-
-                {{-- Warning --}}
-                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <div class="flex items-start gap-3">
-                        <svg class="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                        <div>
-                            <p class="text-sm font-medium text-amber-800">Important</p>
-                            <ul class="text-xs text-amber-700 mt-1 space-y-1">
-                                <li>Disabling blocks all calls</li>
-                                <li>Balance changes bypass audit trail</li>
-                                <li>Use profile page for tracked adjustments</li>
-                            </ul>
-                        </div>
                     </div>
                 </div>
             </div>
