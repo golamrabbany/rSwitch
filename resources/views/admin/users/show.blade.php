@@ -382,7 +382,7 @@
                 <div class="detail-card-body">
                     <div class="detail-grid">
                         <div class="detail-item">
-                            <span class="detail-label">Full Name</span>
+                            <span class="detail-label">Account Name</span>
                             <span class="detail-value">{{ $user->name }}</span>
                         </div>
                         <div class="detail-item">
@@ -600,7 +600,7 @@
                                 <span class="detail-value">{{ ucfirst($kyc->account_type ?? '—') }}</span>
                             </div>
                             <div class="detail-item">
-                                <span class="detail-label">Full Name</span>
+                                <span class="detail-label">Account Name</span>
                                 <span class="detail-value">{{ $kyc->full_name ?? '—' }}</span>
                             </div>
                             @if($kyc->contact_person)

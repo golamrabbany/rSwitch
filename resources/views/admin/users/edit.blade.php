@@ -52,9 +52,9 @@
                     <div class="form-card-body">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
-                                <label class="form-label">Full Name</label>
+                                <label class="form-label">Account Name</label>
                                 <input type="text" name="name" value="{{ old('name', $user->name) }}" required class="form-input" placeholder="Enter full name">
-                                <p class="form-hint">Legal name or company name</p>
+                                <p class="form-hint">Display name for this account</p>
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
                             <div class="form-group">
