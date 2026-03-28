@@ -129,9 +129,9 @@ class SipAccountController extends Controller
             }
         }
 
-        // Auto-set caller_id_number to username, max_channels to 1
+        // Auto-set caller_id_number to username, max_channels to system default
         $validated['caller_id_number'] = $validated['caller_id_number'] ?: $validated['username'];
-        $validated['max_channels'] = $validated['max_channels'] ?: 1;
+        $validated['max_channels'] = $validated['max_channels'] ?: (int) \App\Models\SystemSetting::get('default_max_channels', 10);
 
         // Channel pool check — SIP channels cannot exceed client's max_channels
         $clientMaxChannels = $client->max_channels;

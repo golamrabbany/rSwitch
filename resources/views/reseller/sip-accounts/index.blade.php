@@ -276,7 +276,7 @@
 
                             {{-- Hidden: Caller ID Number = username, Max Channels = 1 --}}
                             <input type="hidden" name="caller_id_number" :value="form.caller_id_number">
-                            <input type="hidden" name="max_channels" value="1">
+                            <input type="hidden" name="max_channels" value="{{ \App\Models\SystemSetting::get('default_max_channels', 10) }}">
 
                             {{-- Caller ID Name + Codec --}}
                             <div class="grid grid-cols-2 gap-4">
@@ -402,7 +402,7 @@ function sipPage() {
             password: '{{ \Illuminate\Support\Str::random(16) }}',
             caller_id_name: '',
             caller_id_number: '',
-            max_channels: '5',
+            max_channels: '{{ \App\Models\SystemSetting::get('default_max_channels', 10) }}',
             codec_allow: 'ulaw',
             status: 'active',
         },
@@ -416,7 +416,7 @@ function sipPage() {
                 password: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-4),
                 caller_id_name: '',
                 caller_id_number: '',
-                max_channels: '5',
+                max_channels: '{{ \App\Models\SystemSetting::get('default_max_channels', 10) }}',
                 codec_allow: 'ulaw',
                 status: 'active',
             };

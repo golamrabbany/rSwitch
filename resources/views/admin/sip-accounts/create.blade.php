@@ -180,7 +180,7 @@
 
                             <div class="form-group" :style="kycError ? 'opacity: 0.4; pointer-events: none;' : ''">
                                 <label for="max_channels" class="form-label">Max Channels</label>
-                                <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', '2') }}" required min="1" max="100" class="form-input">
+                                <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', \App\Models\SystemSetting::get('default_max_channels', 10)) }}" required min="1" max="100" class="form-input">
                                 <p class="form-hint">Concurrent call limit (1-100)</p>
                                 <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                             </div>

@@ -80,7 +80,7 @@
                 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
                         <label for="max_channels" class="block text-sm font-medium text-gray-700">Max Channels</label>
-                        <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', '2') }}" required min="1" max="100"
+                        <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', \App\Models\SystemSetting::get('default_max_channels', 10)) }}" required min="1" max="100"
                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                     </div>
