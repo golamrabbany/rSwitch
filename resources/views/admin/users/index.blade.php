@@ -34,6 +34,28 @@
         </div>
     </div>
 
+    {{-- KYC Summary Tabs (Client list only) --}}
+    @if($roleFilter === 'client' && !empty($kycStats))
+        <div class="flex flex-wrap gap-2 mb-4">
+            <a href="{{ route('admin.users.index', ['role' => 'client']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ !request('kyc_status') ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                All <span class="font-bold">{{ $kycStats['total'] }}</span>
+            </a>
+            <a href="{{ route('admin.users.index', ['role' => 'client', 'kyc_status' => 'pending']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ request('kyc_status') === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                Pending <span class="font-bold">{{ $kycStats['pending'] }}</span>
+            </a>
+            <a href="{{ route('admin.users.index', ['role' => 'client', 'kyc_status' => 'approved']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ request('kyc_status') === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Approved <span class="font-bold">{{ $kycStats['approved'] }}</span>
+            </a>
+            <a href="{{ route('admin.users.index', ['role' => 'client', 'kyc_status' => 'rejected']) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors {{ request('kyc_status') === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                Rejected <span class="font-bold">{{ $kycStats['rejected'] }}</span>
+            </a>
+        </div>
+    @endif
+
     {{-- Section 2: Filter Card --}}
     <div class="filter-card mb-3">
         <form method="GET" class="filter-row">

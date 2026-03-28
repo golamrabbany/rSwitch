@@ -59,7 +59,26 @@ class UserController extends Controller
             $query->where('rate_group_id', $request->rate_group_id);
         }
 
+        if ($request->filled('kyc_status')) {
+            $query->where('kyc_status', $request->kyc_status);
+        }
+
         $users = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        // KYC stats for client list
+        $kycStats = [];
+        if ($request->role === 'client') {
+            $kycBase = User::where('role', 'client');
+            if (!$authUser->isSuperAdmin()) {
+                $kycBase->visibleTo($authUser);
+            }
+            $kycStats = [
+                'total' => (clone $kycBase)->count(),
+                'pending' => (clone $kycBase)->where('kyc_status', 'pending')->count(),
+                'approved' => (clone $kycBase)->where('kyc_status', 'approved')->count(),
+                'rejected' => (clone $kycBase)->where('kyc_status', 'rejected')->count(),
+            ];
+        }
 
         // Get resellers for the filter dropdown (scoped for non-super admins)
         if ($request->role === 'client') {
@@ -108,7 +127,7 @@ class UserController extends Controller
             }
         }
 
-        return view('admin.users.index', compact('users', 'resellers', 'rateGroups', 'kycDataJson'));
+        return view('admin.users.index', compact('users', 'resellers', 'rateGroups', 'kycDataJson', 'kycStats'));
     }
 
     public function create()
