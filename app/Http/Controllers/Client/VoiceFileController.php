@@ -9,13 +9,26 @@ use Illuminate\Http\Request;
 
 class VoiceFileController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $voiceFiles = VoiceFile::where('user_id', auth()->id())
-            ->orderByDesc('created_at')
-            ->paginate(20);
+        $query = VoiceFile::where('user_id', auth()->id());
 
-        return view('client.voice-files.index', compact('voiceFiles'));
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $voiceFiles = $query->orderByDesc('created_at')->paginate(20);
+
+        $baseQuery = VoiceFile::where('user_id', auth()->id());
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'draft' => (clone $baseQuery)->where('status', 'draft')->count(),
+            'pending' => (clone $baseQuery)->where('status', 'pending')->count(),
+            'approved' => (clone $baseQuery)->where('status', 'approved')->count(),
+            'rejected' => (clone $baseQuery)->where('status', 'rejected')->count(),
+        ];
+
+        return view('client.voice-files.index', compact('voiceFiles', 'stats'));
     }
 
     public function create()
@@ -36,8 +49,14 @@ class VoiceFileController extends Controller
             $request->name
         );
 
-        return redirect()->route('client.voice-files.show', $voiceFile)
-            ->with('success', 'Voice file uploaded. Pending admin approval.');
+        $status = $request->input('action') === 'draft' ? 'draft' : 'pending';
+        $voiceFile->update(['status' => $status]);
+
+        $msg = $status === 'draft'
+            ? 'Voice template saved as draft.'
+            : 'Voice template uploaded. Pending admin approval.';
+
+        return redirect()->route('client.voice-files.index')->with('success', $msg);
     }
 
     public function show(VoiceFile $voiceFile)

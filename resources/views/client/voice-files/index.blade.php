@@ -14,6 +14,37 @@
         </div>
     </div>
 
+    {{-- Smart Summary --}}
+    <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <a href="{{ route('client.voice-files.index') }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ !request('status') ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
+            All <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ !request('status') ? 'bg-indigo-100' : 'bg-gray-100' }}">{{ $stats['total'] }}</span>
+        </a>
+        @if($stats['draft'] > 0)
+        <a href="{{ route('client.voice-files.index', ['status' => 'draft']) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ request('status') === 'draft' ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
+            <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+            Draft <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ request('status') === 'draft' ? 'bg-gray-200' : 'bg-gray-100' }}">{{ $stats['draft'] }}</span>
+        </a>
+        @endif
+        @if($stats['pending'] > 0)
+        <a href="{{ route('client.voice-files.index', ['status' => 'pending']) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ request('status') === 'pending' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+            Pending <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ request('status') === 'pending' ? 'bg-amber-100' : 'bg-gray-100' }}">{{ $stats['pending'] }}</span>
+        </a>
+        @endif
+        @if($stats['approved'] > 0)
+        <a href="{{ route('client.voice-files.index', ['status' => 'approved']) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ request('status') === 'approved' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            Approved <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ request('status') === 'approved' ? 'bg-emerald-100' : 'bg-gray-100' }}">{{ $stats['approved'] }}</span>
+        </a>
+        @endif
+        @if($stats['rejected'] > 0)
+        <a href="{{ route('client.voice-files.index', ['status' => 'rejected']) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ request('status') === 'rejected' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
+            <span class="w-2 h-2 rounded-full bg-red-500"></span>
+            Rejected <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ request('status') === 'rejected' ? 'bg-red-100' : 'bg-gray-100' }}">{{ $stats['rejected'] }}</span>
+        </a>
+        @endif
+    </div>
+
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
         @if($voiceFiles->total() > 0)
             <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">

@@ -26,6 +26,7 @@ class SurveyTemplateController extends Controller
         $baseQuery = SurveyTemplate::where('client_id', auth()->id());
         $stats = [
             'total' => (clone $baseQuery)->count(),
+            'draft' => (clone $baseQuery)->where('status', 'draft')->count(),
             'pending' => (clone $baseQuery)->where('status', 'pending')->count(),
             'approved' => (clone $baseQuery)->where('status', 'approved')->count(),
             'rejected' => (clone $baseQuery)->where('status', 'rejected')->count(),

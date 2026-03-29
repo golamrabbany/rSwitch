@@ -22,7 +22,8 @@
     <form method="POST" action="{{ route('client.broadcasts.store') }}" enctype="multipart/form-data"
           x-data="{
               type: '{{ old('type', 'simple') }}',
-              phoneListType: '{{ old('phone_list_type', 'manual') }}'
+              phoneListType: '{{ old('phone_list_type', 'manual') }}',
+              scheduleType: '{{ old('schedule_type', 'now') }}'
           }">
         @csrf
 
@@ -104,6 +105,37 @@
                     </div>
                 </div>
 
+                {{-- Schedule --}}
+                <div class="form-card">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Schedule</h3>
+                        <p class="form-card-subtitle">When to start the broadcast</p>
+                    </div>
+                    <div class="form-card-body space-y-4">
+                        <div class="flex gap-3">
+                            <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors" :class="scheduleType === 'now' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
+                                <input type="radio" name="schedule_type" value="now" x-model="scheduleType" class="sr-only">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                <span class="text-sm font-medium">Start Manually</span>
+                            </label>
+                            <label class="flex-1 flex items-center justify-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors" :class="scheduleType === 'scheduled' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'">
+                                <input type="radio" name="schedule_type" value="scheduled" x-model="scheduleType" class="sr-only">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                <span class="text-sm font-medium">Schedule</span>
+                            </label>
+                        </div>
+                        <div x-show="scheduleType === 'now'" x-transition class="text-sm text-gray-500">
+                            <p>Broadcast will be created as <strong>draft</strong>. Start it manually from the detail page.</p>
+                        </div>
+                        <div x-show="scheduleType === 'scheduled'" x-transition>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="form-group"><label class="form-label">Date</label><input type="date" name="scheduled_date" value="{{ old('scheduled_date') }}" class="form-input" min="{{ now()->format('Y-m-d') }}"></div>
+                                <div class="form-group"><label class="form-label">Time</label><input type="time" name="scheduled_time" value="{{ old('scheduled_time') }}" class="form-input"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- Phone Numbers --}}
                 <div class="form-card">
                     <div class="form-card-header">
@@ -145,37 +177,19 @@
                     </div>
                 </div>
 
-                {{-- Call Settings --}}
-                <div class="form-card">
-                    <div class="form-card-header">
-                        <h3 class="form-card-title">Call Settings</h3>
-                        <p class="form-card-subtitle">Configure how calls are placed</p>
-                    </div>
-                    <div class="form-card-body">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="form-group">
-                                <label class="form-label">Max Concurrent Calls</label>
-                                <input type="number" name="max_concurrent" x-ref="maxConcurrent" value="{{ old('max_concurrent', 5) }}" min="1" max="50" class="form-input">
-                                <p class="form-hint">Auto-set from SIP channel limit.</p>
-                                <x-input-error :messages="$errors->get('max_concurrent')" class="mt-2" />
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Ring Timeout (seconds)</label>
-                                <input type="number" name="ring_timeout" value="{{ old('ring_timeout', 30) }}" min="10" max="120" class="form-input">
-                                <p class="form-hint">How long to ring before giving up.</p>
-                                <x-input-error :messages="$errors->get('ring_timeout')" class="mt-2" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {{-- Call Settings (hidden, auto-set from SIP account) --}}
+                <input type="hidden" name="max_concurrent" x-ref="maxConcurrent" value="{{ old('max_concurrent', 5) }}">
+                <input type="hidden" name="ring_timeout" value="{{ old('ring_timeout', 30) }}">
 
                 {{-- Form Actions --}}
                 <div class="flex items-center justify-end gap-3">
                     <a href="{{ route('client.broadcasts.index') }}" class="btn-secondary">Cancel</a>
+                    <button type="submit" name="action" value="draft" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                        Save Draft
+                    </button>
                     <button type="submit" class="btn-primary">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                        </svg>
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                         Create Broadcast
                     </button>
                 </div>

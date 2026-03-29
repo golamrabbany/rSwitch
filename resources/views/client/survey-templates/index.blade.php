@@ -19,6 +19,12 @@
         <a href="{{ route('client.survey-templates.index') }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ !request('status') ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
             All <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ !request('status') ? 'bg-indigo-100' : 'bg-gray-100' }}">{{ $stats['total'] }}</span>
         </a>
+        @if(($stats['draft'] ?? 0) > 0)
+        <a href="{{ route('client.survey-templates.index', ['status' => 'draft']) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ request('status') === 'draft' ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
+            <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+            Draft <span class="px-1.5 py-0.5 rounded-full text-xs tabular-nums {{ request('status') === 'draft' ? 'bg-gray-200' : 'bg-gray-100' }}">{{ $stats['draft'] }}</span>
+        </a>
+        @endif
         @if($stats['pending'] > 0)
         <a href="{{ route('client.survey-templates.index', ['status' => 'pending']) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border {{ request('status') === 'pending' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50' }} text-sm font-medium transition-colors">
             <span class="w-2 h-2 rounded-full bg-amber-500"></span>

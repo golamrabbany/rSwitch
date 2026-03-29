@@ -399,6 +399,15 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->g
         Route::delete('dnc/{dncNumber}', [Client\DncController::class, 'destroy'])->name('dnc.destroy');
         Route::post('dnc/bulk-destroy', [Client\DncController::class, 'bulkDestroy'])->name('dnc.bulk-destroy');
 
+        // Reports
+        Route::get('reports/active-calls', [Client\ReportController::class, 'activeCalls'])->name('reports.active-calls');
+        Route::get('reports/success-calls', [Client\ReportController::class, 'successCalls'])->name('reports.success-calls');
+        Route::get('reports/success-calls/export', [Client\ReportController::class, 'exportSuccessCalls'])->name('reports.export-success-calls');
+        Route::get('reports/failed-calls', [Client\ReportController::class, 'failedCalls'])->name('reports.failed-calls');
+        Route::get('reports/failed-calls/export', [Client\ReportController::class, 'exportFailedCalls'])->name('reports.export-failed-calls');
+        Route::get('reports/call-summary', [Client\ReportController::class, 'callSummary'])->name('reports.call-summary');
+        Route::get('reports/call-summary/export', [Client\ReportController::class, 'exportCallSummary'])->name('reports.export-call-summary');
+
         Route::get('transactions', [Client\TransactionController::class, 'index'])->name('transactions.index');
 
         Route::get('invoices', [Client\InvoiceController::class, 'index'])->name('invoices.index');

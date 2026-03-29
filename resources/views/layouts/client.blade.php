@@ -58,7 +58,7 @@
                         <a href="{{ route('client.base-rate') }}" class="nav-child {{ request()->routeIs('client.base-rate') ? 'active' : 'text-gray-500' }}">Base Rate</a>
                         <a href="{{ route('client.sip-accounts.index') }}" class="nav-child {{ request()->routeIs('client.sip-accounts.*') ? 'active' : 'text-gray-500' }}">SIP Accounts</a>
                         <a href="{{ route('client.dids.index') }}" class="nav-child {{ request()->routeIs('client.dids.*') ? 'active' : 'text-gray-500' }}">DIDs</a>
-                        <a href="{{ route('client.cdr.index') }}" class="nav-child {{ request()->routeIs('client.cdr.*') ? 'active' : 'text-gray-500' }}">CDR / Reports</a>
+                        <a href="{{ route('client.cdr.index') }}" class="nav-child {{ request()->routeIs('client.cdr.*') ? 'active' : 'text-gray-500' }}">CDR</a>
                     </div>
                 </div>
 
@@ -81,6 +81,28 @@
                         <a href="{{ route('client.survey-templates.index') }}" class="nav-child {{ request()->routeIs('client.survey-templates.*') ? 'active' : 'text-gray-500' }}">Survey Templates</a>
                         <a href="{{ route('client.broadcasts.index') }}" class="nav-child {{ request()->routeIs('client.broadcasts.*') ? 'active' : 'text-gray-500' }}">Broadcasts</a>
                         <a href="{{ route('client.dnc.index') }}" class="nav-child {{ request()->routeIs('client.dnc.*') ? 'active' : 'text-gray-500' }}">DNC List</a>
+                    </div>
+                </div>
+
+                <!-- Reports Menu -->
+                @php $reportsActive = request()->routeIs('client.reports.*'); @endphp
+                <div x-data="{ open: {{ $reportsActive ? 'true' : 'false' }} }" class="mb-1">
+                    <button @click="open = !open" class="nav-parent {{ $reportsActive ? 'has-active' : 'text-gray-600' }}">
+                        <div class="flex items-center">
+                            <svg class="nav-icon {{ $reportsActive ? 'text-indigo-600' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                            <span class="nav-text">Reports</span>
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-collapse class="nav-children">
+                        <a href="{{ route('client.reports.active-calls') }}" class="nav-child {{ request()->routeIs('client.reports.active-calls') ? 'active' : 'text-gray-500' }}">Active Calls</a>
+                        <a href="{{ route('client.reports.success-calls') }}" class="nav-child {{ request()->routeIs('client.reports.success-calls') ? 'active' : 'text-gray-500' }}">Success Calls</a>
+                        <a href="{{ route('client.reports.failed-calls') }}" class="nav-child {{ request()->routeIs('client.reports.failed-calls') ? 'active' : 'text-gray-500' }}">Failed Calls</a>
+                        <a href="{{ route('client.reports.call-summary') }}" class="nav-child {{ request()->routeIs('client.reports.call-summary') ? 'active' : 'text-gray-500' }}">Call Summary</a>
                     </div>
                 </div>
 

@@ -47,7 +47,7 @@
 
                             {{-- File Upload --}}
                             <div class="form-group">
-                                <label for="audio_file" class="form-label">Audio File</label>
+                                <label for="voice_file" class="form-label">Audio File</label>
                                 <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-indigo-400 transition-colors"
                                      x-data="{ fileName: '' }"
                                      @dragover.prevent="$el.classList.add('border-indigo-500', 'bg-indigo-50')"
@@ -58,9 +58,9 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
                                         </svg>
                                         <div class="flex text-sm text-gray-600 justify-center">
-                                            <label for="audio_file" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500">
+                                            <label for="voice_file" class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500">
                                                 <span>Upload a file</span>
-                                                <input id="audio_file" name="audio_file" type="file" accept=".wav,.mp3" required class="sr-only" x-ref="fileInput" @change="fileName = $event.target.files[0]?.name || ''">
+                                                <input id="voice_file" name="voice_file" type="file" accept=".wav,.mp3" required class="sr-only" x-ref="fileInput" @change="fileName = $event.target.files[0]?.name || ''">
                                             </label>
                                             <p class="pl-1">or drag and drop</p>
                                         </div>
@@ -69,7 +69,7 @@
                                     </div>
                                 </div>
                                 <p class="form-hint">Supported formats: WAV, MP3. Maximum file size: 10MB.</p>
-                                <x-input-error :messages="$errors->get('audio_file')" class="mt-2" />
+                                <x-input-error :messages="$errors->get('voice_file')" class="mt-2" />
                             </div>
                         </div>
                     </div>
@@ -78,11 +78,13 @@
                 {{-- Form Actions --}}
                 <div class="flex items-center justify-end gap-3">
                     <a href="{{ route('client.voice-files.index') }}" class="btn-secondary">Cancel</a>
-                    <button type="submit" class="btn-primary">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                        </svg>
-                        Upload Voice File
+                    <button type="submit" name="action" value="draft" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                        Save Draft
+                    </button>
+                    <button type="submit" name="action" value="submit" class="btn-primary">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Submit for Review
                     </button>
                 </div>
             </div>

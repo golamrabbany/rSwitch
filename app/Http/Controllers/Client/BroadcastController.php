@@ -89,10 +89,22 @@ class BroadcastController extends Controller
             }
         }
 
+        // Handle scheduling
+        if ($request->input('schedule_type') === 'scheduled' && $request->filled('scheduled_date') && $request->filled('scheduled_time')) {
+            $scheduledAt = \Carbon\Carbon::parse($request->scheduled_date . ' ' . $request->scheduled_time);
+            abort_if($scheduledAt->isPast(), 422, 'Scheduled time must be in the future.');
+            $data['scheduled_at'] = $scheduledAt;
+            $data['status'] = 'scheduled';
+        }
+
         $broadcast = $service->create($data, auth()->user());
 
-        return redirect()->route('client.broadcasts.show', $broadcast)
-            ->with('success', "Broadcast '{$broadcast->name}' created with {$broadcast->total_numbers} numbers.");
+        $msg = "Broadcast '{$broadcast->name}' created with {$broadcast->total_numbers} numbers.";
+        if ($broadcast->status === 'scheduled') {
+            $msg .= ' Scheduled for ' . $broadcast->scheduled_at->format('M d, Y g:i A') . '.';
+        }
+
+        return redirect()->route('client.broadcasts.show', $broadcast)->with('success', $msg);
     }
 
     public function show(Broadcast $broadcast)
@@ -111,23 +123,116 @@ class BroadcastController extends Controller
     public function edit(Broadcast $broadcast)
     {
         abort_unless($broadcast->user_id === auth()->id(), 403);
-        abort_unless(in_array($broadcast->status, ['draft', 'scheduled']), 403, 'Only draft or scheduled broadcasts can be edited.');
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled', 'paused']), 403, 'Pause the broadcast first to edit.');
 
-        return view('client.broadcasts.edit', compact('broadcast'));
+        $broadcast->load('voiceFile', 'sipAccount');
+
+        $sipAccounts = SipAccount::where('user_id', auth()->id())
+            ->where('status', 'active')
+            ->get(['id', 'username', 'max_channels']);
+
+        // draft/scheduled can change more fields than paused
+        $canEditFull = in_array($broadcast->status, ['draft', 'scheduled']);
+
+        return view('client.broadcasts.edit', compact('broadcast', 'sipAccounts', 'canEditFull'));
     }
 
     public function update(Request $request, Broadcast $broadcast)
     {
         abort_unless($broadcast->user_id === auth()->id(), 403);
-        abort_unless(in_array($broadcast->status, ['draft', 'scheduled']), 403);
+        abort_unless(in_array($broadcast->status, ['draft', 'scheduled', 'paused']), 403, 'Pause the broadcast first to edit.');
 
-        $request->validate([
-            'name' => ['required', 'string', 'max:150'],
-            'max_concurrent' => ['nullable', 'integer', 'min:1', 'max:50'],
-            'ring_timeout' => ['nullable', 'integer', 'min:10', 'max:120'],
-        ]);
+        $canEditFull = in_array($broadcast->status, ['draft', 'scheduled']);
 
-        $broadcast->update($request->only('name', 'max_concurrent', 'ring_timeout'));
+        $rules = [
+            'sip_account_id' => ['nullable', 'exists:sip_accounts,id'],
+        ];
+
+        if ($canEditFull) {
+            $rules['name'] = ['required', 'string', 'max:150'];
+            $rules['phone_numbers'] = ['nullable', 'string'];
+            $rules['csv_file'] = ['nullable', 'file', 'mimes:csv,txt', 'max:5120'];
+        }
+
+        $request->validate($rules);
+
+        $data = [];
+
+        // SIP account change — auto-set max_concurrent from SIP max_channels
+        if ($request->filled('sip_account_id')) {
+            $sip = SipAccount::where('id', $request->sip_account_id)->where('user_id', auth()->id())->first();
+            abort_unless($sip, 403);
+            $data['sip_account_id'] = $sip->id;
+            $data['caller_id_number'] = $sip->username;
+            $data['max_concurrent'] = $sip->max_channels ?? $broadcast->max_concurrent;
+        }
+
+        // Draft/Scheduled: can also update name, schedule, add numbers
+        if ($canEditFull) {
+            $data['name'] = $request->name;
+
+            // Schedule change
+            if ($request->input('schedule_type') === 'scheduled' && $request->filled('scheduled_date') && $request->filled('scheduled_time')) {
+                $scheduledAt = \Carbon\Carbon::parse($request->scheduled_date . ' ' . $request->scheduled_time);
+                abort_if($scheduledAt->isPast(), 422, 'Scheduled time must be in the future.');
+                $data['scheduled_at'] = $scheduledAt;
+                $data['status'] = 'scheduled';
+            } elseif ($request->input('schedule_type') === 'now' && $broadcast->status === 'scheduled') {
+                $data['scheduled_at'] = null;
+                $data['status'] = 'draft';
+            }
+
+            // Add more numbers (append, don't replace)
+            $newNumbers = [];
+            if ($request->filled('phone_numbers')) {
+                $raw = preg_split('/[\r\n,;]+/', $request->phone_numbers);
+                $newNumbers = collect($raw)
+                    ->map(fn ($n) => preg_replace('/[^0-9+]/', '', trim($n)))
+                    ->filter(fn ($n) => strlen($n) >= 7)
+                    ->unique()
+                    ->values()
+                    ->toArray();
+            } elseif ($request->hasFile('csv_file')) {
+                $lines = file($request->file('csv_file')->getRealPath(), FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $newNumbers = collect($lines)
+                    ->map(fn ($n) => preg_replace('/[^0-9+]/', '', trim(str_getcsv($n)[0] ?? '')))
+                    ->filter(fn ($n) => strlen($n) >= 7)
+                    ->unique()
+                    ->values()
+                    ->toArray();
+            }
+
+            if (!empty($newNumbers)) {
+                // Remove DNC + existing numbers
+                $cleanNumbers = \App\Models\DncNumber::filterNumbers($newNumbers);
+                $existing = $broadcast->numbers()->pluck('phone_number')->toArray();
+                $cleanNumbers = array_values(array_diff($cleanNumbers, $existing));
+
+                if (!empty($cleanNumbers)) {
+                    $now = now();
+                    $inserts = [];
+                    foreach ($cleanNumbers as $number) {
+                        $inserts[] = [
+                            'broadcast_id' => $broadcast->id,
+                            'phone_number' => $number,
+                            'status' => 'pending',
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }
+                    \App\Models\BroadcastNumber::insert($inserts);
+                    $data['total_numbers'] = $broadcast->total_numbers + count($cleanNumbers);
+                }
+            }
+        }
+
+        $broadcast->update($data);
+
+        // Save & Start
+        if ($request->input('edit_action') === 'start' && $broadcast->total_numbers > 0) {
+            app(BroadcastService::class)->start($broadcast);
+            return redirect()->route('client.broadcasts.show', $broadcast)->with('success', 'Broadcast updated and started.');
+        }
 
         return redirect()->route('client.broadcasts.show', $broadcast)->with('success', 'Broadcast updated.');
     }
