@@ -116,10 +116,10 @@ class SipProvisioningService
     private function reloadPjsip(): void
     {
         try {
-            $asteriskHost = config('services.asterisk.host', env('AMI_HOST', '127.0.0.1'));
-            $amiPort = config('services.asterisk.ami_port', env('AMI_PORT', 5038));
-            $amiUser = config('services.asterisk.ami_user', env('AMI_USER', 'rswitch'));
-            $amiSecret = config('services.asterisk.ami_secret', env('AMI_SECRET', ''));
+            $asteriskHost = config('services.ami.host', '127.0.0.1');
+            $amiPort = (int) config('services.ami.port', 5038);
+            $amiUser = config('services.ami.username', 'rswitch');
+            $amiSecret = config('services.ami.secret', '');
 
             // Connect to Asterisk AMI and send reload command
             $socket = @fsockopen($asteriskHost, $amiPort, $errno, $errstr, 3);

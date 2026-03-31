@@ -424,7 +424,7 @@ exten => 600,1,Answer()
 EOF
     fi
 
-    # Modules
+    # Modules (clean — no unused module errors)
     cat > /etc/asterisk/modules.conf << 'EOF'
 [modules]
 autoload = yes
@@ -444,13 +444,27 @@ noload = res_pjsip_phoneprov.so
 noload = res_config_pgsql.so
 noload = res_config_ldap.so
 noload = cdr_adaptive_odbc.so
+noload = cdr_pgsql.so
+noload = cdr_tds.so
+noload = cdr_sqlite3_custom.so
+noload = cdr_radius.so
+noload = cel_pgsql.so
+noload = cel_tds.so
+noload = cel_sqlite3_custom.so
+noload = cel_radius.so
 noload = res_hep.so
 noload = res_hep_pjsip.so
 noload = res_hep_rtcp.so
 noload = res_calendar.so
 noload = res_fax.so
+noload = res_adsi.so
+noload = res_smdi.so
+noload = pbx_lua.so
+noload = pbx_ael.so
 noload = app_festival.so
 noload = app_amd.so
+noload = app_getcpeid.so
+noload = app_adsiprog.so
 EOF
 
     # Manager — allow App Server IP + localhost
@@ -470,18 +484,21 @@ read = command,system,call,cdr
 write = command,system,call
 EOF
 
-    # Logger
+    # Logger (with full log for debugging)
     cat > /etc/asterisk/logger.conf << 'EOF'
 [general]
 dateformat=%F %T.%3q
 [logfiles]
-console => notice,warning,error
+console => notice,warning,error,verbose
 messages => notice,warning,error
+full => notice,warning,error,debug,verbose
 security => security
 EOF
 
-    # Asterisk core
-    if [[ -d "/usr/lib/x86_64-linux-gnu/asterisk/modules" ]]; then AST_MOD_DIR="/usr/lib/x86_64-linux-gnu/asterisk/modules"; elif [[ -d "/usr/lib64/asterisk/modules" ]]; then AST_MOD_DIR="/usr/lib64/asterisk/modules"; else AST_MOD_DIR="/usr/lib/asterisk/modules"; fi
+    # Detect actual module path
+    AST_MOD_DIR="/usr/lib/asterisk/modules"
+    [[ -d "/usr/lib/x86_64-linux-gnu/asterisk/modules" ]] && AST_MOD_DIR="/usr/lib/x86_64-linux-gnu/asterisk/modules"
+    [[ -d "/usr/lib64/asterisk/modules" ]] && AST_MOD_DIR="/usr/lib64/asterisk/modules"
 
     cat > /etc/asterisk/asterisk.conf << EOF
 [directories]
@@ -517,14 +534,29 @@ EOF
 asterisk soft nofile 131072
 asterisk hard nofile 131072
 EOF
-    mkdir -p /etc/systemd/system/asterisk.service.d
-    cat > /etc/systemd/system/asterisk.service.d/limits.conf << 'EOF'
+
+    # Proper systemd service (auto-restart, correct startup)
+    cat > /etc/systemd/system/asterisk.service << 'EOF'
+[Unit]
+Description=Asterisk PBX
+After=network.target mysql.service
+
 [Service]
+Type=simple
+ExecStartPre=/bin/mkdir -p /var/run/asterisk
+ExecStart=/usr/sbin/asterisk -f
+ExecReload=/usr/sbin/asterisk -rx "core reload"
+ExecStop=/usr/sbin/asterisk -rx "core stop now"
+Restart=always
+RestartSec=5
 LimitNOFILE=131072
-LimitCORE=infinity
 Nice=-10
+
+[Install]
+WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
+    systemctl enable asterisk
 
     # Kernel tuning
     cat > /etc/sysctl.d/99-rswitch-asterisk.conf << 'EOF'
@@ -538,8 +570,17 @@ fs.file-max = 262144
 EOF
     sysctl -p /etc/sysctl.d/99-rswitch-asterisk.conf 2>/dev/null || true
 
+    # Remove sample AEL/Lua configs (prevent startup errors)
+    rm -f /etc/asterisk/extensions.ael /etc/asterisk/extensions.lua 2>/dev/null
+
+    # Protect config files from accidental overwrite
     chown -R asterisk:asterisk /etc/asterisk
-    systemctl enable asterisk
+    chmod 444 /etc/asterisk/extensions.conf /etc/asterisk/modules.conf /etc/asterisk/pjsip.conf \
+              /etc/asterisk/manager.conf /etc/asterisk/res_odbc.conf /etc/asterisk/extconfig.conf \
+              /etc/asterisk/sorcery.conf /etc/asterisk/rtp.conf /etc/asterisk/logger.conf \
+              /etc/asterisk/asterisk.conf 2>/dev/null
+
+    # Note: pjsip_trunks.conf is NOT protected — trunks are DB-based (ODBC realtime)
 
     log_success "Asterisk configured (AMI permits: localhost + ${APP_SERVER_IP})"
 }
@@ -563,21 +604,17 @@ install_python_services() {
     source venv/bin/activate
     pip install --upgrade pip --quiet
     pip install -r requirements.txt --quiet
+    pip install cryptography --quiet
     deactivate
 
-    # Python DB user
+    # Python DB user (GRANT ALL to avoid partition table permission issues)
     PYTHON_DB_PASS=$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | head -c 16)
 
     if [[ "$INSTALL_MYSQL" == "yes" ]]; then
         MYSQL_ROOT_PASS="${DB_PASS}_root"
         mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
             CREATE USER IF NOT EXISTS 'python_svc'@'localhost' IDENTIFIED BY '${PYTHON_DB_PASS}';
-            GRANT SELECT ON ${DB_NAME}.* TO 'python_svc'@'localhost';
-            GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.call_records TO 'python_svc'@'localhost';
-            GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.transactions TO 'python_svc'@'localhost';
-            GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.invoices TO 'python_svc'@'localhost';
-            GRANT SELECT, UPDATE ON ${DB_NAME}.users TO 'python_svc'@'localhost';
-            GRANT SELECT, INSERT, UPDATE, DELETE ON ${DB_NAME}.broadcast_numbers TO 'python_svc'@'localhost';
+            GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO 'python_svc'@'localhost';
             FLUSH PRIVILEGES;
         " 2>/dev/null || true
         PYTHON_DB_HOST="127.0.0.1"

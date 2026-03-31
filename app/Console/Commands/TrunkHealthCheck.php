@@ -120,10 +120,10 @@ class TrunkHealthCheck extends Command
 
     private function connectAmi()
     {
-        $host = config('services.ami.host', env('AMI_HOST', 'asterisk'));
-        $port = (int) config('services.ami.port', env('AMI_PORT', 5038));
-        $username = config('services.ami.username', env('AMI_USERNAME', 'laravel'));
-        $secret = config('services.ami.secret', env('AMI_SECRET', ''));
+        $host = config('services.ami.host', '127.0.0.1');
+        $port = (int) config('services.ami.port', 5038);
+        $username = config('services.ami.username', 'rswitch');
+        $secret = config('services.ami.secret', '');
 
         $fp = @fsockopen($host, $port, $errno, $errstr, 5);
 

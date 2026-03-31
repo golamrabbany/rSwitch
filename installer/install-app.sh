@@ -275,6 +275,13 @@ install_application() {
     sed -i "s|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=redis|" .env
     sed -i "s|^REDIS_HOST=.*|REDIS_HOST=127.0.0.1|" .env
 
+    # Remove old .env AMI lines (from .env.example) before adding correct ones
+    sed -i '/^# rSwitch: Asterisk/d' .env
+    sed -i '/^AMI_USERNAME=/d' .env
+    sed -i '0,/^AMI_SECRET=$/{/^AMI_SECRET=$/d}' .env
+    sed -i '0,/^AMI_PORT=5038$/{/^AMI_PORT=5038$/d}' .env
+    sed -i '/^AMI_HOST=asterisk/d' .env
+
     cat >> .env << EOF
 
 # Remote Engine Server (Asterisk + Python billing)
@@ -291,25 +298,34 @@ EOF
 
     chown ${WEB_USER}:${WEB_USER} .env
 
-    sudo -u ${WEB_USER} php artisan key:generate --force
+    # Remove Docker Asterisk conf (not needed — trunks use DB realtime)
+    rm -rf ${INSTALL_DIR}/docker/asterisk/conf 2>/dev/null
+
+    sudo -u ${WEB_USER} php${PHP_VERSION} artisan key:generate --force
 
     log_info "Running database migrations..."
-    sudo -u ${WEB_USER} php artisan migrate --force
+    sudo -u ${WEB_USER} php${PHP_VERSION} artisan migrate --force
+
+    # Fix ps_contacts for Asterisk 20+ compatibility
+    log_info "Fixing ps_contacts table..."
+    for col in "via_addr VARCHAR(40)" "via_port INT" "call_id VARCHAR(255)" "endpoint VARCHAR(40)" "prune_on_boot VARCHAR(5) DEFAULT 'no'" "authenticate_qualify VARCHAR(5) DEFAULT 'no'" "qualify_timeout FLOAT DEFAULT 3.0"; do
+        mysql -h${DB_HOST} -u${DB_USER} -p"${DB_PASS}" ${DB_NAME} -e "ALTER TABLE ps_contacts ADD COLUMN $col;" 2>/dev/null || true
+    done
 
     log_info "Seeding database..."
-    sudo -u ${WEB_USER} php artisan db:seed --force
+    sudo -u ${WEB_USER} php${PHP_VERSION} artisan db:seed --force
 
     log_info "Building frontend assets..."
     mkdir -p /var/www/.npm && chown -R ${WEB_USER}:${WEB_USER} /var/www/.npm
     sudo -u ${WEB_USER} npm ci
     sudo -u ${WEB_USER} npm run build
 
-    sudo -u ${WEB_USER} php artisan storage:link
+    sudo -u ${WEB_USER} php${PHP_VERSION} artisan storage:link
 
     log_info "Caching configuration..."
-    sudo -u ${WEB_USER} php artisan config:cache
-    sudo -u ${WEB_USER} php artisan route:cache
-    sudo -u ${WEB_USER} php artisan view:cache
+    sudo -u ${WEB_USER} php${PHP_VERSION} artisan config:cache
+    sudo -u ${WEB_USER} php${PHP_VERSION} artisan route:cache
+    sudo -u ${WEB_USER} php${PHP_VERSION} artisan view:cache
 
     chmod -R 775 storage bootstrap/cache
     chown -R ${WEB_USER}:${WEB_USER} storage bootstrap/cache
@@ -432,7 +448,7 @@ create_admin_user() {
     [[ "$OS" == "centos" || "$OS" == "almalinux" ]] && WEB_USER="nginx" || WEB_USER="www-data"
     mkdir -p /var/www/.config/psysh && chown -R ${WEB_USER}:${WEB_USER} /var/www/.config
 
-    HASHED_PASS=$(php -r "echo password_hash('${ADMIN_PASSWORD}', PASSWORD_BCRYPT);")
+    HASHED_PASS=$(php${PHP_VERSION} -r "echo password_hash('${ADMIN_PASSWORD}', PASSWORD_BCRYPT);")
     mysql -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASS}" ${DB_NAME} -e "
         INSERT INTO users (name, email, password, role, status, email_verified_at, billing_type, balance, created_at, updated_at)
         VALUES ('Super Admin', '${ADMIN_EMAIL}', '${HASHED_PASS}', 'super_admin', 'active', NOW(), 'postpaid', 0, NOW(), NOW())
@@ -478,7 +494,7 @@ SSL Type:          ${SSL_TYPE}
 Commands:
   View logs:       tail -f ${INSTALL_DIR}/storage/logs/laravel.log
   Restart workers: supervisorctl restart all
-  Clear cache:     cd ${INSTALL_DIR} && php artisan optimize:clear
+  Clear cache:     cd ${INSTALL_DIR} && php${PHP_VERSION} artisan optimize:clear
 
 ╔══════════════════════════════════════════════════════════════════╗
 ║  DELETE THIS FILE AFTER SAVING CREDENTIALS SECURELY!             ║

@@ -41,4 +41,11 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
 
+    'ami' => [
+        'host' => env('AMI_HOST', '127.0.0.1'),
+        'port' => (int) env('AMI_PORT', 5038),
+        'username' => env('AMI_USER', 'rswitch'),
+        'secret' => env('AMI_SECRET', ''),
+    ],
+
 ];

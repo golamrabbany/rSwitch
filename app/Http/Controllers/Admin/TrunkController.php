@@ -54,6 +54,7 @@ class TrunkController extends Controller
         $validated = $this->validateTrunk($request);
         $validated['register'] = $request->boolean('register');
         $validated['health_check'] = $request->boolean('health_check');
+        $validated['cli_prefix_strip'] = $validated['cli_prefix_strip'] ?? 0;
 
         $trunk = Trunk::create($validated);
 
@@ -163,7 +164,7 @@ class TrunkController extends Controller
             // CLI manipulation
             'cli_mode'             => ['required', Rule::in(['passthrough', 'override', 'prefix_strip', 'translate', 'hide'])],
             'cli_override_number'  => ['nullable', 'string', 'max:40'],
-            'cli_prefix_strip'     => ['required', 'integer', 'min:0', 'max:20'],
+            'cli_prefix_strip'     => ['nullable', 'integer', 'min:0', 'max:20'],
             'cli_prefix_add'       => ['nullable', 'string', 'max:20'],
 
             // Incoming
