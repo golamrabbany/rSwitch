@@ -70,9 +70,9 @@ class TrunkController extends Controller
     {
         $trunk->load('routes');
 
-        $configFile = base_path('docker/asterisk/conf/pjsip_trunks.conf');
-        $provisioned = file_exists($configFile)
-            && str_contains(file_get_contents($configFile), "[trunk-{$trunk->direction}-{$trunk->id}]");
+        // Check if trunk is provisioned in PJSIP realtime DB
+        $trunkId = "trunk-{$trunk->direction}-{$trunk->id}";
+        $provisioned = \DB::table('ps_endpoints')->where('id', $trunkId)->exists();
 
         return view('admin.trunks.show', compact('trunk', 'provisioned'));
     }

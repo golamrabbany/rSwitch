@@ -80,15 +80,29 @@ class TrunkProvisioningService
             // ps_aors (only for outgoing/both)
             if ($isOutgoing) {
                 $port = $trunk->port ?: 5060;
+                $contactUri = "sip:{$trunk->host}:{$port}";
+
                 DB::table('ps_aors')->updateOrInsert(
                     ['id' => "{$id}-aor"],
                     [
-                        'contact' => "sip:{$trunk->host}:{$port}",
-                        'qualify_frequency' => 60,
+                        'contact' => $contactUri,
+                        'qualify_frequency' => 0, // Don't qualify — trunk may not respond to OPTIONS
+                    ]
+                );
+
+                // Static contact in ps_contacts (required for Asterisk to dial the trunk)
+                DB::table('ps_contacts')->updateOrInsert(
+                    ['id' => "{$id}-aor;@static"],
+                    [
+                        'uri' => $contactUri,
+                        'expiration_time' => '9999999999',
+                        'qualify_frequency' => '0',
+                        'endpoint' => $id,
                     ]
                 );
             } else {
                 DB::table('ps_aors')->where('id', "{$id}-aor")->delete();
+                DB::table('ps_contacts')->where('id', 'like', "{$id}-aor%")->delete();
             }
 
             // ps_endpoint_id_ips (match incoming packets from trunk host)
@@ -120,7 +134,7 @@ class TrunkProvisioningService
 
         DB::transaction(function () use ($id) {
             DB::table('ps_endpoint_id_ips')->where('endpoint', $id)->delete();
-            DB::table('ps_contacts')->where('id', 'like', "{$id}%")->delete();
+            DB::table('ps_contacts')->where('id', 'like', "{$id}-aor%")->delete();
             DB::table('ps_aors')->where('id', "{$id}-aor")->delete();
             DB::table('ps_auths')->where('id', "{$id}-auth")->delete();
             DB::table('ps_endpoints')->where('id', $id)->delete();
