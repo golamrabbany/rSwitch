@@ -302,7 +302,7 @@ configure_asterisk() {
 type=global
 max_initial_qualify_time=4
 keep_alive_interval=30
-disable_tcp_switch=yes
+user_agent=rSwitch 2.01
 
 [transport-udp]
 type=transport
@@ -424,12 +424,14 @@ exten => 600,1,Answer()
 EOF
     fi
 
-    # Modules (clean — no unused module errors)
+    # Modules — hardened: only load what rSwitch needs (243 vs 319 default)
     cat > /etc/asterisk/modules.conf << 'EOF'
 [modules]
 autoload = yes
 preload = res_odbc.so
 preload = res_config_odbc.so
+
+; Unused channel drivers
 noload = chan_alsa.so
 noload = chan_console.so
 noload = chan_skinny.so
@@ -440,31 +442,126 @@ noload = chan_oss.so
 noload = chan_sip.so
 noload = chan_iax2.so
 noload = chan_dahdi.so
-noload = res_pjsip_phoneprov.so
-noload = res_config_pgsql.so
-noload = res_config_ldap.so
+noload = chan_audiosocket.so
+noload = chan_motif.so
+noload = chan_rtp.so
+
+; Unused apps
+noload = app_agent_pool.so
+noload = app_alarmreceiver.so
+noload = app_audiosocket.so
+noload = app_dictate.so
+noload = app_disa.so
+noload = app_dtmfstore.so
+noload = app_externalivr.so
+noload = app_followme.so
+noload = app_jack.so
+noload = app_mf.so
+noload = app_minivm.so
+noload = app_morsecode.so
+noload = app_mp3.so
+noload = app_privacy.so
+noload = app_sf.so
+noload = app_signal.so
+noload = app_sms.so
+noload = app_stream_echo.so
+noload = app_test.so
+noload = app_waitforcond.so
+noload = app_waitforring.so
+noload = app_waitforsilence.so
+noload = app_zapateller.so
+noload = app_festival.so
+noload = app_amd.so
+noload = app_getcpeid.so
+noload = app_adsiprog.so
+
+; ARI REST API (security risk — not used)
+noload = res_ari.so
+noload = res_ari_applications.so
+noload = res_ari_asterisk.so
+noload = res_ari_bridges.so
+noload = res_ari_channels.so
+noload = res_ari_device_states.so
+noload = res_ari_endpoints.so
+noload = res_ari_events.so
+noload = res_ari_model.so
+noload = res_ari_playbacks.so
+noload = res_ari_recordings.so
+noload = res_ari_sounds.so
+
+; Unused codecs
+noload = codec_codec2.so
+noload = codec_lpc10.so
+noload = codec_ilbc.so
+noload = codec_speex.so
+noload = codec_g726.so
+
+; Unused CDR/CEL backends
 noload = cdr_adaptive_odbc.so
 noload = cdr_pgsql.so
 noload = cdr_tds.so
 noload = cdr_sqlite3_custom.so
 noload = cdr_radius.so
+noload = cdr_odbc.so
 noload = cel_pgsql.so
 noload = cel_tds.so
 noload = cel_sqlite3_custom.so
 noload = cel_radius.so
+noload = cel_odbc.so
+
+; Unused resource modules
+noload = res_pjsip_phoneprov.so
+noload = res_config_pgsql.so
+noload = res_config_ldap.so
+noload = res_config_sqlite3.so
+noload = res_config_curl.so
 noload = res_hep.so
 noload = res_hep_pjsip.so
 noload = res_hep_rtcp.so
 noload = res_calendar.so
 noload = res_fax.so
+noload = res_fax_spandsp.so
 noload = res_adsi.so
 noload = res_smdi.so
+noload = res_snmp.so
+noload = res_xmpp.so
+noload = res_phoneprov.so
+noload = res_audiosocket.so
+noload = res_ael_share.so
+noload = res_prometheus.so
+noload = res_statsd.so
+noload = res_rtp_multicast.so
+noload = res_geolocation.so
+noload = res_stun_monitor.so
+noload = res_tonedetect.so
+noload = res_corosync.so
+noload = res_calendar_caldav.so
+noload = res_calendar_icalendar.so
+noload = res_calendar_exchange.so
+noload = res_calendar_ews.so
+noload = res_pjsip_geolocation.so
+noload = res_pjsip_phoneprov_provider.so
+noload = res_aeap.so
+
+; Unused PBX
 noload = pbx_lua.so
 noload = pbx_ael.so
-noload = app_festival.so
-noload = app_amd.so
-noload = app_getcpeid.so
-noload = app_adsiprog.so
+noload = pbx_dundi.so
+noload = pbx_realtime.so
+
+; Unused formats
+noload = format_g719.so
+noload = format_g723.so
+noload = format_g726.so
+noload = format_g729.so
+noload = format_h263.so
+noload = format_h264.so
+noload = format_ilbc.so
+noload = format_ogg_speex.so
+noload = format_ogg_vorbis.so
+noload = format_siren14.so
+noload = format_siren7.so
+noload = format_vox.so
 EOF
 
     # Manager — allow App Server IP + localhost
