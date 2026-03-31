@@ -59,14 +59,18 @@
                 </div>
             </div>
             {{-- Right: Key Metrics --}}
-            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;">
+            <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
                 <div class="text-center p-2 rounded-lg bg-gray-50">
-                    <p class="text-xs text-gray-500">Duration</p>
-                    <p class="text-sm font-bold text-gray-900 tabular-nums">{{ sprintf('%d:%02d', intdiv($record->duration, 60), $record->duration % 60) }}</p>
+                    <p class="text-xs text-gray-500">Ring</p>
+                    <p class="text-sm font-bold text-gray-900 tabular-nums">{{ max(0, ($record->duration ?? 0) - ($record->billsec ?? 0)) }}s</p>
                 </div>
                 <div class="text-center p-2 rounded-lg bg-gray-50">
-                    <p class="text-xs text-gray-500">Billsec</p>
+                    <p class="text-xs text-gray-500">Talk</p>
                     <p class="text-sm font-bold text-gray-900 tabular-nums">{{ sprintf('%d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }}</p>
+                </div>
+                <div class="text-center p-2 rounded-lg bg-gray-50">
+                    <p class="text-xs text-gray-500">Total</p>
+                    <p class="text-sm font-bold text-gray-900 tabular-nums">{{ sprintf('%d:%02d', intdiv($record->duration, 60), $record->duration % 60) }}</p>
                 </div>
                 <div class="text-center p-2 rounded-lg bg-gray-50">
                     <p class="text-xs text-gray-500">Cost</p>
@@ -122,25 +126,37 @@
             </div>
 
             {{-- Timing --}}
+            @php
+                $ringDuration = max(0, ($record->duration ?? 0) - ($record->billsec ?? 0));
+                $connectedAt = ($record->call_end && $record->billsec > 0) ? $record->call_end->copy()->subSeconds($record->billsec) : null;
+            @endphp
             <div class="detail-card">
                 <div class="detail-card-header"><h3 class="detail-card-title">Timing & Duration</h3></div>
                 <div class="detail-card-body">
                     <div class="detail-grid">
                         <div class="detail-item">
-                            <span class="detail-label">Call Start</span>
+                            <span class="detail-label">Ring Start</span>
                             <span class="detail-value">{{ $record->call_start?->format('d M Y, H:i:s') }}</span>
                         </div>
                         <div class="detail-item">
-                            <span class="detail-label">Call End</span>
+                            <span class="detail-label">Connected</span>
+                            <span class="detail-value">{{ $connectedAt?->format('d M Y, H:i:s') ?? '—' }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Hangup</span>
                             <span class="detail-value">{{ $record->call_end?->format('d M Y, H:i:s') ?? '—' }}</span>
                         </div>
                         <div class="detail-item">
-                            <span class="detail-label">Duration</span>
-                            <span class="detail-value tabular-nums">{{ sprintf('%d:%02d', intdiv($record->duration, 60), $record->duration % 60) }} <span class="text-gray-400 text-xs">({{ $record->duration }}s)</span></span>
+                            <span class="detail-label">Ring Duration</span>
+                            <span class="detail-value tabular-nums">{{ $ringDuration }}s</span>
                         </div>
                         <div class="detail-item">
-                            <span class="detail-label">Billsec</span>
-                            <span class="detail-value tabular-nums">{{ sprintf('%d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }} <span class="text-gray-400 text-xs">({{ $record->billsec }}s)</span></span>
+                            <span class="detail-label">Talk Duration</span>
+                            <span class="detail-value tabular-nums font-semibold">{{ sprintf('%d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }} <span class="text-gray-400 text-xs">({{ $record->billsec }}s)</span></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Total Duration</span>
+                            <span class="detail-value tabular-nums">{{ sprintf('%d:%02d', intdiv($record->duration, 60), $record->duration % 60) }} <span class="text-gray-400 text-xs">({{ $record->duration }}s)</span></span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">Billable Duration</span>

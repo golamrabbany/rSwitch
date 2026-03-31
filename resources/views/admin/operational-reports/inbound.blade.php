@@ -249,8 +249,8 @@
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">DID</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Destination</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Call Time</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">CDR Dur.</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Bill Dur.</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Ring</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Bill Dur.</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                         </tr>
@@ -297,22 +297,14 @@
                                     <div class="text-xs text-gray-400 font-mono">{{ $call->call_end?->format('Y-m-d H:i:s') ?? '-' }}</div>
                                 </td>
 
-                                {{-- CDR Duration --}}
-                                <td class="px-3 py-2">
-                                    @if($call->duration > 0)
-                                        <span class="font-medium text-gray-900">{{ gmdate('H:i:s', $call->duration) }}</span>
-                                    @else
-                                        <span class="text-gray-400">-</span>
-                                    @endif
+                                {{-- Ring --}}
+                                <td class="px-3 py-2 text-right tabular-nums text-gray-500">
+                                    {{ max(0, ($call->duration ?? 0) - ($call->billsec ?? 0)) }}s
                                 </td>
 
                                 {{-- Bill Duration --}}
-                                <td class="px-3 py-2">
-                                    @if($call->billable_duration > 0)
-                                        <span class="font-medium text-gray-900">{{ gmdate('H:i:s', $call->billable_duration) }}</span>
-                                    @else
-                                        <span class="text-gray-400">-</span>
-                                    @endif
+                                <td class="px-3 py-2 text-right tabular-nums text-gray-700 font-medium">
+                                    {{ $call->billsec ?? 0 }}s
                                 </td>
 
                                 {{-- Trunk + IP --}}

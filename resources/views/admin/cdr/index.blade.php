@@ -153,8 +153,8 @@
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date / Time</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Callee</th>
-                    <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
-                    <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Billsec</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Ring</th>
+                    <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Bill Dur.</th>
                     <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Cost</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Disposition</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
@@ -178,11 +178,11 @@
                         <td class="px-3 py-2">
                             <span class="tabular-nums text-gray-900">{{ $record->callee }}</span>
                         </td>
-                        <td class="px-3 py-2 text-right tabular-nums text-gray-700">
-                            {{ sprintf('%d:%02d', intdiv($record->duration, 60), $record->duration % 60) }}
+                        <td class="px-3 py-2 text-right tabular-nums text-gray-500">
+                            {{ max(0, ($record->duration ?? 0) - ($record->billsec ?? 0)) }}s
                         </td>
-                        <td class="px-3 py-2 text-right tabular-nums text-gray-700">
-                            {{ sprintf('%d:%02d', intdiv($record->billsec, 60), $record->billsec % 60) }}
+                        <td class="px-3 py-2 text-right tabular-nums text-gray-700 font-medium">
+                            {{ $record->billsec }}s
                         </td>
                         <td class="px-3 py-2 text-right tabular-nums font-bold text-gray-900">
                             {{ format_currency($record->total_cost, 4) }}
