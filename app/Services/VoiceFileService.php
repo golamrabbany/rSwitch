@@ -194,6 +194,6 @@ class VoiceFileService
      */
     private function getAsteriskDir(): string
     {
-        return env('BROADCAST_VOICE_PATH', '/var/spool/asterisk/voicebroadcast');
+        return config('services.asterisk.voice_path', '/var/spool/asterisk/voicebroadcast');
     }
 }

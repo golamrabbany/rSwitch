@@ -113,7 +113,7 @@ class VoiceFileController extends Controller
             if ($newVf && $newVf->id !== $voiceFile->id) {
                 // Delete old files
                 \Illuminate\Support\Facades\Storage::disk('private')->delete($voiceFile->file_path);
-                $oldAsteriskPath = env('BROADCAST_VOICE_PATH', '/var/spool/asterisk/voicebroadcast') . '/' . $voiceFile->file_path_asterisk . '.wav';
+                $oldAsteriskPath = config('services.asterisk.voice_path', '/var/spool/asterisk/voicebroadcast') . '/' . $voiceFile->file_path_asterisk . '.wav';
                 if (file_exists($oldAsteriskPath)) {
                     @unlink($oldAsteriskPath);
                 }

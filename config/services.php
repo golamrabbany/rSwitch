@@ -48,4 +48,12 @@ return [
         'secret' => env('AMI_SECRET', ''),
     ],
 
+    'python_api' => [
+        'url' => env('PYTHON_API_URL', 'http://127.0.0.1:8001'),
+    ],
+
+    'asterisk' => [
+        'voice_path' => env('BROADCAST_VOICE_PATH', '/var/spool/asterisk/voicebroadcast'),
+    ],
+
 ];
