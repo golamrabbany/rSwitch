@@ -56,10 +56,66 @@ class InboundCallHandler:
 
         if not trunk_id:
             await agi.verbose("rSwitch: Cannot identify incoming trunk")
-            # Still try to route by DID — trunk might be unknown
 
-        # 2. Look up DID
-        # Try multiple number formats: exact, stripped +, with +
+        # 2. Direct SIP account match — if called number is a registered SIP account, ring it
+        sip_target = None
+        for number in [extension, extension.lstrip("+"), f"+{extension.lstrip('+')}"]:
+            sip_target = session.execute(
+                text("""
+                    SELECT s.id, s.username, s.user_id, u.parent_id as reseller_id
+                    FROM sip_accounts s
+                    JOIN users u ON s.user_id = u.id
+                    WHERE s.username = :ext AND s.status = 'active'
+                    LIMIT 1
+                """),
+                {"ext": number},
+            ).first()
+            if sip_target:
+                break
+
+        if sip_target:
+            # Check if SIP account is registered
+            contact = session.execute(
+                text("SELECT id FROM ps_contacts WHERE endpoint = :ext LIMIT 1"),
+                {"ext": sip_target.username},
+            ).first()
+
+            dial_string = f"PJSIP/{sip_target.username}"
+            dial_timeout = "60"
+            await agi.verbose(f"rSwitch: Inbound -> SIP {sip_target.username} (direct match)")
+
+            # Create CDR
+            cdr_uuid = str(uuid.uuid4())
+            session.execute(
+                text("""
+                    INSERT INTO call_records
+                    (uuid, user_id, reseller_id, call_flow, caller, callee,
+                     incoming_trunk_id, sip_account_id,
+                     call_start, disposition, status, created_at)
+                    VALUES
+                    (:uuid, :user_id, :reseller_id, 'trunk_to_sip',
+                     :caller, :callee, :trunk_id, :sip_id,
+                     NOW(), 'ANSWERED', 'in_progress', NOW())
+                """),
+                {
+                    "uuid": cdr_uuid,
+                    "user_id": sip_target.user_id,
+                    "reseller_id": sip_target.reseller_id,
+                    "caller": caller_id,
+                    "callee": extension,
+                    "trunk_id": trunk_id,
+                    "sip_id": sip_target.id,
+                },
+            )
+            session.commit()
+
+            await agi.set_variable("ROUTE_ACTION", "DIAL")
+            await agi.set_variable("ROUTE_DIAL_STRING", dial_string)
+            await agi.set_variable("ROUTE_DIAL_TIMEOUT", dial_timeout)
+            await agi.set_variable("CDR_UUID", cdr_uuid)
+            return
+
+        # 3. Look up DID
         did = None
         for number in [extension, extension.lstrip("+"), f"+{extension.lstrip('+')}"]:
             did = session.execute(
@@ -86,24 +142,22 @@ class InboundCallHandler:
             if trunk_id:
                 routed = await _transit.handle(agi, session, trunk_id, caller_id, extension)
                 if routed:
-                    return  # Transit call routed successfully
+                    return
 
-            await agi.verbose(f"rSwitch: DID {extension} not found, no transit route")
+            await agi.verbose(f"rSwitch: DID {extension} not found, no SIP match, no transit route")
             await agi.set_variable("ROUTE_ACTION", "REJECT")
             await agi.set_variable("ROUTE_REJECT_REASON", "no_did")
             return
 
-        # 3. Route based on destination type
+        # 4. Route based on DID destination type
         dial_string = ""
         dial_timeout = "60"
 
         if did.destination_type == "sip_account" and did.sip_username:
-            # Route to SIP account
             dial_string = f"PJSIP/{did.sip_username}"
             await agi.verbose(f"rSwitch: DID {extension} -> SIP {did.sip_username}")
 
         elif did.destination_type == "ring_group" and did.ring_group_id:
-            # Route to ring group — build dial string for all members
             members = session.execute(
                 text("""
                     SELECT s.username
@@ -124,7 +178,6 @@ class InboundCallHandler:
                 return
 
         elif did.destination_type == "external" and did.destination_number:
-            # Forward to external number via trunk
             dial_string = f"PJSIP/{did.destination_number}@trunk-outgoing-1"
             await agi.verbose(f"rSwitch: DID {extension} -> External {did.destination_number}")
 
