@@ -336,7 +336,6 @@ class OutboundCallHandler:
                 WHERE tr.status = 'active'
                 AND t.status = 'active'
                 AND t.direction IN ('outgoing', 'both')
-                AND t.health_status != 'down'
                 AND :dest LIKE CONCAT(tr.prefix, '%')
                 ORDER BY LENGTH(tr.prefix) DESC, tr.priority ASC, tr.weight DESC
             """),

@@ -27,10 +27,10 @@ Schedule::command('cdr:aggregate')
     ->withoutOverlapping()
     ->runInBackground();
 
-Schedule::command('trunk:health-check')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+// Health check disabled — causes trunk auto-disable issues
+// Trunk providers that don't respond to OPTIONS get flagged as 'down'
+// which blocks call routing. Manual trunk management is more reliable.
+// Schedule::command('trunk:health-check')->everyMinute()->withoutOverlapping()->runInBackground();
 
 Schedule::command('billing:generate-invoices')
     ->monthlyOn(1, '02:00')
