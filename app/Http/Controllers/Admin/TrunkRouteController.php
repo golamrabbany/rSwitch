@@ -135,19 +135,46 @@ class TrunkRouteController extends Controller
 
         $result = $this->routeSelection->selectTrunks($validated['destination'], $time);
 
-        $formatRoute = fn (?TrunkRoute $r) => $r ? [
-            'id'          => $r->id,
-            'prefix'      => $r->prefix,
-            'trunk_name'  => $r->trunk->name,
-            'trunk_id'    => $r->trunk_id,
-            'provider'    => $r->trunk->provider,
-            'priority'    => $r->priority,
-            'weight'      => $r->weight,
-            'time_window' => $r->time_start
-                ? substr($r->time_start, 0, 5) . ' - ' . substr($r->time_end, 0, 5)
-                : 'Always',
-            'days'        => $r->days_of_week ?? 'All days',
-        ] : null;
+        $destination = $validated['destination'];
+
+        $formatRoute = function (?TrunkRoute $r) use ($destination) {
+            if (!$r) return null;
+
+            // Step-by-step transformation
+            $afterRemove = $destination;
+            if ($r->remove_prefix !== null && $r->remove_prefix !== '' && str_starts_with($afterRemove, $r->remove_prefix)) {
+                $afterRemove = substr($afterRemove, strlen($r->remove_prefix));
+            }
+
+            $afterAdd = $afterRemove;
+            if ($r->add_prefix) {
+                $afterAdd = $r->add_prefix . $afterAdd;
+            }
+
+            $afterMnp = $r->applyMnpTransformation($afterAdd);
+
+            return [
+                'id'               => $r->id,
+                'prefix'           => $r->prefix,
+                'trunk_name'       => $r->trunk->name,
+                'trunk_id'         => $r->trunk_id,
+                'provider'         => $r->trunk->provider,
+                'priority'         => $r->priority,
+                'weight'           => $r->weight,
+                'time_window'      => $r->time_start
+                    ? substr($r->time_start, 0, 5) . ' - ' . substr($r->time_end, 0, 5)
+                    : 'Always',
+                'days'             => $r->days_of_week ?? 'All days',
+                'destination_number' => $afterMnp,
+                'remove_prefix'    => $r->remove_prefix !== null && $r->remove_prefix !== '' ? $r->remove_prefix : null,
+                'add_prefix'       => $r->add_prefix ?: null,
+                'mnp_enabled'      => $r->mnp_enabled,
+                'step_original'    => $destination,
+                'step_after_remove' => ($afterRemove !== $destination) ? $afterRemove : null,
+                'step_after_add'   => ($afterAdd !== $afterRemove) ? $afterAdd : null,
+                'step_after_mnp'   => ($afterMnp !== $afterAdd) ? $afterMnp : null,
+            ];
+        };
 
         return response()->json([
             'primary'        => $formatRoute($result['primary']),

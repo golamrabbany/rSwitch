@@ -108,7 +108,10 @@
                                     {{-- Dropdown --}}
                                     <div x-show="showTrunkDropdown"
                                          x-cloak
-                                         @click.outside="showTrunkDropdown = false"
+                                         x-transition
+                                         @click.outside="setTimeout(() => showTrunkDropdown = false, 150)"
+                                         @mousedown.prevent
+                                         style="display: none;"
                                          class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                                         <template x-if="filteredTrunks.length === 0">
                                             <div class="px-4 py-3 text-sm text-gray-500">No trunks found</div>

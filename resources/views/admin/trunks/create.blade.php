@@ -121,13 +121,6 @@
                                 <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                             </div>
 
-                            <div class="form-group">
-                                <label for="outgoing_priority" class="form-label">Outgoing Priority</label>
-                                <input type="number" id="outgoing_priority" name="outgoing_priority" value="{{ old('outgoing_priority', '10') }}" required min="1" max="100" class="form-input">
-                                <p class="form-hint">Lower number = higher priority for route selection</p>
-                                <x-input-error :messages="$errors->get('outgoing_priority')" class="mt-2" />
-                            </div>
-
                             <div class="form-group md:col-span-2" x-data="{
                                 codecs: ['ulaw', 'alaw', 'g729', 'g722', 'opus', 'gsm', 'ilbc'],
                                 selected: '{{ old('codec_allow', 'ulaw,alaw,g729') }}'.split(',').map(s => s.trim()).filter(Boolean),
@@ -212,12 +205,7 @@
                         </div>
                         <div class="form-card-body">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label for="incoming_context" class="form-label">Incoming Context</label>
-                                    <input type="text" id="incoming_context" name="incoming_context" value="{{ old('incoming_context', 'from-trunk') }}" required class="form-input font-mono">
-                                    <p class="form-hint">Asterisk dialplan context, usually "from-trunk"</p>
-                                    <x-input-error :messages="$errors->get('incoming_context')" class="mt-2" />
-                                </div>
+                                <input type="hidden" name="incoming_context" value="from-trunk">
 
                                 <div class="form-group">
                                     <label for="incoming_auth_type" class="form-label">Auth Type</label>

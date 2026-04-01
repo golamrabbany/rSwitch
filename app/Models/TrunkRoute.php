@@ -53,7 +53,7 @@ class TrunkRoute extends Model
     {
         $result = $number;
 
-        if ($this->remove_prefix && str_starts_with($result, $this->remove_prefix)) {
+        if ($this->remove_prefix !== null && $this->remove_prefix !== '' && str_starts_with($result, $this->remove_prefix)) {
             $result = substr($result, strlen($this->remove_prefix));
             if ($result === '' || $result === false) {
                 $result = $number;

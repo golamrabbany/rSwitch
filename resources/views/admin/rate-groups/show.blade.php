@@ -51,8 +51,8 @@
         importModal: false,
         rateModal: false,
         rateMode: 'add',
-        rate: { id: '', prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '6', effective_date: '{{ now()->format('Y-m-d') }}', end_date: '', status: 'active', rate_type: 'regular' },
-        openAdd() { this.rateMode = 'add'; this.rate = { id: '', prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '6', effective_date: '{{ now()->format('Y-m-d') }}', end_date: '', status: 'active', rate_type: 'regular' }; this.rateModal = true; },
+        rate: { id: '', prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '1', effective_date: '{{ now()->format('Y-m-d') }}', end_date: '', status: 'active', rate_type: 'regular' },
+        openAdd() { this.rateMode = 'add'; this.rate = { id: '', prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '1', effective_date: '{{ now()->format('Y-m-d') }}', end_date: '', status: 'active', rate_type: 'regular' }; this.rateModal = true; },
         openEdit(r) { this.rateMode = 'edit'; this.rate = { ...r }; this.rateModal = true; },
         openView(r) { this.rateMode = 'view'; this.rate = { ...r }; this.rateModal = true; },
     }">

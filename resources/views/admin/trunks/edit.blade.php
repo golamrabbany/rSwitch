@@ -47,14 +47,12 @@
                             <div class="form-group">
                                 <label for="name" class="form-label">Trunk Name</label>
                                 <input type="text" id="name" name="name" value="{{ old('name', $trunk->name) }}" required class="form-input">
-                                <p class="form-hint">Unique name to identify this trunk</p>
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
 
                             <div class="form-group">
                                 <label for="provider" class="form-label">Provider</label>
                                 <input type="text" id="provider" name="provider" value="{{ old('provider', $trunk->provider) }}" required class="form-input">
-                                <p class="form-hint">SIP trunk provider company name</p>
                                 <x-input-error :messages="$errors->get('provider')" class="mt-2" />
                             </div>
 
@@ -65,7 +63,6 @@
                                     <option value="incoming">Incoming</option>
                                     <option value="both">Both (Incoming & Outgoing)</option>
                                 </select>
-                                <p class="form-hint">Outgoing for sending, Incoming for receiving calls</p>
                                 <x-input-error :messages="$errors->get('direction')" class="mt-2" />
                             </div>
 
@@ -79,16 +76,6 @@
                                 </select>
                                 <p class="form-hint">Provider's rate card — used for trunk cost in P&L reports</p>
                                 <x-input-error :messages="$errors->get('rate_group_id')" class="mt-2" />
-                            </div>
-
-                            <div class="form-group">
-                                <label for="status" class="form-label">Status</label>
-                                <select id="status" name="status" required class="form-input">
-                                    <option value="active" {{ old('status', $trunk->status) === 'active' ? 'selected' : '' }}>Active</option>
-                                    <option value="disabled" {{ old('status', $trunk->status) === 'disabled' ? 'selected' : '' }}>Disabled</option>
-                                </select>
-                                <p class="form-hint">Disabled trunks are removed from PJSIP config</p>
-                                <x-input-error :messages="$errors->get('status')" class="mt-2" />
                             </div>
                         </div>
                     </div>
@@ -130,13 +117,6 @@
                                 <input type="number" id="max_channels" name="max_channels" value="{{ old('max_channels', $trunk->max_channels) }}" required min="1" max="9999" class="form-input">
                                 <p class="form-hint">Maximum concurrent calls on this trunk</p>
                                 <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
-                            </div>
-
-                            <div class="form-group">
-                                <label for="outgoing_priority" class="form-label">Outgoing Priority</label>
-                                <input type="number" id="outgoing_priority" name="outgoing_priority" value="{{ old('outgoing_priority', $trunk->outgoing_priority) }}" required min="1" max="100" class="form-input">
-                                <p class="form-hint">Lower number = higher priority for route selection</p>
-                                <x-input-error :messages="$errors->get('outgoing_priority')" class="mt-2" />
                             </div>
 
                             <div class="form-group md:col-span-2" x-data="{
@@ -218,18 +198,12 @@
                 <template x-if="direction === 'incoming' || direction === 'both'">
                     <div class="form-card">
                         <div class="form-card-header">
-                            <h3 class="form-card-title">Incoming Settings</h3>
-                            <p class="form-card-subtitle">Configuration for incoming calls</p>
+                            <h3 class="form-card-title">Incoming Calls</h3>
+                            <p class="form-card-subtitle">How to identify and accept inbound calls from this trunk</p>
                         </div>
                         <div class="form-card-body">
+                            <input type="hidden" name="incoming_context" value="from-trunk">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label for="incoming_context" class="form-label">Incoming Context</label>
-                                    <input type="text" id="incoming_context" name="incoming_context" value="{{ old('incoming_context', $trunk->incoming_context) }}" required class="form-input font-mono">
-                                    <p class="form-hint">Asterisk dialplan context, usually "from-trunk"</p>
-                                    <x-input-error :messages="$errors->get('incoming_context')" class="mt-2" />
-                                </div>
-
                                 <div class="form-group">
                                     <label for="incoming_auth_type" class="form-label">Auth Type</label>
                                     <select id="incoming_auth_type" name="incoming_auth_type" required class="form-input">
@@ -241,10 +215,10 @@
                                     <x-input-error :messages="$errors->get('incoming_auth_type')" class="mt-2" />
                                 </div>
 
-                                <div class="form-group md:col-span-2">
-                                    <label for="incoming_ip_acl" class="form-label">IP ACL</label>
+                                <div class="form-group">
+                                    <label for="incoming_ip_acl" class="form-label">Allowed IPs</label>
                                     <input type="text" id="incoming_ip_acl" name="incoming_ip_acl" value="{{ old('incoming_ip_acl', $trunk->incoming_ip_acl) }}" class="form-input font-mono" placeholder="1.2.3.4, 5.6.7.0/24">
-                                    <p class="form-hint">Allowed source IPs, comma-separated. Required for IP-based auth.</p>
+                                    <p class="form-hint">Source IPs to accept, comma-separated</p>
                                     <x-input-error :messages="$errors->get('incoming_ip_acl')" class="mt-2" />
                                 </div>
                             </div>
@@ -404,58 +378,83 @@
                     </div>
                 </div>
 
-                {{-- Form Actions --}}
-                <div class="flex items-center justify-end gap-3">
-                    <a href="{{ route('admin.trunks.show', $trunk) }}" class="btn-secondary">Cancel</a>
-                    <button type="submit" class="btn-primary">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Save Changes
-                    </button>
-                </div>
             </div>
 
-            {{-- Sidebar - Right Side --}}
-            <div class="space-y-6">
-                {{-- Account Info --}}
+            {{-- Sidebar - Right Side (Fixed on scroll) --}}
+            <div class="space-y-6" style="position: sticky; top: 1rem; align-self: start;">
+                {{-- Status & Actions --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
-                        <h3 class="detail-card-title">Trunk Info</h3>
+                        <h3 class="detail-card-title">Publish</h3>
+                    </div>
+                    <div class="detail-card-body space-y-4">
+                        <div class="form-group">
+                            <label for="status" class="form-label">Status</label>
+                            <select id="status" name="status" required class="form-input">
+                                <option value="active" {{ old('status', $trunk->status) === 'active' ? 'selected' : '' }}>Active</option>
+                                <option value="disabled" {{ old('status', $trunk->status) === 'disabled' ? 'selected' : '' }}>Disabled</option>
+                            </select>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button type="submit" class="flex-1 btn-primary justify-center">
+                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                Save
+                            </button>
+                            <a href="{{ route('admin.trunks.show', $trunk) }}" class="flex-1 btn-secondary justify-center">Cancel</a>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Quick Info --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Quick Info</h3>
                     </div>
                     <div class="detail-card-body">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        <div class="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg mb-4">
+                            <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                                 </svg>
                             </div>
                             <div>
-                                <p class="font-medium text-gray-900">{{ $trunk->name }}</p>
-                                <span class="badge {{ $trunk->status === 'active' ? 'badge-success' : ($trunk->status === 'auto_disabled' ? 'badge-warning' : 'badge-danger') }}">
-                                    {{ $trunk->status === 'auto_disabled' ? 'Auto-disabled' : ucfirst($trunk->status) }}
-                                </span>
+                                <p class="text-sm font-medium text-indigo-800">{{ $trunk->name }}</p>
+                                <p class="text-xs text-indigo-600 font-mono">{{ $trunk->host }}:{{ $trunk->port }}</p>
                             </div>
                         </div>
 
-                        <div class="space-y-3 text-sm border-t border-gray-100 pt-4">
+                        <div class="space-y-3 text-sm">
+                            <div class="flex items-center gap-2 text-gray-600">
+                                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>PJSIP endpoint configured</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-gray-600">
+                                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>Authentication setup</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-gray-600">
+                                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span>Ready for routing rules</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 text-sm border-t border-gray-100 pt-4 mt-4">
                             <div class="flex justify-between">
                                 <span class="text-gray-500">Trunk ID</span>
                                 <span class="font-mono text-gray-900">#{{ $trunk->id }}</span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-gray-500">Health</span>
-                                @if($trunk->health_status === 'up')
-                                    <span class="badge badge-success">Healthy</span>
-                                @elseif($trunk->health_status === 'down')
-                                    <span class="badge badge-danger">Down</span>
-                                @else
-                                    <span class="badge badge-gray">Unknown</span>
-                                @endif
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Created</span>
-                                <span class="text-gray-900">{{ $trunk->created_at->format('M d, Y') }}</span>
+                                <span class="text-gray-500">Direction</span>
+                                <span class="badge {{ $trunk->direction === 'both' ? 'badge-purple' : ($trunk->direction === 'incoming' ? 'badge-info' : 'badge-success') }}">{{ ucfirst($trunk->direction) }}</span>
                             </div>
                             @if($trunk->routes->count() > 0)
                             <div class="flex justify-between">
@@ -463,6 +462,10 @@
                                 <span class="font-medium text-gray-900">{{ $trunk->routes->count() }}</span>
                             </div>
                             @endif
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">Created</span>
+                                <span class="text-gray-900">{{ $trunk->created_at->format('M d, Y') }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -494,6 +497,37 @@
                     </div>
                 </div>
 
+                {{-- Common Codecs --}}
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Common Codecs</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="font-mono text-gray-700">ulaw</span>
+                                <span class="text-xs text-gray-500">G.711 (NA)</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="font-mono text-gray-700">alaw</span>
+                                <span class="text-xs text-gray-500">G.711 (EU)</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="font-mono text-gray-700">g729</span>
+                                <span class="text-xs text-gray-500">Low BW</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="font-mono text-gray-700">g722</span>
+                                <span class="text-xs text-gray-500">HD Voice</span>
+                            </div>
+                            <div class="flex justify-between items-center py-1">
+                                <span class="font-mono text-gray-700">opus</span>
+                                <span class="text-xs text-gray-500">Modern</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- Tips --}}
                 <div class="detail-card">
                     <div class="detail-card-header">
@@ -518,12 +552,6 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                                 </svg>
                                 <span>Disabling removes trunk from rSwitch</span>
-                            </li>
-                            <li class="flex items-start gap-2">
-                                <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                </svg>
-                                <span>Active calls may be affected</span>
                             </li>
                         </ul>
                     </div>

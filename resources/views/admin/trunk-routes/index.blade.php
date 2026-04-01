@@ -8,6 +8,12 @@
             <p class="page-subtitle">Manage trunk routing and failover configuration</p>
         </div>
         <div class="page-actions">
+            <button onclick="document.dispatchEvent(new CustomEvent('open-route-test'))" type="button" class="btn-action-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+                Test Route
+            </button>
             <a href="{{ route('admin.trunk-routes.create') }}" class="btn-action-primary-admin">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -17,130 +23,220 @@
         </div>
     </div>
 
-    {{-- Route Test Tool --}}
-    <div class="detail-card mb-6" x-data="routeTestTool()">
-        <button @click="open = !open" type="button"
-                class="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-50 rounded-t-xl">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                    </svg>
-                </div>
-                <div>
-                    <span class="text-sm font-semibold text-gray-900">Route Test Tool</span>
-                    <p class="text-xs text-gray-500">Test which trunk would be selected for a destination</p>
-                </div>
-            </div>
-            <svg :class="{ 'rotate-180': open }" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-            </svg>
-        </button>
-        <div x-show="open" x-cloak class="px-5 pb-5 border-t border-gray-100">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                <div class="form-group">
-                    <label class="form-label">Destination Number</label>
-                    <input type="text" x-model="destination" placeholder="e.g. 8801712345678"
-                           class="form-input font-mono" @keydown.enter.prevent="testRoute()">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Test Time (optional)</label>
-                    <input type="datetime-local" x-model="testTime" class="form-input">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Timezone</label>
-                    <select x-model="testTimezone" class="form-input">
-                        <option value="UTC">UTC</option>
-                        <option value="Asia/Dhaka">Asia/Dhaka</option>
-                        <option value="Europe/London">Europe/London</option>
-                        <option value="America/New_York">America/New_York</option>
-                        <option value="America/Los_Angeles">America/Los_Angeles</option>
-                    </select>
-                </div>
-                <div class="form-group flex items-end">
-                    <button @click="testRoute()" :disabled="loading || !destination" class="btn-primary w-full">
-                        <span x-show="!loading">Test Route</span>
-                        <span x-show="loading" x-cloak>Testing...</span>
-                    </button>
-                </div>
-            </div>
+    {{-- Route Test Modal --}}
+    <div x-data="routeTestTool()" @open-route-test.document="open = true">
+        {{-- Modal --}}
+        <div x-show="open" x-cloak class="relative z-50" role="dialog" aria-modal="true" @keydown.escape.window="open = false">
+            <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm"></div>
 
-            {{-- Results --}}
-            <div x-show="result" x-cloak class="mt-6 space-y-4">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-gray-500">Matched Prefix:</span>
-                    <template x-if="result && result.matched_prefix">
-                        <span class="font-mono font-semibold text-indigo-600 text-lg" x-text="result.matched_prefix"></span>
-                    </template>
-                    <template x-if="result && !result.matched_prefix">
-                        <span class="text-sm text-red-600">No matching route found</span>
-                    </template>
-                </div>
+            <div class="fixed inset-0 overflow-y-auto">
+                <div class="flex min-h-full items-start justify-center p-4 pt-16" @click="open = false">
+                    <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                         @click.stop class="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col">
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="result && result.primary">
-                    <div class="rounded-lg border-2 border-emerald-200 bg-emerald-50 p-4">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="badge badge-success">Primary</span>
-                        </div>
-                        <template x-if="result && result.primary">
-                            <div>
-                                <p class="text-sm font-semibold text-gray-900" x-text="result.primary.trunk_name"></p>
-                                <p class="text-xs text-gray-500" x-text="result.primary.provider"></p>
-                                <div class="mt-2 text-xs text-gray-600 space-y-1">
-                                    <p>Priority: <span class="font-medium" x-text="result.primary.priority"></span> | Weight: <span class="font-medium" x-text="result.primary.weight"></span></p>
-                                    <p>Time: <span class="font-mono" x-text="result.primary.time_window"></span></p>
-                                    <p>Days: <span x-text="result.primary.days"></span></p>
+                        {{-- Header --}}
+                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-base font-semibold text-gray-900">Route Test Tool</h3>
+                                    <p class="text-xs text-gray-500">Test which trunk would be selected for a destination</p>
                                 </div>
                             </div>
-                        </template>
-                    </div>
-                    <div class="rounded-lg border-2 p-4"
-                         :class="result && result.failover ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="badge" :class="result && result.failover ? 'badge-warning' : 'badge-gray'">Failover</span>
+                            <button @click="open = false" class="rounded-lg p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
                         </div>
-                        <template x-if="result && result.failover">
-                            <div>
-                                <p class="text-sm font-semibold text-gray-900" x-text="result.failover.trunk_name"></p>
-                                <p class="text-xs text-gray-500" x-text="result.failover.provider"></p>
-                                <div class="mt-2 text-xs text-gray-600 space-y-1">
-                                    <p>Priority: <span class="font-medium" x-text="result.failover.priority"></span> | Weight: <span class="font-medium" x-text="result.failover.weight"></span></p>
-                                    <p>Time: <span class="font-mono" x-text="result.failover.time_window"></span></p>
-                                    <p>Days: <span x-text="result.failover.days"></span></p>
+
+                        {{-- Body --}}
+                        <div class="px-6 py-5 overflow-y-auto flex-1">
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div class="form-group">
+                                    <label class="form-label">Destination Number</label>
+                                    <input type="text" x-model="destination" placeholder="e.g. 01712345678"
+                                           class="form-input font-mono" @keydown.enter.prevent="testRoute()" x-ref="destInput">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Test Time (optional)</label>
+                                    <input type="datetime-local" x-model="testTime" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Timezone</label>
+                                    <select x-model="testTimezone" class="form-input">
+                                        <option value="UTC">UTC</option>
+                                        <option value="Asia/Dhaka">Asia/Dhaka</option>
+                                        <option value="Europe/London">Europe/London</option>
+                                        <option value="America/New_York">America/New_York</option>
+                                    </select>
+                                </div>
+                                <div class="form-group flex items-end">
+                                    <button @click="testRoute()" :disabled="loading || !destination" class="btn-primary w-full">
+                                        <span x-show="!loading">Test Route</span>
+                                        <span x-show="loading" x-cloak>Testing...</span>
+                                    </button>
                                 </div>
                             </div>
-                        </template>
-                        <template x-if="result && !result.failover">
-                            <p class="text-sm text-gray-400 italic">No failover trunk</p>
-                        </template>
-                    </div>
-                </div>
 
-                <div x-show="result && result.all_matches && result.all_matches.length > 0">
-                    <h4 class="text-sm font-medium text-gray-700 mb-2">All Matching Routes (<span x-text="result ? result.all_matches.length : 0"></span>)</h4>
-                    <div class="overflow-hidden rounded-lg border border-gray-200">
-                        <table class="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Trunk</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weight</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                <template x-for="match in (result ? result.all_matches : [])" :key="match.id">
-                                    <tr>
-                                        <td class="px-3 py-2 text-gray-900" x-text="match.trunk_name"></td>
-                                        <td class="px-3 py-2" x-text="match.priority"></td>
-                                        <td class="px-3 py-2" x-text="match.weight"></td>
-                                        <td class="px-3 py-2 font-mono text-xs" x-text="match.time_window"></td>
-                                        <td class="px-3 py-2 text-xs" x-text="match.days"></td>
-                                    </tr>
+                            {{-- Results --}}
+                            <div x-show="result" x-cloak class="mt-5 space-y-4 border-t border-gray-100 pt-5">
+                                {{-- Matched Info --}}
+                                {{-- Transformation Steps --}}
+                                <template x-if="result && result.primary">
+                                    <div class="p-4 bg-gray-50 rounded-lg">
+                                        <div class="flex items-center gap-2 mb-3">
+                                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Number Transformation</p>
+                                            <template x-if="result.primary.mnp_enabled">
+                                                <span class="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">MNP</span>
+                                            </template>
+                                        </div>
+                                        <div class="overflow-x-auto">
+                                            <div class="flex items-end gap-2 font-mono text-xs min-w-max">
+                                                {{-- Original --}}
+                                                <div class="text-center">
+                                                    <p class="text-[10px] text-gray-400 font-sans mb-1">Original</p>
+                                                    <span class="inline-block bg-white border border-gray-200 px-2.5 py-1.5 rounded-md text-gray-800 font-semibold" x-text="result.primary.step_original"></span>
+                                                </div>
+
+                                                {{-- Remove step --}}
+                                                <template x-if="result.primary.step_after_remove">
+                                                    <div class="flex items-end gap-2">
+                                                        <svg class="w-4 h-4 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                                        <div class="text-center">
+                                                            <p class="text-[10px] text-red-400 font-sans mb-1">Remove <span class="font-mono">"<span x-text="result.primary.remove_prefix"></span>"</span></p>
+                                                            <span class="inline-block bg-red-50 border border-red-200 px-2.5 py-1.5 rounded-md text-red-700 font-semibold" x-text="result.primary.step_after_remove"></span>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                {{-- Add step --}}
+                                                <template x-if="result.primary.step_after_add">
+                                                    <div class="flex items-end gap-2">
+                                                        <svg class="w-4 h-4 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                                        <div class="text-center">
+                                                            <p class="text-[10px] text-blue-400 font-sans mb-1">Add <span class="font-mono">"<span x-text="result.primary.add_prefix"></span>"</span></p>
+                                                            <span class="inline-block bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded-md text-blue-700 font-semibold" x-text="result.primary.step_after_add"></span>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                {{-- MNP step --}}
+                                                <template x-if="result.primary.step_after_mnp">
+                                                    <div class="flex items-end gap-2">
+                                                        <svg class="w-4 h-4 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                                        <div class="text-center">
+                                                            <p class="text-[10px] text-purple-400 font-sans mb-1">MNP</p>
+                                                            <span class="inline-block bg-purple-50 border border-purple-200 px-2.5 py-1.5 rounded-md text-purple-700 font-semibold" x-text="result.primary.step_after_mnp"></span>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                {{-- Final Output --}}
+                                                <div class="flex items-end gap-2">
+                                                    <svg class="w-4 h-4 text-emerald-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                                    <div class="text-center">
+                                                        <p class="text-[10px] text-emerald-500 font-sans mb-1 font-bold">Sent to Trunk</p>
+                                                        <span class="inline-block bg-emerald-50 border-2 border-emerald-400 px-3 py-1.5 rounded-md text-emerald-700 font-bold text-sm" x-text="result.primary.destination_number"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </template>
-                            </tbody>
-                        </table>
+
+                                <template x-if="result && !result.matched_prefix">
+                                    <div class="p-4 bg-red-50 rounded-lg text-center">
+                                        <span class="text-sm text-red-600 font-medium">No matching route found</span>
+                                    </div>
+                                </template>
+
+                                {{-- Primary & Failover --}}
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="result && result.primary">
+                                    <div class="rounded-lg border-2 border-emerald-200 bg-emerald-50 p-4">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="badge badge-success">Primary</span>
+                                        </div>
+                                        <template x-if="result && result.primary">
+                                            <div>
+                                                <p class="text-sm font-semibold text-gray-900" x-text="result.primary.trunk_name"></p>
+                                                <p class="text-xs text-gray-500" x-text="result.primary.provider"></p>
+                                                <div class="mt-2 font-mono text-sm text-emerald-700 bg-emerald-100/50 px-2 py-1 rounded" x-text="result.primary.destination_number"></div>
+                                                <div class="mt-2 text-xs text-gray-600 space-y-1">
+                                                    <p>Priority: <span class="font-medium" x-text="result.primary.priority"></span> | Weight: <span class="font-medium" x-text="result.primary.weight"></span></p>
+                                                    <p>Time: <span class="font-mono" x-text="result.primary.time_window"></span></p>
+                                                    <p>Days: <span x-text="result.primary.days"></span></p>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <div class="rounded-lg border-2 p-4"
+                                         :class="result && result.failover ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="badge" :class="result && result.failover ? 'badge-warning' : 'badge-gray'">Failover</span>
+                                        </div>
+                                        <template x-if="result && result.failover">
+                                            <div>
+                                                <p class="text-sm font-semibold text-gray-900" x-text="result.failover.trunk_name"></p>
+                                                <p class="text-xs text-gray-500" x-text="result.failover.provider"></p>
+                                                <div class="mt-2 font-mono text-sm text-amber-700 bg-amber-100/50 px-2 py-1 rounded" x-text="result.failover.destination_number"></div>
+                                                <div class="mt-2 text-xs text-gray-600 space-y-1">
+                                                    <p>Priority: <span class="font-medium" x-text="result.failover.priority"></span> | Weight: <span class="font-medium" x-text="result.failover.weight"></span></p>
+                                                    <p>Time: <span class="font-mono" x-text="result.failover.time_window"></span></p>
+                                                    <p>Days: <span x-text="result.failover.days"></span></p>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="result && !result.failover">
+                                            <p class="text-sm text-gray-400 italic">No failover trunk</p>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                {{-- All Matching Routes --}}
+                                <div x-show="result && result.all_matches && result.all_matches.length > 0">
+                                    <h4 class="text-sm font-medium text-gray-700 mb-2">All Matching Routes (<span x-text="result ? result.all_matches.length : 0"></span>)</h4>
+                                    <div class="overflow-hidden rounded-lg border border-gray-200">
+                                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Trunk</th>
+                                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Destination</th>
+                                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weight</th>
+                                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-200">
+                                                <template x-for="match in (result ? result.all_matches : [])" :key="match.id">
+                                                    <tr>
+                                                        <td class="px-3 py-2 text-gray-900" x-text="match.trunk_name"></td>
+                                                        <td class="px-3 py-2 font-mono text-xs text-gray-700" x-text="match.destination_number"></td>
+                                                        <td class="px-3 py-2" x-text="match.priority"></td>
+                                                        <td class="px-3 py-2" x-text="match.weight"></td>
+                                                        <td class="px-3 py-2 font-mono text-xs" x-text="match.time_window"></td>
+                                                        <td class="px-3 py-2 text-xs" x-text="match.days"></td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Footer --}}
+                        <div class="px-6 py-4 border-t border-gray-100 flex justify-end">
+                            <button @click="open = false" class="btn-secondary">Close</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -221,7 +317,7 @@
                                 <a href="{{ route('admin.trunks.show', $route->trunk) }}" class="font-medium text-gray-900 hover:text-indigo-600">
                                     {{ $route->trunk->name }}
                                 </a>
-                                <div class="text-xs text-gray-500">{{ $route->trunk->provider }}</div>
+                                <div class="text-xs text-gray-500 font-mono">{{ $route->trunk->host }}@if($route->mnp_enabled) <span class="text-purple-600 font-sans font-medium ml-1">MNP</span>@endif</div>
                             </div>
                         </td>
                         <td class="px-3 py-2">
@@ -297,6 +393,9 @@
     function routeTestTool() {
         return {
             open: false,
+            init() {
+                this.$watch('open', (val) => { if (val) this.$nextTick(() => this.$refs.destInput?.focus()); });
+            },
             destination: '',
             testTime: '',
             testTimezone: 'UTC',

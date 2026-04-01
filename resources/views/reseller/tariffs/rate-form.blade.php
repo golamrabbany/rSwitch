@@ -83,7 +83,7 @@
                             </div>
                             <div>
                                 <label for="billing_increment" class="block text-sm font-medium text-gray-700 mb-1.5">Billing Increment (seconds)</label>
-                                <input type="number" name="billing_increment" id="billing_increment" min="1" value="{{ old('billing_increment', $rate?->billing_increment ?? 6) }}" placeholder="6" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                                <input type="number" name="billing_increment" id="billing_increment" min="1" value="{{ old('billing_increment', $rate?->billing_increment ?? 1) }}" placeholder="1" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                                 <p class="text-xs text-gray-400 mt-1.5">Common: 1 (per-second), 6 (6/6), 60 (per-minute)</p>
                             </div>
                         </div>

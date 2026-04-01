@@ -103,10 +103,6 @@
                                 @endif
                             </span>
                         </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Priority</span>
-                            <span class="detail-value">{{ $trunk->outgoing_priority }}</span>
-                        </div>
                         <div class="detail-item md:col-span-2">
                             <span class="detail-label">Codecs</span>
                             <div class="flex flex-wrap gap-1.5 mt-1">

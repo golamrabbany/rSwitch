@@ -431,7 +431,7 @@ function pageData() {
         show: false,
         mode: 'add',
         rateId: null,
-        form: { prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '6', rate_type: 'regular' },
+        form: { prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '1', rate_type: 'regular' },
         deleteModal: false,
         deletePrefix: '',
         deleteAction: '',
@@ -439,7 +439,7 @@ function pageData() {
         openAdd() {
             this.mode = 'add';
             this.rateId = null;
-            this.form = { prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '6', rate_type: 'regular' };
+            this.form = { prefix: '', destination: '', rate_per_minute: '', connection_fee: '0', min_duration: '0', billing_increment: '1', rate_type: 'regular' };
             this.show = true;
         },
         openEdit(data) {

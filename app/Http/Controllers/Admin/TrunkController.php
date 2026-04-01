@@ -151,9 +151,6 @@ class TrunkController extends Controller
             'password'          => [$trunk ? 'nullable' : 'nullable', 'string', 'max:100'],
             'register_string'   => ['nullable', 'string', 'max:255'],
 
-            // Outgoing
-            'outgoing_priority' => ['required', 'integer', 'min:1', 'max:100'],
-
             // Dial manipulation
             'dial_pattern_match'   => ['nullable', 'string', 'max:50'],
             'dial_pattern_replace' => ['nullable', 'string', 'max:50'],
