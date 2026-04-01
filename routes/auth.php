@@ -6,12 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
 Route::middleware(['guest', 'throttle:5,1'])->group(function () {
-    Volt::route('register', 'pages.auth.register')
-        ->name('register');
-
-    // Client/Reseller login uses Livewire, Admins use OTP login at /admin/login
-    Volt::route('login', 'pages.auth.login')
-        ->name('login');
+    // Login and Register are now handled by UnifiedLoginController and RegisterController in web.php
 
     Volt::route('forgot-password', 'pages.auth.forgot-password')
         ->name('password.request');
@@ -30,12 +25,4 @@ Route::middleware('auth')->group(function () {
 
     Volt::route('confirm-password', 'pages.auth.confirm-password')
         ->name('password.confirm');
-
-    Route::post('logout', function () {
-        Auth::guard('web')->logout();
-        request()->session()->invalidate();
-        request()->session()->regenerateToken();
-
-        return redirect('/');
-    })->name('logout');
 });

@@ -40,11 +40,51 @@ logger = logging.getLogger(__name__)
 _redis_pool = None
 
 
+# BD MNP operator prefix → route number
+BD_MNP_MAP = {
+    '13': '71',  # Grameenphone
+    '14': '91',  # Banglalink
+    '15': '51',  # Teletalk
+    '16': '81',  # Airtel
+    '17': '71',  # Grameenphone
+    '18': '81',  # Robi
+    '19': '91',  # Banglalink
+}
+
+
+def _apply_bd_mnp(number: str) -> str:
+    """Auto-convert BD number to MNP format: 880 + route_code + national_number.
+    Non-BD numbers pass through unchanged."""
+    n = number.lstrip('+')
+
+    # Normalize to national (strip country code / leading zero)
+    if n.startswith('00880'):
+        national = n[5:]
+    elif n.startswith('880'):
+        national = n[3:]
+    elif n.startswith('0'):
+        national = n[1:]
+    else:
+        national = n
+
+    # Validate: 10 digits, starts with BD operator prefix
+    if len(national) != 10:
+        return number
+
+    op = national[:2]
+    mnp_code = BD_MNP_MAP.get(op)
+    if not mnp_code:
+        return number  # Not BD mobile, passthrough
+
+    return '880' + mnp_code + national
+
+
 def _get_redis() -> redis_lib.Redis:
     """Get Redis client from shared connection pool (created once, reused)."""
     global _redis_pool
     if _redis_pool is None:
-        redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+        from shared.config import get_settings
+        redis_url = get_settings().redis_url
         _redis_pool = redis_lib.ConnectionPool.from_url(redis_url, max_connections=20)
     return redis_lib.Redis(connection_pool=_redis_pool)
 
@@ -328,8 +368,9 @@ class OutboundCallHandler:
             text("""
                 SELECT tr.id, tr.prefix, tr.priority, tr.weight, tr.trunk_id,
                        tr.remove_prefix, tr.add_prefix, t.tech_prefix,
+                       tr.mnp_enabled,
                        tr.time_start, tr.time_end, tr.days_of_week, tr.timezone,
-                       t.name as trunk_name, t.id as tid,
+                       t.name as trunk_name, t.id as tid, t.direction as trunk_direction,
                        t.cli_mode, t.cli_override_number, t.max_channels as trunk_max_channels
                 FROM trunk_routes tr
                 JOIN trunks t ON tr.trunk_id = t.id
@@ -393,12 +434,16 @@ class OutboundCallHandler:
         if primary.add_prefix:
             dial_number = primary.add_prefix + dial_number
 
+        # BD MNP auto-convert (after remove/add prefix)
+        if primary.mnp_enabled:
+            dial_number = _apply_bd_mnp(dial_number)
+
         # Tech prefix
         if primary.tech_prefix:
             dial_number = primary.tech_prefix + dial_number
 
         # 9. Build dial string
-        trunk_endpoint = f"trunk-outgoing-{primary.tid}"
+        trunk_endpoint = f"trunk-{primary.trunk_direction}-{primary.tid}"
         dial_string = f"PJSIP/{dial_number}@{trunk_endpoint}"
 
         # Failover trunk
@@ -410,9 +455,11 @@ class OutboundCallHandler:
                 fo_number = fo_number[len(failover.remove_prefix):]
             if failover.add_prefix:
                 fo_number = failover.add_prefix + fo_number
+            if failover.mnp_enabled:
+                fo_number = _apply_bd_mnp(fo_number)
             if failover.tech_prefix:
                 fo_number = failover.tech_prefix + fo_number
-            fo_endpoint = f"trunk-outgoing-{failover.tid}"
+            fo_endpoint = f"trunk-{failover.trunk_direction}-{failover.tid}"
             failover_string = f"PJSIP/{fo_number}@{fo_endpoint}"
 
         # 10. Determine CLI

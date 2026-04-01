@@ -428,9 +428,9 @@ class RatingService:
                     "billable_duration": cdr.billable_duration,
                 }
 
-            # Use destination if it looks like a phone number, otherwise use callee
-            raw_dest = cdr.destination or ""
-            destination = raw_dest if any(c.isdigit() for c in raw_dest) else cdr.callee
+            # Use callee (original dialed number) for rate matching.
+            # destination may contain MNP-transformed number which won't match rate prefixes.
+            destination = cdr.callee or cdr.destination or ""
 
             # ── Transit calls (trunk_to_trunk): no user, use trunk rates ──
             if cdr.call_flow == "trunk_to_trunk":

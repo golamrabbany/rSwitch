@@ -223,56 +223,7 @@
                 </div>
 
                 {{-- MNP Dipping --}}
-                <div class="form-card" x-data="{ mnpEnabled: {{ old('mnp_enabled', $trunkRoute->mnp_enabled) ? 'true' : 'false' }} }">
-                    <div class="form-card-header">
-                        <h3 class="form-card-title">MNP Dipping</h3>
-                        <p class="form-card-subtitle">Mobile Number Portability transformation</p>
-                    </div>
-                    <div class="form-card-body">
-                        <div class="form-group">
-                            <label class="flex items-center gap-2">
-                                <input type="checkbox" name="mnp_enabled" value="1" x-model="mnpEnabled" class="form-checkbox">
-                                <span class="text-sm text-gray-700">Enable MNP Dipping</span>
-                            </label>
-                            <p class="form-hint">Transform numbers to MNP format before sending to trunk.</p>
-                        </div>
-
-                        <div x-show="mnpEnabled" x-cloak class="space-y-4 mt-4">
-                            <div class="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-                                <div class="flex items-start gap-3">
-                                    <svg class="w-5 h-5 text-indigo-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
-                                    <div class="text-sm">
-                                        <p class="font-medium text-indigo-800">MNP Transformation Example</p>
-                                        <p class="text-indigo-600 mt-1">
-                                            <span class="font-mono">88017XXXXXXXX</span> →
-                                            <span class="font-mono">880<strong class="text-indigo-800">71</strong>17XXXXXXXX</span>
-                                        </p>
-                                        <p class="text-indigo-600 text-xs mt-1">Insert "71" at position 3 (after country code "880")</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="form-group">
-                                    <label for="mnp_prefix" class="form-label">MNP Prefix</label>
-                                    <input type="text" id="mnp_prefix" name="mnp_prefix" value="{{ old('mnp_prefix', $trunkRoute->mnp_prefix ?? '71') }}"
-                                           class="form-input font-mono" placeholder="e.g. 71" maxlength="10">
-                                    <p class="form-hint">Digits to insert for MNP lookup</p>
-                                    <x-input-error :messages="$errors->get('mnp_prefix')" class="mt-2" />
-                                </div>
-                                <div class="form-group">
-                                    <label for="mnp_insert_position" class="form-label">Insert Position</label>
-                                    <input type="number" id="mnp_insert_position" name="mnp_insert_position" value="{{ old('mnp_insert_position', $trunkRoute->mnp_insert_position ?? 3) }}"
-                                           class="form-input" min="0" max="20" placeholder="e.g. 3">
-                                    <p class="form-hint">Position after which to insert MNP prefix (0 = beginning)</p>
-                                    <x-input-error :messages="$errors->get('mnp_insert_position')" class="mt-2" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                @include('admin.trunk-routes._mnp-section', ['mnpEnabled' => old('mnp_enabled', $trunkRoute->mnp_enabled)])
 
                 {{-- Time-Based Routing --}}
                 <div class="form-card">

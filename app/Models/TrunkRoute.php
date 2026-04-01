@@ -13,17 +13,28 @@ class TrunkRoute extends Model
     protected $fillable = [
         'trunk_id', 'prefix', 'time_start', 'time_end',
         'days_of_week', 'timezone', 'priority', 'weight',
-        'remove_prefix', 'add_prefix',
-        'mnp_enabled', 'mnp_prefix', 'mnp_insert_position', 'status',
+        'remove_prefix', 'add_prefix', 'mnp_enabled', 'status',
     ];
 
     protected function casts(): array
     {
         return [
             'mnp_enabled' => 'boolean',
-            'mnp_insert_position' => 'integer',
         ];
     }
+
+    /**
+     * BD operator prefix → MNP route number mapping.
+     */
+    public const BD_MNP_MAP = [
+        '13' => '71',  // Grameenphone
+        '14' => '91',  // Banglalink
+        '15' => '51',  // Teletalk
+        '16' => '81',  // Airtel
+        '17' => '71',  // Grameenphone
+        '18' => '81',  // Robi
+        '19' => '91',  // Banglalink
+    ];
 
     public function trunk(): BelongsTo
     {
@@ -37,23 +48,18 @@ class TrunkRoute extends Model
 
     /**
      * Apply route-level dial prefix manipulation.
-     *
-     * Order: remove_prefix first, then add_prefix.
-     * Example: 880171xxx → remove "880" → 171xxx → add "0" → 0171xxx
      */
     public function applyDialPrefixManipulation(string $number): string
     {
         $result = $number;
 
-        // 1. Remove matching prefix
         if ($this->remove_prefix && str_starts_with($result, $this->remove_prefix)) {
             $result = substr($result, strlen($this->remove_prefix));
             if ($result === '' || $result === false) {
-                $result = $number; // Don't strip to empty
+                $result = $number;
             }
         }
 
-        // 2. Add prefix
         if ($this->add_prefix) {
             $result = $this->add_prefix . $result;
         }
@@ -62,29 +68,75 @@ class TrunkRoute extends Model
     }
 
     /**
-     * Apply MNP transformation to a number if enabled.
+     * Apply BD MNP transformation.
      *
-     * Example: 88017XXXXXXXXX -> 880[71]17XXXXXXXXX
-     * - mnp_prefix: "71"
-     * - mnp_insert_position: 3 (insert after 3rd digit, i.e., after "880")
+     * Auto-normalizes any input format to national number,
+     * then builds MNP format: 880 + operator_route + national_number
      *
-     * @param string $number The original number
-     * @return string The transformed number (or original if MNP not enabled)
+     * @param string $number The number after remove/add prefix manipulation
+     * @return string MNP formatted number, or original if not BD mobile
      */
     public function applyMnpTransformation(string $number): string
     {
-        if (!$this->mnp_enabled || empty($this->mnp_prefix)) {
+        if (!$this->mnp_enabled) {
             return $number;
         }
 
-        $position = $this->mnp_insert_position ?? 3;
+        // Normalize to national number (strip country code / leading zero)
+        $national = self::normalizeToBdNational($number);
 
-        // Ensure position is valid
-        if ($position < 0 || $position > strlen($number)) {
-            return $number;
+        if ($national === null) {
+            return $number; // Not a BD number, passthrough
         }
 
-        // Insert MNP prefix at the specified position
-        return substr($number, 0, $position) . $this->mnp_prefix . substr($number, $position);
+        // Get operator from first 2 digits
+        $operatorPrefix = substr($national, 0, 2);
+        $mnpCode = self::BD_MNP_MAP[$operatorPrefix] ?? null;
+
+        if ($mnpCode === null) {
+            return $number; // Unknown operator, passthrough
+        }
+
+        return '880' . $mnpCode . $national;
+    }
+
+    /**
+     * Normalize any BD number format to national number (without 0 or country code).
+     *
+     * +8801714101351  → 1714101351
+     * 008801714101351 → 1714101351
+     * 8801714101351   → 1714101351
+     * 01714101351     → 1714101351
+     * 1714101351      → 1714101351
+     *
+     * Returns null if not a recognizable BD mobile number.
+     */
+    public static function normalizeToBdNational(string $number): ?string
+    {
+        // Strip + prefix
+        $number = ltrim($number, '+');
+
+        // Strip 00880 / 880 / 0
+        if (str_starts_with($number, '00880')) {
+            $national = substr($number, 5);
+        } elseif (str_starts_with($number, '880')) {
+            $national = substr($number, 3);
+        } elseif (str_starts_with($number, '0')) {
+            $national = substr($number, 1);
+        } else {
+            $national = $number;
+        }
+
+        // Validate: must start with 13-19 and be 10 digits
+        if (strlen($national) !== 10) {
+            return null;
+        }
+
+        $op = substr($national, 0, 2);
+        if (!isset(self::BD_MNP_MAP[$op])) {
+            return null;
+        }
+
+        return $national;
     }
 }

@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'kyc.approved' => KycApprovedMiddleware::class,
+            'domain' => \App\Http\Middleware\DomainMiddleware::class,
         ]);
 
         if (env('APP_ENV') !== 'testing') {

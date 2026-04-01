@@ -14,6 +14,8 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -41,6 +43,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Force HTTPS when behind Cloudflare proxy (Flexible SSL)
+        if (request()->header('X-Forwarded-Proto') === 'https' || config('app.env') === 'production') {
+            URL::forceScheme('https');
+        }
+
+        // Register MD5-compatible auth provider (for migrated WebLink passwords)
+        Auth::provider('md5_compatible', function ($app, array $config) {
+            return new \App\Auth\Md5CompatibleUserProvider(
+                $app['hash'],
+                $config['model']
+            );
+        });
+
         // Register policies
         foreach ($this->policies as $model => $policy) {
             Gate::policy($model, $policy);

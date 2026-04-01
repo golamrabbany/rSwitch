@@ -48,7 +48,7 @@ class AdminOtpLoginController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (!$user || !\App\Auth\Md5CompatibleUserProvider::checkPassword($request->password, $user)) {
             RateLimiter::hit($key, 60);
             return back()->withErrors([
                 'email' => 'Invalid credentials.',

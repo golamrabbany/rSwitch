@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Multi-Domain Configuration
+    |--------------------------------------------------------------------------
+    |
+    | When set, admin routes are restricted to admin_domain and
+    | reseller/client routes to client_domain. Leave null for single-domain.
+    |
+    */
+
+    'admin_domain' => env('ADMIN_DOMAIN'),
+    'client_domain' => env('CLIENT_DOMAIN'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

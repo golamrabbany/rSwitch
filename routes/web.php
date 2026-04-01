@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin;
+use App\Http\Controllers\Auth\UnifiedLoginController;
+use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Client;
 use App\Http\Controllers\RechargeAdmin;
 use App\Http\Controllers\Reseller;
@@ -9,17 +11,24 @@ use App\Http\Controllers\KycSubmissionController;
 use App\Http\Controllers\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/admin/login');
+Route::redirect('/', '/login');
 
-// Admin OTP Login (guest routes)
-Route::prefix('admin')->name('admin.')->middleware('guest')->group(function () {
-    Route::get('login', [Admin\AdminOtpLoginController::class, 'showLoginForm'])->name('login');
-    Route::post('login', [Admin\AdminOtpLoginController::class, 'login'])->middleware('throttle:5,1')->name('login.submit');
-    Route::get('login/verify', [Admin\AdminOtpLoginController::class, 'showOtpForm'])->name('otp.verify.form');
-    Route::post('login/verify', [Admin\AdminOtpLoginController::class, 'verifyOtp'])->middleware('throttle:5,1')->name('otp.verify');
-    Route::post('login/regenerate', [Admin\AdminOtpLoginController::class, 'regenerateOtp'])->name('otp.regenerate');
+// Unified Login (all roles — password + OTP on same page)
+Route::middleware('guest')->group(function () {
+    Route::get('login', [UnifiedLoginController::class, 'showLoginForm'])->name('login');
+    Route::post('login/validate', [UnifiedLoginController::class, 'validateCredentials'])->middleware('throttle:10,1')->name('login.validate');
+    Route::post('login/verify-otp', [UnifiedLoginController::class, 'verifyOtp'])->middleware('throttle:10,1')->name('login.verify-otp');
+    Route::post('login/resend-otp', [UnifiedLoginController::class, 'resendOtp'])->middleware('throttle:5,1')->name('login.resend-otp');
+
+    // Client self-signup with KYC
+    Route::get('register', [RegisterController::class, 'showRegistrationForm'])->name('register');
+    Route::post('register', [RegisterController::class, 'register']);
 });
-Route::post('admin/logout', [Admin\AdminOtpLoginController::class, 'logout'])->middleware('auth')->name('admin.logout');
+Route::post('logout', [UnifiedLoginController::class, 'logout'])->middleware('auth')->name('logout');
+
+// Legacy admin login redirect (for bookmarks)
+Route::get('admin/login', fn () => redirect()->route('login'))->name('admin.login');
+Route::post('admin/logout', [UnifiedLoginController::class, 'logout'])->middleware('auth')->name('admin.logout');
 
 // Impersonation routes (Super Admin only)
 Route::post('admin/impersonate/{user}', [Admin\ImpersonationController::class, 'start'])->middleware('auth')->name('admin.impersonate.start');
@@ -40,7 +49,7 @@ Route::view('profile', 'profile')
     ->name('profile');
 
 // Super Admin ONLY routes (global system features)
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:super_admin'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:super_admin', 'domain:admin'])->group(function () {
     // Super Admin Management
     Route::resource('super-admins', Admin\SuperAdminController::class);
 
@@ -97,7 +106,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:super_admin'])
 });
 
 // Admin routes (both super_admin and admin) - scoped to assigned resellers for regular admins
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin', 'domain:admin'])->group(function () {
     Route::get('dashboard', Admin\DashboardController::class)->name('dashboard');
 
     Route::get('profile', [Admin\ProfileController::class, 'index'])->name('profile');
@@ -220,7 +229,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 });
 
 // Recharge Admin routes (view-only access + balance operations)
-Route::prefix('recharge-admin')->name('recharge-admin.')->middleware(['auth', 'role:recharge_admin'])->group(function () {
+Route::prefix('recharge-admin')->name('recharge-admin.')->middleware(['auth', 'role:recharge_admin', 'domain:admin'])->group(function () {
     Route::get('dashboard', RechargeAdmin\DashboardController::class)->name('dashboard');
 
     // Balance operations - THE ONLY WRITE OPERATIONS for recharge admin
@@ -245,7 +254,7 @@ Route::prefix('recharge-admin')->name('recharge-admin.')->middleware(['auth', 'r
 });
 
 // Reseller routes
-Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller'])->group(function () {
+Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller', 'domain:client'])->group(function () {
     Route::get('dashboard', Reseller\DashboardController::class)->name('dashboard');
 
     Route::middleware('kyc.approved')->group(function () {
@@ -341,7 +350,7 @@ Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller
 });
 
 // Client routes
-Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->group(function () {
+Route::prefix('client')->name('client.')->middleware(['auth', 'role:client', 'domain:client'])->group(function () {
     Route::get('dashboard', Client\DashboardController::class)->name('dashboard');
 
     Route::middleware('kyc.approved')->group(function () {

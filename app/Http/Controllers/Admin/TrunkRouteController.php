@@ -171,8 +171,6 @@ class TrunkRouteController extends Controller
             'remove_prefix'       => ['nullable', 'string', 'max:20', 'regex:/^\d*$/'],
             'add_prefix'          => ['nullable', 'string', 'max:20', 'regex:/^\d*$/'],
             'mnp_enabled'         => ['nullable', 'boolean'],
-            'mnp_prefix'          => ['nullable', 'string', 'max:10', 'regex:/^\d*$/'],
-            'mnp_insert_position' => ['nullable', 'integer', 'min:0', 'max:20'],
             'status'              => ['required', Rule::in(['active', 'disabled'])],
         ]);
 
@@ -186,12 +184,6 @@ class TrunkRouteController extends Controller
 
         // Handle MNP checkbox (unchecked = not sent)
         $validated['mnp_enabled'] = $request->boolean('mnp_enabled');
-
-        // If MNP disabled, clear related fields
-        if (!$validated['mnp_enabled']) {
-            $validated['mnp_prefix'] = null;
-            $validated['mnp_insert_position'] = 3;
-        }
 
         return $validated;
     }

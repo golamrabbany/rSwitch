@@ -145,8 +145,8 @@ class CallEndHandler:
 
         # 7. Clean up credit control metadata from Redis
         try:
-            redis_url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
-            r = redis_lib.from_url(redis_url)
+            from shared.config import get_settings
+            r = redis_lib.from_url(get_settings().redis_url)
             r.delete(f"rswitch:active_call:{cdr_uuid}")
         except Exception as e:
             logger.warning(f"Failed to clean up credit control key for {cdr_uuid}: {e}")
