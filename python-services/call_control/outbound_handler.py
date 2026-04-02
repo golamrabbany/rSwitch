@@ -128,7 +128,12 @@ class OutboundCallHandler:
         extension = agi.get_extension()
         caller_id = agi.get_caller_id()
 
-        await agi.verbose(f"rSwitch: Outbound {caller_id} -> {extension}")
+        # Get SIP device info
+        src_ip_raw = await agi.get_variable("CHANNEL(pjsip,remote_addr)") or ""
+        src_ip = src_ip_raw.split(":")[0] if src_ip_raw else ""  # Strip port
+        user_agent = await agi.get_variable("CHANNEL(pjsip,useragent)") or ""
+
+        await agi.verbose(f"rSwitch: Outbound {caller_id} -> {extension} (IP:{src_ip})")
 
         # 1. Extract SIP account username from PJSIP channel
         # Format: PJSIP/username-uniqueid
@@ -323,11 +328,11 @@ class OutboundCallHandler:
                     text("""
                         INSERT INTO call_records
                         (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                         caller, callee,
+                         caller, callee, src_ip, user_agent,
                          call_start, disposition, status, created_at)
                         VALUES
                         (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
-                         :caller, :callee,
+                         :caller, :callee, :src_ip, :user_agent,
                          NOW(), 'ANSWERED', 'in_progress', NOW())
                     """),
                     {
@@ -337,6 +342,8 @@ class OutboundCallHandler:
                         "reseller_id": row.parent_id,
                         "caller": caller_id,
                         "callee": extension,
+                        "src_ip": src_ip,
+                        "user_agent": user_agent,
                     },
                 )
                 session.commit()
@@ -355,12 +362,12 @@ class OutboundCallHandler:
                     text("""
                         INSERT INTO call_records
                         (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                         caller, callee,
+                         caller, callee, src_ip, user_agent,
                          call_start, call_end, duration, billsec,
                          disposition, hangup_cause, status, created_at)
                         VALUES
                         (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
-                         :caller, :callee,
+                         :caller, :callee, :src_ip, :user_agent,
                          NOW(), NOW(), 0, 0,
                          'FAILED', 'CALLEE_NOT_REGISTERED', 'unbillable', NOW())
                     """),
@@ -371,6 +378,8 @@ class OutboundCallHandler:
                         "reseller_id": row.parent_id,
                         "caller": caller_id,
                         "callee": extension,
+                        "src_ip": src_ip,
+                        "user_agent": user_agent,
                     },
                 )
                 session.commit()
@@ -413,12 +422,12 @@ class OutboundCallHandler:
                 text("""
                     INSERT INTO call_records
                     (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                     caller, callee, destination,
+                     caller, callee, destination, src_ip, user_agent,
                      call_start, call_end, duration, billsec,
                      disposition, hangup_cause, status, created_at)
                     VALUES
                     (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
-                     :caller, :callee, :callee,
+                     :caller, :callee, :callee, :src_ip, :user_agent,
                      NOW(), NOW(), 0, 0,
                      'FAILED', 'NO_ROUTE_FOUND', 'unbillable', NOW())
                 """),
@@ -429,6 +438,8 @@ class OutboundCallHandler:
                     "reseller_id": row.parent_id,
                     "caller": caller_id,
                     "callee": extension,
+                    "src_ip": src_ip,
+                    "user_agent": user_agent,
                 },
             )
             session.commit()
@@ -503,10 +514,12 @@ class OutboundCallHandler:
                 INSERT INTO call_records
                 (uuid, sip_account_id, user_id, reseller_id, call_flow,
                  caller, callee, destination, outgoing_trunk_id,
+                 src_ip, user_agent,
                  call_start, disposition, status, created_at)
                 VALUES
                 (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
                  :caller, :callee, :destination, :trunk_id,
+                 :src_ip, :user_agent,
                  NOW(), 'ANSWERED', 'in_progress', NOW())
             """),
             {
@@ -518,6 +531,8 @@ class OutboundCallHandler:
                 "callee": extension,
                 "destination": dial_number,
                 "trunk_id": primary.tid,
+                "src_ip": src_ip,
+                "user_agent": user_agent,
             },
         )
         session.commit()

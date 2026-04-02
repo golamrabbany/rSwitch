@@ -368,7 +368,6 @@ Route::prefix('client')->name('client.')->middleware(['auth', 'role:client', 'do
         Route::get('cdr', [Client\CdrController::class, 'index'])->name('cdr.index');
         Route::get('cdr/export', [Client\CdrController::class, 'export'])->name('cdr.export');
         Route::get('cdr/{uuid}', [Client\CdrController::class, 'show'])->name('cdr.show');
-        Route::get('cdr/{uuid}/recording', [Admin\RecordingController::class, 'play'])->name('cdr.recording');
 
         // Voice Broadcast — Voice Files
         Route::get('voice-files', [Client\VoiceFileController::class, 'index'])->name('voice-files.index');

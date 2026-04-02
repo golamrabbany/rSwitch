@@ -145,22 +145,6 @@
             </div>
 
             {{-- Call Recording --}}
-            @if($hasRecording)
-            <div class="detail-card">
-                <div class="detail-card-header">
-                    <div class="flex items-start justify-between w-full">
-                        <h3 class="detail-card-title">Call Recording</h3>
-                        <a href="{{ route('client.cdr.recording', $record->uuid) }}" download class="text-xs text-indigo-600 hover:text-indigo-500 font-medium">Download</a>
-                    </div>
-                </div>
-                <div class="detail-card-body">
-                    <audio controls preload="none" class="w-full">
-                        <source src="{{ route('client.cdr.recording', $record->uuid) }}" type="audio/wav">
-                    </audio>
-                    <p class="text-xs text-gray-400 mt-2">Recording: {{ $record->uuid }}.wav</p>
-                </div>
-            </div>
-            @endif
         </div>
 
         {{-- Sidebar (1/3) --}}

@@ -30,12 +30,8 @@ class RecordingController extends Controller
 
         abort_unless($record, 404, 'Call record not found.');
 
-        // Authorization: admins (super_admin, admin, recharge_admin) can access all
-        // Clients and resellers can only access their own records
-        $authUser = auth()->user();
-        if ($authUser->isClient() || $authUser->isReseller()) {
-            abort_unless($record->user_id === $authUser->id, 403);
-        }
+        // Admin only — resellers and clients cannot access recordings
+        abort_unless(auth()->user()->isAnyAdmin(), 403);
 
         // Check recording file exists
         $filePath = config('filesystems.disks.recordings.root') . '/' . $uuid . '.wav';

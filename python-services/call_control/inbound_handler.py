@@ -28,6 +28,21 @@ logger = logging.getLogger(__name__)
 
 _transit = TransitCallHandler()
 
+# BD MNP codes for reverse lookup
+BD_MNP_CODES = {'71', '91', '51', '81'}
+
+
+def _reverse_bd_mnp(number: str) -> str:
+    """Reverse BD MNP format to clean international format.
+    880711714101351 (15 digits, MNP) → 8801714101351 (13 digits, clean)
+    Non-BD or non-MNP numbers pass through unchanged."""
+    n = number.lstrip('+')
+    if n.startswith('00'):
+        n = n[2:]
+    if len(n) == 15 and n.startswith('880') and n[3:5] in BD_MNP_CODES:
+        return '880' + n[5:]
+    return number
+
 
 class InboundCallHandler:
     """Handles inbound call routing decisions via AGI."""
@@ -41,9 +56,17 @@ class InboundCallHandler:
 
     async def _process(self, agi: AgiConnection, session: Session) -> None:
         extension = agi.get_extension()  # Called DID number
-        caller_id = agi.get_caller_id()
+        raw_caller = agi.get_caller_id()  # Original from trunk (may be MNP)
+        clean_caller = _reverse_bd_mnp(raw_caller)  # Reversed for display
 
-        await agi.verbose(f"rSwitch: Inbound {caller_id} -> DID {extension}")
+        # Set clean caller ID on channel for phone display
+        if clean_caller != raw_caller:
+            await agi.set_variable("CALLERID(num)", clean_caller)
+            await agi.verbose(f"rSwitch: MNP reverse {raw_caller} -> {clean_caller}")
+
+        caller_id = raw_caller  # Keep raw in caller_id variable for CDR
+
+        await agi.verbose(f"rSwitch: Inbound {raw_caller} -> DID {extension}")
 
         # 1. Identify incoming trunk
         trunk_endpoint = await agi.get_variable("TRUNK_ENDPOINT")
@@ -64,6 +87,7 @@ class InboundCallHandler:
             sip_target = session.execute(
                 text("""
                     SELECT s.id, s.username, s.user_id, s.max_channels,
+                           s.allow_recording,
                            s.call_forward_enabled, s.call_forward_type,
                            s.call_forward_dest_type, s.call_forward_destination,
                            s.call_forward_timeout,
@@ -81,7 +105,8 @@ class InboundCallHandler:
         if sip_target:
             # Handle call forwarding
             forward_result = await self._handle_forwarding(
-                agi, session, sip_target, caller_id, extension, trunk_id
+                agi, session, sip_target, caller_id, extension, trunk_id,
+                raw_caller=raw_caller, clean_caller=clean_caller
             )
             if forward_result:
                 return  # Forwarding handled everything
@@ -97,19 +122,20 @@ class InboundCallHandler:
             session.execute(
                 text("""
                     INSERT INTO call_records
-                    (uuid, user_id, reseller_id, call_flow, caller, callee,
+                    (uuid, user_id, reseller_id, call_flow, caller, caller_id, callee,
                      incoming_trunk_id, sip_account_id,
                      call_start, disposition, status, created_at)
                     VALUES
                     (:uuid, :user_id, :reseller_id, 'trunk_to_sip',
-                     :caller, :callee, :trunk_id, :sip_id,
+                     :caller, :caller_id, :callee, :trunk_id, :sip_id,
                      NOW(), 'ANSWERED', 'in_progress', NOW())
                 """),
                 {
                     "uuid": cdr_uuid,
                     "user_id": sip_target.user_id,
                     "reseller_id": sip_target.reseller_id,
-                    "caller": caller_id,
+                    "caller": raw_caller,
+                    "caller_id": clean_caller,
                     "callee": extension,
                     "trunk_id": trunk_id,
                     "sip_id": sip_target.id,
@@ -117,11 +143,12 @@ class InboundCallHandler:
             )
             session.commit()
 
-            # Set forward variables for dialplan (CFNR/CFB handled after dial)
+            # Set variables for dialplan (CFNR/CFB handled after dial)
             await agi.set_variable("ROUTE_ACTION", "DIAL")
             await agi.set_variable("ROUTE_DIAL_STRING", dial_string)
             await agi.set_variable("ROUTE_DIAL_TIMEOUT", dial_timeout)
             await agi.set_variable("CDR_UUID", cdr_uuid)
+            await agi.set_variable("RECORD_CALL", "1" if sip_target.allow_recording else "0")
 
             if sip_target.call_forward_enabled and sip_target.call_forward_type in ('cfnr', 'cfb', 'cfnr_cfb'):
                 fwd_dest_type = getattr(sip_target, 'call_forward_dest_type', 'number') or 'number'
@@ -185,6 +212,7 @@ class InboundCallHandler:
             sip_fwd = session.execute(
                 text("""
                     SELECT s.id, s.username, s.user_id, s.max_channels,
+                           s.allow_recording,
                            s.call_forward_enabled, s.call_forward_type,
                            s.call_forward_dest_type, s.call_forward_destination,
                            s.call_forward_timeout,
@@ -200,7 +228,8 @@ class InboundCallHandler:
             if sip_fwd and sip_fwd.call_forward_enabled and sip_fwd.call_forward_type == 'cfu':
                 # CFU — forward immediately without ringing
                 forward_result = await self._handle_forwarding(
-                    agi, session, sip_fwd, caller_id, extension, trunk_id
+                    agi, session, sip_fwd, caller_id, extension, trunk_id,
+                    raw_caller=raw_caller, clean_caller=clean_caller
                 )
                 if forward_result:
                     return
@@ -243,11 +272,11 @@ class InboundCallHandler:
         session.execute(
             text("""
                 INSERT INTO call_records
-                (uuid, user_id, reseller_id, call_flow, caller, callee,
+                (uuid, user_id, reseller_id, call_flow, caller, caller_id, callee,
                  incoming_trunk_id, did_id, sip_account_id,
                  call_start, disposition, status, created_at)
                 VALUES
-                (:uuid, :user_id, :reseller_id, 'trunk_to_sip', :caller, :callee,
+                (:uuid, :user_id, :reseller_id, 'trunk_to_sip', :caller, :caller_id, :callee,
                  :trunk_id, :did_id, :sip_account_id,
                  NOW(), 'ANSWERED', 'in_progress', NOW())
             """),
@@ -255,7 +284,8 @@ class InboundCallHandler:
                 "uuid": cdr_uuid,
                 "user_id": did.user_id,
                 "reseller_id": did.reseller_id,
-                "caller": caller_id,
+                "caller": raw_caller,
+                "caller_id": clean_caller,
                 "callee": extension,
                 "trunk_id": trunk_id,
                 "did_id": did.id,
@@ -269,6 +299,7 @@ class InboundCallHandler:
         await agi.set_variable("ROUTE_DIAL_STRING", dial_string)
         await agi.set_variable("ROUTE_DIAL_TIMEOUT", dial_timeout)
         await agi.set_variable("CDR_UUID", cdr_uuid)
+        await agi.set_variable("RECORD_CALL", "1" if sip_fwd and sip_fwd.allow_recording else "0")
 
         # Set forward variables for DID→SIP with CFNR/CFB
         if sip_fwd and sip_fwd.call_forward_enabled and sip_fwd.call_forward_type in ('cfnr', 'cfb', 'cfnr_cfb'):
@@ -285,7 +316,7 @@ class InboundCallHandler:
                 await agi.set_variable("FORWARD_USER_ID", str(sip_fwd.user_id))
                 await agi.set_variable("FORWARD_RESELLER_ID", str(sip_fwd.reseller_id or ''))
 
-    async def _handle_forwarding(self, agi, session, sip, caller_id, extension, trunk_id):
+    async def _handle_forwarding(self, agi, session, sip, caller_id, extension, trunk_id, raw_caller=None, clean_caller=None):
         """Handle CFU (unconditional forward). Returns True if handled."""
         if not sip.call_forward_enabled:
             return False
@@ -310,19 +341,20 @@ class InboundCallHandler:
         session.execute(
             text("""
                 INSERT INTO call_records
-                (uuid, user_id, reseller_id, call_flow, caller, callee,
+                (uuid, user_id, reseller_id, call_flow, caller, caller_id, callee,
                  forwarded_from, incoming_trunk_id, sip_account_id,
                  call_start, disposition, status, created_at)
                 VALUES
                 (:uuid, :user_id, :reseller_id, 'trunk_to_sip',
-                 :caller, :callee, :fwd_from, :trunk_id, :sip_id,
+                 :caller, :caller_id, :callee, :fwd_from, :trunk_id, :sip_id,
                  NOW(), 'ANSWERED', 'in_progress', NOW())
             """),
             {
                 "uuid": cdr_uuid,
                 "user_id": sip.user_id,
                 "reseller_id": sip.reseller_id,
-                "caller": caller_id,
+                "caller": raw_caller or caller_id,
+                "caller_id": clean_caller or caller_id,
                 "callee": fwd_dest,
                 "fwd_from": sip.username,
                 "trunk_id": trunk_id,
