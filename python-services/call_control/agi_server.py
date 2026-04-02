@@ -20,6 +20,7 @@ from call_control.outbound_handler import OutboundCallHandler
 from call_control.inbound_handler import InboundCallHandler
 from call_control.call_end_handler import CallEndHandler
 from call_control.broadcast_handler import BroadcastCallHandler
+from call_control.forward_handler import ForwardCallHandler
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ _outbound = OutboundCallHandler()
 _inbound = InboundCallHandler()
 _call_end = CallEndHandler()
 _broadcast = BroadcastCallHandler()
+_forward = ForwardCallHandler()
 
 
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -56,6 +58,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                 await _call_end.handle(conn, session)
             elif script == "broadcast_call":
                 await _broadcast.handle(conn, session)
+            elif script == "forward_call":
+                await _forward.handle(conn, session)
             else:
                 logger.warning(f"Unknown AGI script: {script}")
                 await conn.verbose(f"rSwitch: Unknown script '{script}'")

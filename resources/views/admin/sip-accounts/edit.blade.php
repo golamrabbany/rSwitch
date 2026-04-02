@@ -299,6 +299,105 @@
                     </div>
                 </div>
 
+                {{-- Call Forwarding --}}
+                <div class="form-card" x-data="{
+                    cfEnabled: {{ old('call_forward_enabled', $sipAccount->call_forward_enabled) ? 'true' : 'false' }},
+                    destType: '{{ old('call_forward_dest_type', $sipAccount->call_forward_dest_type ?? 'number') }}'
+                }">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Call Forwarding</h3>
+                        <p class="form-card-subtitle">Forward incoming calls to another number or via routing rules</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-4">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">Enable Call Forwarding</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Forward calls to a SIP account, mobile number, or via routing rules</p>
+                            </div>
+                            <input type="hidden" name="call_forward_enabled" :value="cfEnabled ? '1' : '0'">
+                            <button type="button" @click="cfEnabled = !cfEnabled"
+                                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                :class="cfEnabled ? 'bg-indigo-600' : 'bg-gray-200'"
+                                role="switch" :aria-checked="cfEnabled">
+                                <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                    :class="cfEnabled ? 'translate-x-5' : 'translate-x-0'"></span>
+                            </button>
+                        </div>
+
+                        <div x-show="cfEnabled" x-cloak class="space-y-4">
+                            {{-- Destination Type Toggle --}}
+                            <div class="form-group">
+                                <label class="form-label">Destination Type</label>
+                                <input type="hidden" name="call_forward_dest_type" :value="destType">
+                                <div class="flex gap-2">
+                                    <button type="button" @click="destType = 'number'"
+                                            :class="destType === 'number' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'"
+                                            class="flex-1 py-2 px-4 rounded-lg border text-sm font-medium transition-all text-center">
+                                        Number
+                                    </button>
+                                    <button type="button" @click="destType = 'route'"
+                                            :class="destType === 'route' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'"
+                                            class="flex-1 py-2 px-4 rounded-lg border text-sm font-medium transition-all text-center">
+                                        Route (via Routing Rules)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="form-group">
+                                    <label for="call_forward_type" class="form-label">Forward Type</label>
+                                    <select id="call_forward_type" name="call_forward_type" class="form-input">
+                                        <option value="cfu" {{ old('call_forward_type', $sipAccount->call_forward_type) === 'cfu' ? 'selected' : '' }}>Unconditional (CFU)</option>
+                                        <option value="cfnr" {{ old('call_forward_type', $sipAccount->call_forward_type) === 'cfnr' ? 'selected' : '' }}>No Reply (CFNR)</option>
+                                        <option value="cfb" {{ old('call_forward_type', $sipAccount->call_forward_type) === 'cfb' ? 'selected' : '' }}>Busy (CFB)</option>
+                                        <option value="cfnr_cfb" {{ old('call_forward_type', $sipAccount->call_forward_type) === 'cfnr_cfb' ? 'selected' : '' }}>No Reply + Busy</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group" x-show="destType === 'number'">
+                                    <label for="call_forward_destination" class="form-label">Forward To</label>
+                                    <input type="text" id="call_forward_destination" name="call_forward_destination"
+                                           value="{{ old('call_forward_destination', $sipAccount->call_forward_destination) }}"
+                                           class="form-input font-mono" placeholder="SIP account or mobile number">
+                                </div>
+                                <div class="form-group" x-show="destType === 'route'" x-cloak>
+                                    <label class="form-label">Forward To</label>
+                                    <div class="form-input bg-gray-50 text-gray-600 text-sm">
+                                        SIP number → Routing Rules → Trunk
+                                    </div>
+                                    <p class="form-hint">Uses the SIP username as destination, routed via matching trunk rules</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="call_forward_timeout" class="form-label">Ring Timeout (s)</label>
+                                    <input type="number" id="call_forward_timeout" name="call_forward_timeout"
+                                           value="{{ old('call_forward_timeout', $sipAccount->call_forward_timeout ?? 20) }}"
+                                           class="form-input" min="5" max="120" placeholder="20">
+                                    <p class="form-hint">Seconds to ring before forwarding (CFNR)</p>
+                                </div>
+                            </div>
+
+                            <template x-if="destType === 'route'">
+                                <div class="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                                    <p class="text-xs text-indigo-700">
+                                        <strong>Route mode:</strong> The SIP number ({{ $sipAccount->username }}) will be sent to the matching trunk via routing rules.
+                                        Remove/Add prefix and MNP will be applied automatically.
+                                    </p>
+                                </div>
+                            </template>
+
+                            <div class="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                <p class="text-xs text-amber-700">
+                                    <strong>CFU:</strong> Always forward, never ring this account.
+                                    <strong>CFNR:</strong> Ring first, forward if no answer.
+                                    <strong>CFB:</strong> Forward only when busy.
+                                    Forwarding to a mobile number will be billed to the account owner.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- Caller ID --}}
                 <div class="form-card">
                     <div class="form-card-header">

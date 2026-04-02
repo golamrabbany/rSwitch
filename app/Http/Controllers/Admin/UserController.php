@@ -19,7 +19,11 @@ class UserController extends Controller
     {
         $authUser = auth()->user();
         $query = User::with('parent', 'rateGroup', 'kycProfile.reviewer')
-            ->withCount(['children', 'sipAccounts']);
+            ->withCount(['children', 'sipAccounts'])
+            ->selectSub(
+                "SELECT COUNT(*) FROM sip_accounts WHERE user_id = users.id OR user_id IN (SELECT id FROM users AS c WHERE c.parent_id = users.id)",
+                'descendant_sip_count'
+            );
 
         // Apply scoping for non-super admins
         if (!$authUser->isSuperAdmin()) {

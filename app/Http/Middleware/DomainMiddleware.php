@@ -11,12 +11,8 @@ class DomainMiddleware
     /**
      * Restrict access based on domain.
      *
-     * Usage: middleware('domain:admin') — only admin roles on admin domain
-     *        middleware('domain:client') — only reseller/client roles on client domain
-     *
-     * Domains configured in config/app.php:
-     *   'admin_domain' => 'admin.webvoice.net'
-     *   'client_domain' => 'webvoice.net'
+     * domain:admin — these routes only accessible on admin domain
+     * domain:client — these routes only accessible on client domain
      *
      * If domains are not configured, middleware is bypassed (single-domain mode).
      */
@@ -31,20 +27,15 @@ class DomainMiddleware
         }
 
         $currentHost = $request->getHost();
-        $user = $request->user();
-
-        if (!$user) {
-            return $next($request);
-        }
 
         if ($type === 'admin') {
-            // Admin domain: only admin roles allowed
-            if ($currentHost === $clientDomain && $user->isAnyAdmin()) {
+            // Admin routes: block if accessed from client domain
+            if ($currentHost === $clientDomain) {
                 abort(403, 'Admin panel is not accessible from this domain.');
             }
         } elseif ($type === 'client') {
-            // Client domain: only reseller/client roles allowed
-            if ($currentHost === $adminDomain && ($user->isReseller() || $user->isClient())) {
+            // Client/reseller routes: block if accessed from admin domain
+            if ($currentHost === $adminDomain) {
                 abort(403, 'Client panel is not accessible from this domain.');
             }
         }

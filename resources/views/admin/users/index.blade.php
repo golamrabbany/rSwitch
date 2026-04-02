@@ -279,7 +279,7 @@
                             <td class="px-3 py-2 text-center">
                                 <span class="tabular-nums text-gray-700">{{ $user->children_count }}</span>
                                 <span class="text-gray-300 mx-0.5">/</span>
-                                <span class="tabular-nums text-gray-700">{{ $user->sip_accounts_count }}</span>
+                                <span class="tabular-nums text-gray-700">{{ $user->descendant_sip_count ?? $user->sip_accounts_count }}</span>
                             </td>
                         @else
                             <td class="px-3 py-2 text-center">

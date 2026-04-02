@@ -8,6 +8,7 @@ use App\Services\AuditService;
 use App\Services\SipProvisioningService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Http;
 
 class SipAccountController extends Controller
@@ -63,7 +64,16 @@ class SipAccountController extends Controller
             'password' => 'nullable|string|min:6',
             'caller_id_name' => 'required|string|max:80',
             'caller_id_number' => 'required|string|max:20',
+            'call_forward_enabled' => 'boolean',
+            'call_forward_type' => ['nullable', Rule::in(['cfu', 'cfnr', 'cfb', 'cfnr_cfb'])],
+            'call_forward_destination' => 'nullable|string|max:50',
+            'call_forward_timeout' => 'nullable|integer|min:5|max:120',
         ]);
+
+        $validated['call_forward_enabled'] = $request->boolean('call_forward_enabled');
+        if (!$validated['call_forward_enabled']) {
+            $validated['call_forward_destination'] = null;
+        }
 
         $original = $sipAccount->getAttributes();
 

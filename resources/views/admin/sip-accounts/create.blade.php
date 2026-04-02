@@ -325,6 +325,56 @@
                     </div>
                 </div>
 
+                {{-- Call Forwarding --}}
+                <div class="form-card" x-data="{ cfEnabled: {{ old('call_forward_enabled') ? 'true' : 'false' }} }">
+                    <div class="form-card-header">
+                        <h3 class="form-card-title">Call Forwarding</h3>
+                        <p class="form-card-subtitle">Forward incoming calls to another number</p>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-4">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">Enable Call Forwarding</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Forward calls to a SIP account or mobile number</p>
+                            </div>
+                            <input type="hidden" name="call_forward_enabled" :value="cfEnabled ? '1' : '0'">
+                            <button type="button" @click="cfEnabled = !cfEnabled"
+                                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                :class="cfEnabled ? 'bg-indigo-600' : 'bg-gray-200'"
+                                role="switch" :aria-checked="cfEnabled">
+                                <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                    :class="cfEnabled ? 'translate-x-5' : 'translate-x-0'"></span>
+                            </button>
+                        </div>
+                        <div x-show="cfEnabled" x-cloak class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="form-group">
+                                    <label for="call_forward_type" class="form-label">Forward Type</label>
+                                    <select id="call_forward_type" name="call_forward_type" class="form-input">
+                                        <option value="cfu" {{ old('call_forward_type') === 'cfu' ? 'selected' : '' }}>Unconditional (CFU)</option>
+                                        <option value="cfnr" {{ old('call_forward_type', 'cfnr') === 'cfnr' ? 'selected' : '' }}>No Reply (CFNR)</option>
+                                        <option value="cfb" {{ old('call_forward_type') === 'cfb' ? 'selected' : '' }}>Busy (CFB)</option>
+                                        <option value="cfnr_cfb" {{ old('call_forward_type') === 'cfnr_cfb' ? 'selected' : '' }}>No Reply + Busy</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="call_forward_destination" class="form-label">Forward To</label>
+                                    <input type="text" id="call_forward_destination" name="call_forward_destination"
+                                           value="{{ old('call_forward_destination') }}"
+                                           class="form-input font-mono" placeholder="SIP account or mobile">
+                                </div>
+                                <div class="form-group">
+                                    <label for="call_forward_timeout" class="form-label">Ring Timeout (s)</label>
+                                    <input type="number" id="call_forward_timeout" name="call_forward_timeout"
+                                           value="{{ old('call_forward_timeout', 20) }}"
+                                           class="form-input" min="5" max="120">
+                                    <p class="form-hint">For CFNR — ring before forwarding</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- Caller ID --}}
                 <div class="form-card">
                     <div class="form-card-header">

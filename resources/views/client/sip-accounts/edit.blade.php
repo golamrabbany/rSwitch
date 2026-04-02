@@ -83,6 +83,11 @@
                             </div>
                         </div>
 
+                        {{-- Call Forwarding --}}
+                        <div class="border-t border-gray-200 pt-4 mt-4">
+                            <x-call-forward-fields :sipAccount="$sipAccount" />
+                        </div>
+
                         <div class="flex items-center justify-end gap-3 pt-2">
                             <a href="{{ route('client.sip-accounts.show', $sipAccount) }}" class="text-sm font-medium text-gray-600 hover:text-gray-800">Cancel</a>
                             <button type="submit" class="inline-flex items-center px-5 py-2.5 text-sm font-semibold text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">

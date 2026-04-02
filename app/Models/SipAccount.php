@@ -14,6 +14,7 @@ class SipAccount extends Model
         'user_id', 'username', 'password', 'auth_type', 'allowed_ips',
         'caller_id_name', 'caller_id_number', 'random_caller_id', 'max_channels',
         'codec_allow', 'allow_p2p', 'allow_recording',
+        'call_forward_enabled', 'call_forward_type', 'call_forward_dest_type', 'call_forward_destination', 'call_forward_timeout',
         'status', 'last_registered_at', 'last_registered_ip',
     ];
 
@@ -26,6 +27,8 @@ class SipAccount extends Model
             'random_caller_id' => 'boolean',
             'allow_p2p' => 'boolean',
             'allow_recording' => 'boolean',
+            'call_forward_enabled' => 'boolean',
+            'call_forward_timeout' => 'integer',
         ];
     }
 

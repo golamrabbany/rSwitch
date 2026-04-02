@@ -52,6 +52,10 @@ class RegisterController extends Controller
         // Find default parent (first super_admin)
         $superAdmin = User::where('role', 'super_admin')->orderBy('id')->first();
 
+        if (!$superAdmin) {
+            return back()->withInput()->withErrors(['email' => 'Registration is currently unavailable. Please contact support.']);
+        }
+
         return DB::transaction(function () use ($validated, $request, $superAdmin) {
             // Create user as client with pending KYC
             $user = User::create([

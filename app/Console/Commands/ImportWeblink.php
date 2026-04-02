@@ -590,9 +590,9 @@ class ImportWeblink extends Command
 
             $this->counts['sip_accounts']++;
 
-            // Provision to PJSIP realtime tables
+            // Provision to PJSIP realtime tables (skip AMI reload — do once at end)
             try {
-                $sipService->provision($sipAccount);
+                $sipService->provision($sipAccount, skipReload: true);
                 $this->counts['sip_provisioned']++;
             } catch (\Throwable $e) {
                 $this->warn("Failed to provision SIP '{$username}': {$e->getMessage()}");
@@ -600,6 +600,15 @@ class ImportWeblink extends Command
         }
 
         $this->info("Imported {$this->counts['sip_accounts']} SIP accounts ({$this->counts['sip_provisioned']} provisioned).");
+
+        // Single PJSIP reload at the end (instead of per-account)
+        $this->info('Reloading PJSIP...');
+        try {
+            $sipService->reloadPjsip();
+            $this->info('PJSIP reloaded.');
+        } catch (\Throwable $e) {
+            $this->warn("PJSIP reload failed: {$e->getMessage()} — reload manually on Asterisk.");
+        }
     }
 
     private function mapAccountTypeToRole(int $accountType): ?string

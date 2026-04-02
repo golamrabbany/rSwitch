@@ -52,6 +52,29 @@ BD_MNP_MAP = {
 }
 
 
+def _weighted_select(routes):
+    """Select a route using weighted random among same-priority candidates.
+    Routes are already sorted by prefix length DESC, priority ASC, weight DESC.
+    Pick from routes sharing the best (lowest) priority using weight as probability."""
+    import random
+
+    if len(routes) == 1:
+        return routes[0]
+
+    # Get the best priority (already sorted)
+    best_priority = routes[0].priority
+
+    # Filter candidates with same priority
+    candidates = [r for r in routes if r.priority == best_priority]
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # Weighted random selection
+    weights = [max(r.weight or 1, 1) for r in candidates]
+    return random.choices(candidates, weights=weights, k=1)[0]
+
+
 def _apply_bd_mnp(number: str) -> str:
     """Auto-convert BD number to MNP format: 880 + route_code + national_number.
     Non-BD numbers pass through unchanged."""
@@ -420,8 +443,10 @@ class OutboundCallHandler:
             await agi.verbose(f"rSwitch: No route for {extension} — played wrong_number")
             return
 
-        # Filter by time window (simplified — check first matching)
-        primary = routes[0]
+        # Weighted random selection among same-priority routes
+        primary = _weighted_select(routes)
+        # Failover = next best route (different trunk)
+        remaining = [r for r in routes if r.tid != primary.tid]
 
         # 8. Apply dial manipulation
         dial_number = extension
@@ -446,10 +471,10 @@ class OutboundCallHandler:
         trunk_endpoint = f"trunk-{primary.trunk_direction}-{primary.tid}"
         dial_string = f"PJSIP/{dial_number}@{trunk_endpoint}"
 
-        # Failover trunk
+        # Failover trunk (next best from remaining, excluding primary trunk)
         failover_string = ""
-        if len(routes) > 1:
-            failover = routes[1]
+        if remaining:
+            failover = remaining[0]
             fo_number = extension
             if failover.remove_prefix and fo_number.startswith(failover.remove_prefix):
                 fo_number = fo_number[len(failover.remove_prefix):]

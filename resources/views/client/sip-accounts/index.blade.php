@@ -46,6 +46,7 @@
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SIP Account</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller ID</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Chan</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Forward</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -71,6 +72,14 @@
                             <div class="text-xs text-gray-500 font-mono">{{ $sip->caller_id_number ?: '—' }}</div>
                         </td>
                         <td class="px-3 py-2 font-medium">{{ $sip->max_channels }}</td>
+                        <td class="px-3 py-2">
+                            @if($sip->call_forward_enabled && $sip->call_forward_destination)
+                                <div class="text-xs font-mono text-gray-900">{{ $sip->call_forward_destination }}</div>
+                                <div class="text-xs text-gray-400">{{ strtoupper($sip->call_forward_type) }}</div>
+                            @else
+                                <span class="text-xs text-gray-300">—</span>
+                            @endif
+                        </td>
                         <td class="px-3 py-2">
                             @if($sip->status === 'active')
                                 <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active</span>

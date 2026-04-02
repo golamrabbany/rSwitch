@@ -198,6 +198,11 @@ class SipAccountController extends Controller
             'codec_allow' => ['required', 'string', 'max:100'],
             'allow_p2p' => ['boolean'],
             'allow_recording' => ['boolean'],
+            'call_forward_enabled' => ['boolean'],
+            'call_forward_type' => ['nullable', Rule::in(['cfu', 'cfnr', 'cfb', 'cfnr_cfb'])],
+            'call_forward_dest_type' => ['nullable', Rule::in(['number', 'route'])],
+            'call_forward_destination' => ['nullable', 'string', 'max:50'],
+            'call_forward_timeout' => ['nullable', 'integer', 'min:5', 'max:120'],
         ], [
             'username.regex' => 'PIN must contain only numeric digits.',
             'username.min' => "PIN must be at least {$pinMinLen} digits after prefix '{$pinPrefix}' (total {$totalMinLen}).",
@@ -215,6 +220,10 @@ class SipAccountController extends Controller
         // Handle checkbox boolean conversion (unchecked checkboxes send nothing)
         $validated['allow_p2p'] = $request->boolean('allow_p2p');
         $validated['allow_recording'] = $request->boolean('allow_recording');
+        $validated['call_forward_enabled'] = $request->boolean('call_forward_enabled');
+        if (!$validated['call_forward_enabled']) {
+            $validated['call_forward_destination'] = null;
+        }
 
         // Only super admin can enable random caller ID
         $validated['random_caller_id'] = $authUser->isSuperAdmin() ? $request->boolean('random_caller_id') : false;
@@ -281,12 +290,21 @@ class SipAccountController extends Controller
             'codec_allow' => ['required', 'string', 'max:100'],
             'allow_p2p' => ['boolean'],
             'allow_recording' => ['boolean'],
+            'call_forward_enabled' => ['boolean'],
+            'call_forward_type' => ['nullable', Rule::in(['cfu', 'cfnr', 'cfb', 'cfnr_cfb'])],
+            'call_forward_dest_type' => ['nullable', Rule::in(['number', 'route'])],
+            'call_forward_destination' => ['nullable', 'string', 'max:50'],
+            'call_forward_timeout' => ['nullable', 'integer', 'min:5', 'max:120'],
             'status' => ['required', Rule::in(['active', 'suspended', 'disabled'])],
         ]);
 
         // Handle checkbox boolean conversion
         $validated['allow_p2p'] = $request->boolean('allow_p2p');
         $validated['allow_recording'] = $request->boolean('allow_recording');
+        $validated['call_forward_enabled'] = $request->boolean('call_forward_enabled');
+        if (!$validated['call_forward_enabled']) {
+            $validated['call_forward_destination'] = null;
+        }
 
         // Only super admin can toggle random caller ID
         if ($authUser->isSuperAdmin()) {

@@ -96,6 +96,10 @@ class SipAccountController extends Controller
             'caller_id_number' => ['nullable', 'string', 'max:20'],
             'max_channels' => ['nullable', 'integer', 'min:1', 'max:100'],
             'codec_allow' => ['required', 'string', 'max:100'],
+            'call_forward_enabled' => ['boolean'],
+            'call_forward_type' => ['nullable', Rule::in(['cfu', 'cfnr', 'cfb', 'cfnr_cfb'])],
+            'call_forward_destination' => ['nullable', 'string', 'max:50'],
+            'call_forward_timeout' => ['nullable', 'integer', 'min:5', 'max:120'],
         ], [
             'username.regex' => 'PIN must contain only numeric digits.',
             'username.min' => "PIN must be at least {$pinMinLen} digits after prefix '{$pinPrefix}' (total {$totalMinLen}).",
@@ -143,6 +147,11 @@ class SipAccountController extends Controller
             return back()->withInput()->withErrors([
                 'max_channels' => "Exceeds available channels. Client has {$availableChannels} of {$clientMaxChannels} channels available ({$usedChannels} used by other SIP accounts).",
             ]);
+        }
+
+        $validated['call_forward_enabled'] = $request->boolean('call_forward_enabled');
+        if (!$validated['call_forward_enabled']) {
+            $validated['call_forward_destination'] = null;
         }
 
         $sip = SipAccount::create($validated);
@@ -202,8 +211,17 @@ class SipAccountController extends Controller
             'caller_id_number' => ['required', 'string', 'max:20'],
             'max_channels' => ['required', 'integer', 'min:1', 'max:100'],
             'codec_allow' => ['required', 'string', 'max:100'],
+            'call_forward_enabled' => ['boolean'],
+            'call_forward_type' => ['nullable', Rule::in(['cfu', 'cfnr', 'cfb', 'cfnr_cfb'])],
+            'call_forward_destination' => ['nullable', 'string', 'max:50'],
+            'call_forward_timeout' => ['nullable', 'integer', 'min:5', 'max:120'],
             'status' => ['required', Rule::in(['active', 'suspended', 'disabled'])],
         ]);
+
+        $validated['call_forward_enabled'] = $request->boolean('call_forward_enabled');
+        if (!$validated['call_forward_enabled']) {
+            $validated['call_forward_destination'] = null;
+        }
 
         // Channel pool check — exclude current SIP account from used count
         $client = User::find($validated['user_id']);

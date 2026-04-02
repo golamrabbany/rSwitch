@@ -18,7 +18,7 @@ class SipProvisioningService
     /**
      * Provision a SIP account into Asterisk realtime tables.
      */
-    public function provision(SipAccount $sip): void
+    public function provision(SipAccount $sip, bool $skipReload = false): void
     {
         DB::transaction(function () use ($sip) {
             $id = $sip->username;
@@ -86,7 +86,9 @@ class SipProvisioningService
         });
 
         // Invalidate Sorcery memory cache so Asterisk picks up the changes
-        $this->reloadPjsip();
+        if (!$skipReload) {
+            $this->reloadPjsip();
+        }
     }
 
     /**
@@ -113,7 +115,7 @@ class SipProvisioningService
      * This forces Asterisk to re-read endpoints from the database
      * on next access, ensuring provisioning changes take effect immediately.
      */
-    private function reloadPjsip(): void
+    public function reloadPjsip(): void
     {
         try {
             $asteriskHost = config('services.ami.host', '127.0.0.1');

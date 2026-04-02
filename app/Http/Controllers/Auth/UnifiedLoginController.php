@@ -76,7 +76,7 @@ class UnifiedLoginController extends Controller
             \Log::warning('OTP email failed: ' . $e->getMessage());
         }
 
-        RateLimiter::clear($key);
+        // Don't clear rate limiter here — clear after OTP verification
 
         // Mask email for display
         $parts = explode('@', $user->email);
@@ -144,10 +144,11 @@ class UnifiedLoginController extends Controller
             'otp_expires_at' => null,
         ]);
 
-        // Clear session data and rate limiter
+        // Clear session data and rate limiters
         $remember = session('otp_remember', false);
         session()->forget(['otp_user_id', 'otp_remember']);
         RateLimiter::clear($key);
+        RateLimiter::clear('login-attempt:' . $request->ip());
 
         // Login the user
         Auth::login($user, $remember);

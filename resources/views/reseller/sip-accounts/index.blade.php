@@ -70,6 +70,7 @@
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller ID</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Chan</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Forward</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -105,6 +106,14 @@
                         </td>
                         <td class="px-3 py-2 font-medium">{{ $sip->max_channels }}</td>
                         <td class="px-3 py-2">
+                            @if($sip->call_forward_enabled && $sip->call_forward_destination)
+                                <div class="text-xs font-mono text-gray-900">{{ $sip->call_forward_destination }}</div>
+                                <div class="text-xs text-gray-400">{{ strtoupper($sip->call_forward_type) }}</div>
+                            @else
+                                <span class="text-xs text-gray-300">—</span>
+                            @endif
+                        </td>
+                        <td class="px-3 py-2">
                             @if($sip->status === 'active')
                                 <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active</span>
                             @elseif($sip->status === 'suspended')
@@ -121,7 +130,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                     </svg>
                                 </a>
-                                <button @click="openEdit({{ json_encode(['id' => $sip->id, 'user_id' => $sip->user_id, 'password' => $sip->password, 'caller_id_name' => $sip->caller_id_name, 'caller_id_number' => $sip->caller_id_number, 'max_channels' => $sip->max_channels, 'codec_allow' => $sip->codec_allow, 'status' => $sip->status]) }})" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
+                                <button @click="openEdit({{ json_encode(['id' => $sip->id, 'user_id' => $sip->user_id, 'password' => $sip->password, 'caller_id_name' => $sip->caller_id_name, 'caller_id_number' => $sip->caller_id_number, 'max_channels' => $sip->max_channels, 'codec_allow' => $sip->codec_allow, 'status' => $sip->status, 'call_forward_enabled' => $sip->call_forward_enabled, 'call_forward_type' => $sip->call_forward_type, 'call_forward_destination' => $sip->call_forward_destination, 'call_forward_timeout' => $sip->call_forward_timeout]) }})" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
@@ -316,6 +325,37 @@
 
                             </div>{{-- /kycError disable wrapper --}}
 
+                            {{-- Call Forwarding --}}
+                            <div class="border-t border-gray-200 pt-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-sm font-medium text-gray-900">Call Forwarding</span>
+                                    <input type="hidden" name="call_forward_enabled" :value="form.call_forward_enabled ? '1' : '0'">
+                                    <button type="button" @click="form.call_forward_enabled = !form.call_forward_enabled"
+                                        class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+                                        :class="form.call_forward_enabled ? 'bg-emerald-500' : 'bg-gray-200'"
+                                        role="switch">
+                                        <span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200"
+                                            :class="form.call_forward_enabled ? 'translate-x-4' : 'translate-x-0'"></span>
+                                    </button>
+                                </div>
+                                <div x-show="form.call_forward_enabled" x-cloak class="flex gap-2">
+                                    <div class="w-2/5">
+                                        <select name="call_forward_type" x-model="form.call_forward_type" class="form-input text-sm">
+                                            <option value="cfu">Unconditional</option>
+                                            <option value="cfnr">No Reply</option>
+                                            <option value="cfb">Busy</option>
+                                            <option value="cfnr_cfb">No Reply+Busy</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex-1">
+                                        <input type="text" name="call_forward_destination" x-model="form.call_forward_destination" class="form-input font-mono text-sm" placeholder="SIP or mobile number">
+                                    </div>
+                                    <div class="w-20">
+                                        <input type="number" name="call_forward_timeout" x-model="form.call_forward_timeout" class="form-input text-sm text-center" min="5" max="120" placeholder="20" title="Timeout (seconds)">
+                                    </div>
+                                </div>
+                            </div>
+
                             {{-- Status (edit only) --}}
                             <template x-if="mode === 'edit'">
                                 <div>
@@ -401,6 +441,10 @@ function sipPage() {
             max_channels: '{{ \App\Models\SystemSetting::get('default_max_channels', 10) }}',
             codec_allow: 'ulaw',
             status: 'active',
+            call_forward_enabled: false,
+            call_forward_type: 'cfnr',
+            call_forward_destination: '',
+            call_forward_timeout: 20,
         },
         openAdd() {
             this.mode = 'add';
@@ -415,6 +459,10 @@ function sipPage() {
                 max_channels: '{{ \App\Models\SystemSetting::get('default_max_channels', 10) }}',
                 codec_allow: 'ulaw',
                 status: 'active',
+                call_forward_enabled: false,
+                call_forward_type: 'cfnr',
+                call_forward_destination: '',
+                call_forward_timeout: 20,
             };
             this.showModal = true;
         },
@@ -433,6 +481,10 @@ function sipPage() {
                 max_channels: String(data.max_channels),
                 codec_allow: data.codec_allow || 'ulaw',
                 status: data.status || 'active',
+                call_forward_enabled: !!data.call_forward_enabled,
+                call_forward_type: data.call_forward_type || 'cfnr',
+                call_forward_destination: data.call_forward_destination || '',
+                call_forward_timeout: data.call_forward_timeout || 20,
             };
             this.showModal = true;
         }
