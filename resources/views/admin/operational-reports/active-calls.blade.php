@@ -296,8 +296,8 @@
             : '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-purple-100 text-purple-700">OUT</span>';
 
         const durationEl = call.state === 'answered'
-            ? '<span class="relative flex h-2 w-2 inline-block mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span><span class="font-medium text-green-600 call-duration" data-started="' + call.started_at + '">' + formatDuration(call.duration) + '</span>'
-            : '<span class="font-medium text-gray-600 call-duration" data-started="' + call.started_at + '">' + formatDuration(call.duration) + '</span>';
+            ? '<span class="relative flex h-2 w-2 inline-block mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span><span class="font-medium text-green-600 call-duration" data-answered="' + (call.answered_at || '') + '">' + formatDuration(call.duration) + '</span>'
+            : '<span class="text-gray-400 italic">Ringing…</span>';
 
         tr.innerHTML = `
             <td class="px-4 py-3">${statusBadge}</td>
@@ -320,6 +320,11 @@
             const statusCell = row.querySelector('td:first-child');
             if (statusCell) {
                 statusCell.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>';
+            }
+            // Swap "Ringing…" → live billable duration ticker
+            const durationCell = row.querySelector('td:nth-child(5)');
+            if (durationCell) {
+                durationCell.innerHTML = '<span class="relative flex h-2 w-2 inline-block mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span><span class="font-medium text-green-600 call-duration" data-answered="' + (call.answered_at || '') + '">' + formatDuration(call.duration) + '</span>';
             }
             // Flash green briefly
             row.classList.add('bg-emerald-50');
@@ -382,12 +387,12 @@
         }
     }
 
-    // Update durations every second
+    // Update durations every second — only for answered calls (data-answered set).
     setInterval(function() {
         document.querySelectorAll('.call-duration').forEach(el => {
-            const started = parseFloat(el.dataset.started);
-            if (started) {
-                const elapsed = Math.floor(Date.now() / 1000 - started);
+            const answered = parseFloat(el.dataset.answered);
+            if (answered) {
+                const elapsed = Math.floor(Date.now() / 1000 - answered);
                 el.textContent = formatDuration(elapsed);
             }
         });

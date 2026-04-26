@@ -22,12 +22,13 @@ class ActiveCall:
     """Represents an active call tracked via AMI events."""
 
     __slots__ = [
-        "unique_id", "channel", "caller", "callee", "call_flow",
+        "unique_id", "linked_id", "channel", "caller", "callee", "call_flow",
         "state", "started_at", "answered_at", "trunk", "sip_account",
     ]
 
-    def __init__(self, unique_id: str, channel: str):
+    def __init__(self, unique_id: str, channel: str, linked_id: str = ""):
         self.unique_id = unique_id
+        self.linked_id = linked_id or unique_id  # Linkedid groups legs of one call
         self.channel = channel
         self.caller = ""
         self.callee = ""
@@ -39,14 +40,12 @@ class ActiveCall:
         self.sip_account = ""
 
     def to_dict(self) -> dict:
-        duration = 0
-        if self.answered_at:
-            duration = int(time.time() - self.answered_at)
-        elif self.started_at:
-            duration = int(time.time() - self.started_at)
+        # Duration only counts billable time (post-answer). Ringing time = 0.
+        duration = int(time.time() - self.answered_at) if self.answered_at else 0
 
         return {
             "unique_id": self.unique_id,
+            "linked_id": self.linked_id,
             "channel": self.channel,
             "caller": self.caller,
             "callee": self.callee,
@@ -54,6 +53,7 @@ class ActiveCall:
             "state": self.state,
             "duration": duration,
             "started_at": self.started_at,
+            "answered_at": self.answered_at,
             "trunk": self.trunk,
             "sip_account": self.sip_account,
         }
@@ -152,10 +152,13 @@ class AMIListener:
                 if not uid or not channel or uid == '0' or channel == '0':
                     continue
                 if uid not in self._active_calls:
-                    call = ActiveCall(uid, channel)
+                    linked_id = getattr(event, 'Linkedid', '') or uid
+                    call = ActiveCall(uid, channel, linked_id)
                     call.caller = getattr(event, 'CallerIDNum', '') or ''
                     call.callee = getattr(event, 'ConnectedLineNum', '') or getattr(event, 'Exten', '') or ''
-                    call.state = "answered" if getattr(event, 'Duration', '0') != '0' else "ringing"
+                    if call.state == "ringing" and getattr(event, 'Duration', '0') != '0':
+                        call.state = "answered"
+                        call.answered_at = time.time()
                     # Only add if it looks like a real channel
                     if call.caller or call.callee or 'PJSIP' in channel:
                         self._active_calls[uid] = call
@@ -179,11 +182,12 @@ class AMIListener:
         """New channel created — a call is starting."""
         uid = event.get("Uniqueid", "")
         channel = event.get("Channel", "")
+        linked_id = event.get("Linkedid", "") or uid
 
         if not uid or not channel:
             return
 
-        call = ActiveCall(uid, channel)
+        call = ActiveCall(uid, channel, linked_id)
         call.caller = event.get("CallerIDNum", "")
         call.callee = event.get("Exten", "")
         call.state = "ringing"
@@ -459,17 +463,40 @@ class AMIListener:
     # Data access
     # ─────────────────────────────────────────────────────
 
+    def _dedupe_legs(self) -> list[ActiveCall]:
+        """One Asterisk call has 2 legs (caller + dialed). Group by linked_id
+        and keep the most informative leg per call."""
+        by_linked: dict[str, ActiveCall] = {}
+
+        def score(c: ActiveCall) -> tuple:
+            # Higher = better representative. Prefer answered, real caller/callee, oldest.
+            real_caller = bool(c.caller and c.caller != "<unknown>")
+            real_callee = bool(c.callee and c.callee not in ("<unknown>", "s", ""))
+            return (
+                1 if c.state == "answered" else 0,
+                int(real_caller) + int(real_callee),
+                -c.started_at,  # earlier started_at wins ties
+            )
+
+        for call in self._active_calls.values():
+            existing = by_linked.get(call.linked_id)
+            if existing is None or score(call) > score(existing):
+                by_linked[call.linked_id] = call
+
+        return list(by_linked.values())
+
     def get_active_calls_list(self) -> list[dict]:
-        """Return all active calls as a list of dicts."""
-        return [call.to_dict() for call in self._active_calls.values()]
+        """Return active calls as dicts, deduped by linked_id (one per call)."""
+        return [c.to_dict() for c in self._dedupe_legs()]
 
     def get_stats(self) -> dict:
-        """Return summary statistics for active calls."""
-        total = len(self._active_calls)
-        answered = sum(1 for c in self._active_calls.values() if c.state == "answered")
-        ringing = sum(1 for c in self._active_calls.values() if c.state == "ringing")
-        inbound = sum(1 for c in self._active_calls.values() if c.call_flow == "inbound")
-        outbound = sum(1 for c in self._active_calls.values() if c.call_flow == "outbound")
+        """Return summary statistics for active calls (deduped by linked_id)."""
+        calls = self._dedupe_legs()
+        total = len(calls)
+        answered = sum(1 for c in calls if c.state == "answered")
+        ringing = sum(1 for c in calls if c.state == "ringing")
+        inbound = sum(1 for c in calls if c.call_flow == "inbound")
+        outbound = sum(1 for c in calls if c.call_flow == "outbound")
 
         return {
             "total": total,
@@ -481,7 +508,7 @@ class AMIListener:
 
     @property
     def active_count(self) -> int:
-        return len(self._active_calls)
+        return len(self._dedupe_legs())
 
     @property
     def is_connected(self) -> bool:
