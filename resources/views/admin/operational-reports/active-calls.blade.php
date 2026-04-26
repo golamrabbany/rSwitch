@@ -21,48 +21,48 @@
 
     {{-- Stats Cards (compact) --}}
     <div class="mb-4 grid grid-cols-5 gap-2">
-        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
-            <div class="w-7 h-7 rounded-md bg-emerald-100 flex items-center justify-center shrink-0">
+        <div class="flex items-center gap-1.5 px-2 py-1.5 bg-white rounded-md border border-gray-200 min-w-0">
+            <div class="w-6 h-6 rounded bg-emerald-100 flex items-center justify-center shrink-0">
                 <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
             </div>
             <div class="flex items-baseline gap-1.5 min-w-0">
-                <p class="text-lg font-semibold text-emerald-600 leading-none tabular-nums" id="stat-total">{{ number_format($totalActive) }}</p>
+                <p class="text-base font-semibold text-emerald-600 leading-none tabular-nums" id="stat-total">{{ number_format($totalActive) }}</p>
                 <p class="text-xs text-gray-500 truncate">Active</p>
             </div>
         </div>
-        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
-            <div class="w-7 h-7 rounded-md bg-emerald-100 flex items-center justify-center shrink-0">
+        <div class="flex items-center gap-1.5 px-2 py-1.5 bg-white rounded-md border border-gray-200 min-w-0">
+            <div class="w-6 h-6 rounded bg-emerald-100 flex items-center justify-center shrink-0">
                 <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <div class="flex items-baseline gap-1.5 min-w-0">
-                <p class="text-lg font-semibold text-gray-900 leading-none tabular-nums" id="stat-answered">{{ number_format($answeredCount) }}</p>
+                <p class="text-base font-semibold text-gray-900 leading-none tabular-nums" id="stat-answered">{{ number_format($answeredCount) }}</p>
                 <p class="text-xs text-gray-500 truncate">Answered</p>
             </div>
         </div>
-        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
-            <div class="w-7 h-7 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
+        <div class="flex items-center gap-1.5 px-2 py-1.5 bg-white rounded-md border border-gray-200 min-w-0">
+            <div class="w-6 h-6 rounded bg-amber-100 flex items-center justify-center shrink-0">
                 <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
             </div>
             <div class="flex items-baseline gap-1.5 min-w-0">
-                <p class="text-lg font-semibold text-amber-600 leading-none tabular-nums" id="stat-ringing">{{ number_format($ringingCount) }}</p>
+                <p class="text-base font-semibold text-amber-600 leading-none tabular-nums" id="stat-ringing">{{ number_format($ringingCount) }}</p>
                 <p class="text-xs text-gray-500 truncate">Ringing</p>
             </div>
         </div>
-        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
-            <div class="w-7 h-7 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
+        <div class="flex items-center gap-1.5 px-2 py-1.5 bg-white rounded-md border border-gray-200 min-w-0">
+            <div class="w-6 h-6 rounded bg-blue-100 flex items-center justify-center shrink-0">
                 <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
             </div>
             <div class="flex items-baseline gap-1.5 min-w-0">
-                <p class="text-lg font-semibold text-gray-900 leading-none tabular-nums" id="stat-inbound">{{ number_format($inboundActive) }}</p>
+                <p class="text-base font-semibold text-gray-900 leading-none tabular-nums" id="stat-inbound">{{ number_format($inboundActive) }}</p>
                 <p class="text-xs text-gray-500 truncate">Inbound</p>
             </div>
         </div>
-        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
-            <div class="w-7 h-7 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
+        <div class="flex items-center gap-1.5 px-2 py-1.5 bg-white rounded-md border border-gray-200 min-w-0">
+            <div class="w-6 h-6 rounded bg-purple-100 flex items-center justify-center shrink-0">
                 <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             </div>
             <div class="flex items-baseline gap-1.5 min-w-0">
-                <p class="text-lg font-semibold text-gray-900 leading-none tabular-nums" id="stat-outbound">{{ number_format($outboundActive) }}</p>
+                <p class="text-base font-semibold text-gray-900 leading-none tabular-nums" id="stat-outbound">{{ number_format($outboundActive) }}</p>
                 <p class="text-xs text-gray-500 truncate">Outbound</p>
             </div>
         </div>
@@ -189,7 +189,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                 </svg>
             </div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-1">No Active Calls</h3>
+            <h3 class="text-base font-semibold text-gray-900 mb-1">No Active Calls</h3>
             <p class="text-gray-500 text-sm">Waiting for calls — updates appear instantly</p>
             <div class="mt-3 inline-flex items-center gap-2 text-xs text-gray-400">
                 <span class="relative flex h-2 w-2">
