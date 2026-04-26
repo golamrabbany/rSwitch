@@ -117,6 +117,9 @@ class AMIListener:
             await self._load_trunk_status()
             # Start periodic contact refresh
             asyncio.create_task(self._periodic_contact_refresh())
+            # Periodic snapshot so any client desync (missed Hangup, dropped
+            # WS frame) self-corrects within a few seconds.
+            asyncio.create_task(self._periodic_snapshot())
         except Exception as e:
             self._connected = False
             logger.warning(f"AMI connection failed: {e}")
@@ -522,6 +525,22 @@ class AMIListener:
                 await self._load_registered_contacts()
             except Exception as e:
                 logger.debug(f"Periodic contact refresh failed: {e}")
+
+    async def _periodic_snapshot(self):
+        """Broadcast a full active-calls snapshot every 10s so any UI desync
+        (missed event, dropped WS frame) self-corrects shortly after."""
+        while True:
+            await asyncio.sleep(10)
+            if not self._ws_clients:
+                continue
+            try:
+                await self._broadcast({
+                    "type": "snapshot",
+                    "calls": self.get_active_calls_list(),
+                    "stats": self.get_stats(),
+                })
+            except Exception as e:
+                logger.debug(f"Periodic snapshot failed: {e}")
 
     def get_registered_contacts(self) -> dict:
         """Return all registered contacts as {username: {ip, status, ...}}."""

@@ -294,12 +294,23 @@
         if (statInbound) statInbound.textContent = stats.inbound.toLocaleString();
         if (statOutbound) statOutbound.textContent = stats.outbound.toLocaleString();
         if (subtitle) subtitle.textContent = 'Real-time monitoring of ' + stats.total.toLocaleString() + ' ongoing calls';
+
+        // Safety net: if engine reports zero calls but the table still shows rows
+        // (e.g. a hangup event was missed for one leg), sweep them.
+        if (stats.total === 0 && callsTableBody && callsTableBody.children.length > 0) {
+            callsTableBody.innerHTML = '';
+            updateCallsCount();
+            if (callsTable) callsTable.classList.add('hidden');
+            if (emptyState) emptyState.classList.remove('hidden');
+        }
     }
 
     function renderCallsTable(calls) {
         if (!callsTableBody) return;
 
         if (calls.length === 0) {
+            callsTableBody.innerHTML = '';
+            updateCallsCount();
             if (callsTable) callsTable.classList.add('hidden');
             if (emptyState) emptyState.classList.remove('hidden');
             return;

@@ -54,14 +54,23 @@ class CallEndHandler:
             await agi.verbose("rSwitch: No CDR_UUID — skipping")
             return
 
-        # 2. Read call result variables
+        # 2. Read call result variables.
+        # ${CDR(billsec)} is 0 in the hangup-handler context (CDR not yet
+        # finalized). Use ANSWEREDTIME / DIALEDTIME — both set when Dial()
+        # returns and inherited into hangup handlers.
         dial_status = await agi.get_variable("DIALSTATUS") or "CANCEL"
-        duration_str = await agi.get_variable("CALL_DURATION") or "0"
-        billsec_str = await agi.get_variable("CALL_BILLSEC") or "0"
+        answered_str = await agi.get_variable("ANSWEREDTIME") or ""
+        dialed_str = await agi.get_variable("DIALEDTIME") or ""
+        # Legacy fallbacks (older calls / different dialplan paths).
+        duration_str = answered_str or await agi.get_variable("CALL_DURATION") or "0"
+        billsec_str = answered_str or await agi.get_variable("CALL_BILLSEC") or "0"
         hangup_cause = await agi.get_variable("HANGUPCAUSE") or ""
 
-        duration = int(duration_str) if duration_str.isdigit() else 0
-        billsec = int(billsec_str) if billsec_str.isdigit() else 0
+        billsec = int(answered_str) if answered_str.isdigit() else 0
+        ring_time = int(dialed_str) if dialed_str.isdigit() else 0
+        duration = billsec + ring_time
+        if duration == 0 and duration_str.isdigit():
+            duration = int(duration_str)
 
         # 3. Map to disposition
         disposition = DIALSTATUS_MAP.get(dial_status.upper(), "FAILED")
@@ -90,6 +99,27 @@ class CallEndHandler:
         else:
             status = "in_progress"  # Leave for billing service to process
 
+        # Last-resort fallback: if Asterisk gave us 0 but the call answered,
+        # compute wall-clock seconds from call_start. Slightly overcounts
+        # because it includes ring time, but better than billing 0.
+        if billsec == 0 and disposition == "ANSWERED":
+            wall = session.execute(
+                text("SELECT TIMESTAMPDIFF(SECOND, call_start, NOW()) AS s "
+                     "FROM call_records WHERE uuid = :uuid"),
+                {"uuid": cdr_uuid},
+            ).scalar() or 0
+            wall = max(0, int(wall))
+            if wall > 0:
+                logger.warning(
+                    f"CDR {cdr_uuid}: ANSWEREDTIME/DIALEDTIME both 0; "
+                    f"falling back to wall-clock {wall}s"
+                )
+                billsec = wall
+                duration = max(duration, wall)
+                # Re-evaluate billing status now that we have a non-zero billsec.
+                if cdr.call_flow != "sip_to_sip":
+                    status = "in_progress"
+
         # 5. Update CDR
         session.execute(
             text("""
@@ -113,9 +143,10 @@ class CallEndHandler:
         )
         session.commit()
 
-        await agi.verbose(
-            f"rSwitch: CDR {cdr_uuid} — {disposition} "
-            f"({billsec}s, status={status})"
+        logger.info(
+            f"CDR {cdr_uuid}: {disposition} duration={duration}s "
+            f"billsec={billsec}s status={status} "
+            f"(ANSWEREDTIME={answered_str!r} DIALEDTIME={dialed_str!r})"
         )
 
         # 6. Trigger billing for answered trunk calls
