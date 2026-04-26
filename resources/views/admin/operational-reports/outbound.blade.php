@@ -315,6 +315,12 @@
                                         @case('CONGESTION')
                                             <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span>
                                             @break
+                                        @case('UNREACHABLE')
+                                            <span class="inline-flex items-center gap-1 text-xs font-medium text-rose-700" title="Trunk was unreachable — call rejected before dial"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Unreachable</span>
+                                            @break
+                                        @case('NO_ROUTE')
+                                            <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-700"><span class="w-1.5 h-1.5 rounded-full bg-gray-500"></span>No Route</span>
+                                            @break
                                         @default
                                             <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>{{ $call->disposition ?? 'Unknown' }}</span>
                                     @endswitch

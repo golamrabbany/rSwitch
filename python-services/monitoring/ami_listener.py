@@ -74,6 +74,8 @@ class AMIListener:
         self._registered_contacts: dict[str, dict] = {}  # username → {ip, port, user_agent, registered_at}
         self._sip_to_client: dict[str, str] = {}  # sip username → owning user's name
         self._sip_client_loaded_at: float = 0.0
+        self._trunk_status: dict[str, str] = {}  # endpoint name → 'Avail' | 'Unreachable' | 'Unknown'
+        self._trunk_status_started_at: float = time.time()
         self._ws_clients: set = set()  # Connected WebSocket clients
         self._connected = False
         self._reconnect_task: Optional[asyncio.Task] = None
@@ -112,6 +114,7 @@ class AMIListener:
             self._reload_sip_client_map()
             await self._load_active_channels()
             await self._load_registered_contacts()
+            await self._load_trunk_status()
             # Start periodic contact refresh
             asyncio.create_task(self._periodic_contact_refresh())
         except Exception as e:
@@ -383,7 +386,7 @@ class AMIListener:
     # ─────────────────────────────────────────────────────
 
     async def _on_contact_status(self, manager, event):
-        """Track SIP registration status changes in real-time."""
+        """Track SIP registration AND trunk-qualify status changes in real-time."""
         uri = event.get("URI", "")
         status = event.get("ContactStatus", "")
         aor = event.get("AOR", "")
@@ -392,6 +395,19 @@ class AMIListener:
             return
 
         import re
+
+        # Trunk AORs are named "trunk-{direction}-{tid}-aor". The endpoint is
+        # the same string with the "-aor" suffix removed.
+        trunk_match = re.match(r"^(trunk-(?:in|out|both)-\d+)-aor$", aor)
+        if trunk_match:
+            endpoint = trunk_match.group(1)
+            normalized = "Avail" if status in ("Created", "Updated", "Reachable") else "Unreachable"
+            prev = self._trunk_status.get(endpoint)
+            self._trunk_status[endpoint] = normalized
+            if prev != normalized:
+                logger.info(f"Trunk {endpoint} status: {prev or 'unknown'} → {normalized}")
+            return
+
         # Extract IP from URI: sip:username@IP:port
         ip_match = re.search(r"@([\d.]+)", uri)
         ip = ip_match.group(1) if ip_match else ""
@@ -591,6 +607,57 @@ class AMIListener:
     @property
     def active_count(self) -> int:
         return len(self._dedupe_legs())
+
+    # ─────────────────────────────────────────────────────
+    # Trunk reachability
+    # ─────────────────────────────────────────────────────
+
+    async def _load_trunk_status(self) -> None:
+        """Bootstrap trunk reachability from Asterisk on startup. Without this
+        we'd have no data until the next qualify run (~60s).
+
+        Uses `asterisk -rx "pjsip show contacts"` because the AMI
+        PJSIPShowContacts action's event format isn't reliable across
+        Asterisk versions for trunk-style AORs. Output line example:
+            Contact:  trunk-both-3-aor/sip:10.243.16.5:5060   <hash> Avail   55.852
+        """
+        import asyncio as _asyncio
+        import re
+        try:
+            proc = await _asyncio.create_subprocess_exec(
+                "asterisk", "-rx", "pjsip show contacts",
+                stdout=_asyncio.subprocess.PIPE,
+                stderr=_asyncio.subprocess.DEVNULL,
+            )
+            stdout, _ = await proc.communicate()
+            text_out = stdout.decode("utf-8", errors="replace")
+
+            pattern = re.compile(
+                r"Contact:\s+(trunk-(?:in|out|both)-\d+)-aor/\S+\s+\S+\s+(\S+)"
+            )
+            for endpoint, status in pattern.findall(text_out):
+                # Status field is one of: Avail, NonQual, Unknown, Unreachable, NotInUse
+                self._trunk_status[endpoint] = "Avail" if status == "Avail" else "Unreachable"
+            logger.info(f"Loaded trunk status: {self._trunk_status}")
+        except Exception as e:
+            logger.debug(f"Could not load trunk status: {e}")
+
+    def is_trunk_available(self, endpoint: str) -> bool:
+        """Return True if the trunk's contact is qualified Reachable.
+        During a 90 s grace window after engine start, treat unknown as
+        available so we don't reject calls before the first qualify run."""
+        status = self._trunk_status.get(endpoint)
+        if status == "Avail":
+            return True
+        if status == "Unreachable":
+            return False
+        # Unknown: be permissive briefly, then start failing closed.
+        if time.time() - self._trunk_status_started_at < 90:
+            return True
+        return False
+
+    def get_trunk_status_map(self) -> dict[str, str]:
+        return dict(self._trunk_status)
 
     @property
     def is_connected(self) -> bool:

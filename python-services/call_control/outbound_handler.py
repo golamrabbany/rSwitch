@@ -459,6 +459,64 @@ class OutboundCallHandler:
         # Failover = next best route (different trunk)
         remaining = [r for r in routes if r.tid != primary.tid]
 
+        # Pre-flight reachability check: skip trunks whose qualify status is
+        # Unreachable so we don't blackhole the call into fake ringback.
+        from monitoring.ami_listener import get_ami_listener
+        ami = get_ami_listener()
+
+        def _ep(r) -> str:
+            return f"trunk-{r.trunk_direction}-{r.tid}"
+
+        if not ami.is_trunk_available(_ep(primary)):
+            promoted = next((r for r in remaining if ami.is_trunk_available(_ep(r))), None)
+            if promoted is not None:
+                await agi.verbose(
+                    f"rSwitch: trunk {_ep(primary)} unreachable — using {_ep(promoted)}"
+                )
+                primary = promoted
+                remaining = [r for r in routes if r.tid != primary.tid]
+            else:
+                # No reachable trunk — record CDR honestly and reject.
+                cdr_uuid = str(uuid.uuid4())
+                session.execute(
+                    text("""
+                        INSERT INTO call_records
+                        (uuid, sip_account_id, user_id, reseller_id, call_flow,
+                         caller, callee, destination, outgoing_trunk_id,
+                         src_ip, user_agent,
+                         call_start, disposition, status, hangup_cause, created_at)
+                        VALUES
+                        (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
+                         :caller, :callee, :destination, :trunk_id,
+                         :src_ip, :user_agent,
+                         NOW(), 'UNREACHABLE', 'completed', 503, NOW())
+                    """),
+                    {
+                        "uuid": cdr_uuid,
+                        "sip_id": row.id,
+                        "user_id": row.uid,
+                        "reseller_id": row.parent_id,
+                        "caller": caller_id,
+                        "callee": extension,
+                        "destination": extension,
+                        "trunk_id": primary.tid,
+                        "src_ip": src_ip,
+                        "user_agent": user_agent,
+                    },
+                )
+                session.commit()
+                await agi.set_variable("CDR_UUID", cdr_uuid)
+                await agi.set_variable("ROUTE_ACTION", "REJECT")
+                await agi.set_variable("ROUTE_REJECT_REASON", "trunk_unreachable")
+                await agi.verbose(
+                    f"rSwitch: all trunks unreachable for {extension} — rejected"
+                )
+                return
+
+        # Drop any unreachable failover candidates so Asterisk's Dial doesn't
+        # blackhole into them either.
+        remaining = [r for r in remaining if ami.is_trunk_available(_ep(r))]
+
         # 8. Apply dial manipulation
         dial_number = extension
 
