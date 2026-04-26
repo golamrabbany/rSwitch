@@ -13,6 +13,7 @@ Endpoints:
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from decimal import Decimal
 from typing import Optional
@@ -20,6 +21,13 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Configure root logger so logger.info() in handlers (AGI, billing, AMI) is visible.
+# Override with LOG_LEVEL env (default INFO).
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 from shared.config import get_settings
 from shared.redis_client import get_redis

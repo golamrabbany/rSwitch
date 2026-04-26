@@ -131,7 +131,7 @@ class OutboundCallHandler:
         # Get SIP device info
         src_ip_raw = await agi.get_variable("CHANNEL(pjsip,remote_addr)") or ""
         src_ip = src_ip_raw.split(":")[0] if src_ip_raw else ""  # Strip port
-        user_agent = await agi.get_variable("CHANNEL(pjsip,useragent)") or ""
+        user_agent = await agi.get_variable("PJSIP_HEADER(read,User-Agent)") or ""
 
         await agi.verbose(f"rSwitch: Outbound {caller_id} -> {extension} (IP:{src_ip})")
 
