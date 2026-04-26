@@ -35,6 +35,7 @@ class AgiConnection:
         self.reader = reader
         self.writer = writer
         self.env: dict[str, str] = {}
+        self.route_action: Optional[str] = None
         self._closed = False
 
     async def parse(self) -> None:
@@ -87,6 +88,9 @@ class AgiConnection:
 
     async def set_variable(self, name: str, value: str) -> None:
         """SET VARIABLE name value."""
+        # Track ROUTE_ACTION so handlers can detect rejection in a finally block.
+        if name == "ROUTE_ACTION":
+            self.route_action = str(value)
         # Quote value if it contains spaces
         if " " in str(value) or '"' in str(value):
             safe_value = str(value).replace('"', '\\"')

@@ -608,6 +608,28 @@ class AMIListener:
     def active_count(self) -> int:
         return len(self._dedupe_legs())
 
+    async def mark_call_rejected(self, unique_id: str, reason: str = "rejected") -> None:
+        """Called by the AGI handler when it rejects a call (e.g.
+        trunk_unreachable, no_balance). The dialplan still does Answer()
+        + Playback() to play a prompt, which would otherwise show the
+        channel as 'Answered' in Active Calls. Drop it from the live
+        list right away and tell WS clients to remove the row; the
+        normal Hangup event will be a no-op for it."""
+        call = self._active_calls.pop(unique_id, None)
+        if not call:
+            return
+        await self._broadcast({
+            "type": "call_end",
+            "unique_id": unique_id,
+            "linked_id": call.linked_id,
+            "caller": call.caller,
+            "callee": call.callee,
+            "duration": 0,
+            "reason": reason,
+            "stats": self.get_stats(),
+        })
+        logger.debug(f"Call {unique_id} marked rejected ({reason})")
+
     # ─────────────────────────────────────────────────────
     # Trunk reachability
     # ─────────────────────────────────────────────────────

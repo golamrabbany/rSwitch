@@ -123,6 +123,16 @@ class OutboundCallHandler:
             await agi.set_variable("ROUTE_ACTION", "REJECT")
             await agi.set_variable("ROUTE_REJECT_REASON", "internal_error")
 
+        # If the call was rejected, the dialplan will Answer() + Playback() the
+        # prompt — which makes Active Calls show it as 'Answered'. Tell the AMI
+        # listener to drop it from the live list so the UI is honest.
+        if agi.route_action == "REJECT":
+            try:
+                from monitoring.ami_listener import get_ami_listener
+                await get_ami_listener().mark_call_rejected(agi.get_unique_id())
+            except Exception as e:
+                logger.debug(f"mark_call_rejected failed: {e}")
+
     async def _process(self, agi: AgiConnection, session: Session) -> None:
         channel = agi.get_channel()
         extension = agi.get_extension()
