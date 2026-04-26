@@ -107,7 +107,7 @@ class OperationalReportController extends Controller
      */
     public function activeCalls(Request $request)
     {
-        $query = CallRecord::with(['user', 'sipAccount', 'incomingTrunk', 'outgoingTrunk', 'did'])
+        $query = CallRecord::with(['user', 'sipAccount.user', 'incomingTrunk', 'outgoingTrunk', 'did'])
             ->where('status', 'in_progress');
 
         // Search

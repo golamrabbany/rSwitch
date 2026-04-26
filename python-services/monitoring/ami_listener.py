@@ -23,7 +23,7 @@ class ActiveCall:
 
     __slots__ = [
         "unique_id", "linked_id", "channel", "caller", "callee", "call_flow",
-        "state", "started_at", "answered_at", "trunk", "sip_account",
+        "state", "started_at", "answered_at", "trunk", "sip_account", "client",
     ]
 
     def __init__(self, unique_id: str, channel: str, linked_id: str = ""):
@@ -38,6 +38,7 @@ class ActiveCall:
         self.answered_at: Optional[float] = None
         self.trunk = ""
         self.sip_account = ""
+        self.client = ""  # User name owning the SIP account
 
     def to_dict(self) -> dict:
         # Duration only counts billable time (post-answer). Ringing time = 0.
@@ -56,6 +57,7 @@ class ActiveCall:
             "answered_at": self.answered_at,
             "trunk": self.trunk,
             "sip_account": self.sip_account,
+            "client": self.client,
         }
 
 
@@ -70,6 +72,8 @@ class AMIListener:
         self.manager: Optional[Manager] = None
         self._active_calls: dict[str, ActiveCall] = {}  # unique_id → ActiveCall
         self._registered_contacts: dict[str, dict] = {}  # username → {ip, port, user_agent, registered_at}
+        self._sip_to_client: dict[str, str] = {}  # sip username → owning user's name
+        self._sip_client_loaded_at: float = 0.0
         self._ws_clients: set = set()  # Connected WebSocket clients
         self._connected = False
         self._reconnect_task: Optional[asyncio.Task] = None
@@ -105,6 +109,7 @@ class AMIListener:
                 f"{self.settings.asterisk_ami_port}"
             )
             # Load current state on connect
+            self._reload_sip_client_map()
             await self._load_active_channels()
             await self._load_registered_contacts()
             # Start periodic contact refresh
@@ -159,6 +164,14 @@ class AMIListener:
                     if call.state == "ringing" and getattr(event, 'Duration', '0') != '0':
                         call.state = "answered"
                         call.answered_at = time.time()
+                    # Direction + sip account + client (mirror _on_new_channel logic)
+                    if "trunk" in channel.lower() or channel.startswith("PJSIP/trunk"):
+                        call.call_flow = "inbound"
+                        call.trunk = channel.split("/")[1].split("-")[0] if "/" in channel else ""
+                    elif "/" in channel:
+                        call.call_flow = "outbound"
+                        call.sip_account = channel.split("/")[1].split("-")[0]
+                        call.client = self._lookup_client(call.sip_account)
                     # Only add if it looks like a real channel
                     if call.caller or call.callee or 'PJSIP' in channel:
                         self._active_calls[uid] = call
@@ -177,6 +190,46 @@ class AMIListener:
     # ─────────────────────────────────────────────────────
     # AMI Event Handlers
     # ─────────────────────────────────────────────────────
+
+    def _reload_sip_client_map(self) -> None:
+        """Cache SIP username → owning user's name. Called on connect and
+        refreshed periodically; ~14k rows is well under 2 MB in memory."""
+        try:
+            from shared.database import get_sync_engine
+            from sqlalchemy import text
+            engine = get_sync_engine()
+            with engine.connect() as conn:
+                rows = conn.execute(text(
+                    "SELECT s.username, u.name FROM sip_accounts s "
+                    "JOIN users u ON s.user_id = u.id"
+                )).fetchall()
+            self._sip_to_client = {r.username: (r.name or "") for r in rows}
+            self._sip_client_loaded_at = time.time()
+            logger.info(f"Loaded {len(self._sip_to_client)} SIP→client mappings")
+        except Exception as e:
+            logger.warning(f"Could not load SIP→client map: {e}")
+
+    def _lookup_client(self, sip_username: str) -> str:
+        """Resolve client name. If the cache misses (new account since startup),
+        do a one-shot DB read so it appears immediately."""
+        if not sip_username:
+            return ""
+        if sip_username in self._sip_to_client:
+            return self._sip_to_client[sip_username]
+        try:
+            from shared.database import get_sync_engine
+            from sqlalchemy import text
+            engine = get_sync_engine()
+            with engine.connect() as conn:
+                row = conn.execute(text(
+                    "SELECT u.name FROM sip_accounts s "
+                    "JOIN users u ON s.user_id = u.id WHERE s.username = :u LIMIT 1"
+                ), {"u": sip_username}).first()
+            name = (row.name if row else "") or ""
+            self._sip_to_client[sip_username] = name
+            return name
+        except Exception:
+            return ""
 
     async def _on_new_channel(self, manager, event):
         """New channel created — a call is starting."""
@@ -199,16 +252,29 @@ class AMIListener:
         else:
             call.call_flow = "outbound"
             call.sip_account = channel.split("/")[1].split("-")[0] if "/" in channel else ""
+            call.client = self._lookup_client(call.sip_account)
+
+        # Detect if this is a secondary leg of an already-tracked call.
+        # Asterisk creates 2 channels per call (caller leg + dialed leg),
+        # both share the same Linkedid. Only the first one becomes a UI row.
+        is_secondary_leg = any(
+            other.linked_id == linked_id and other.unique_id != uid
+            for other in self._active_calls.values()
+        )
 
         self._active_calls[uid] = call
 
-        await self._broadcast({
-            "type": "call_start",
-            "call": call.to_dict(),
-            "stats": self.get_stats(),
-        })
+        if not is_secondary_leg:
+            await self._broadcast({
+                "type": "call_start",
+                "call": call.to_dict(),
+                "stats": self.get_stats(),
+            })
 
-        logger.debug(f"New channel: uid={uid}, caller={call.caller}, callee={call.callee}")
+        logger.debug(
+            f"New channel: uid={uid}, linked={linked_id}, "
+            f"secondary={is_secondary_leg}, caller={call.caller}, callee={call.callee}"
+        )
 
     async def _on_new_state(self, manager, event):
         """Channel state changed — typically ringing → answered."""
@@ -255,16 +321,32 @@ class AMIListener:
         uid = event.get("Uniqueid", "")
 
         call = self._active_calls.pop(uid, None)
-        if call:
+        if not call:
+            return
+
+        # Only emit call_end when the LAST leg of this linked call is gone.
+        # The UI key is the leg that was broadcast as call_start (the first leg
+        # for this linked_id). If other legs remain, this hangup is silent.
+        other_legs_remain = any(
+            other.linked_id == call.linked_id
+            for other in self._active_calls.values()
+        )
+
+        if not other_legs_remain:
             await self._broadcast({
                 "type": "call_end",
                 "unique_id": uid,
+                "linked_id": call.linked_id,
                 "caller": call.caller,
                 "callee": call.callee,
                 "duration": int(time.time() - call.started_at),
                 "stats": self.get_stats(),
             })
-            logger.debug(f"Hangup: uid={uid}, caller={call.caller}")
+
+        logger.debug(
+            f"Hangup: uid={uid}, linked={call.linked_id}, "
+            f"others_remain={other_legs_remain}"
+        )
 
     async def _on_cdr(self, manager, event):
         """CDR written — trigger billing."""

@@ -19,27 +19,52 @@
         </div>
     </div>
 
-    {{-- Stats Cards --}}
-    <div class="mb-5" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:1rem;">
-        <div class="stat-card">
-            <div class="stat-icon bg-emerald-100"><svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></div>
-            <div class="stat-content"><p class="stat-value text-emerald-600" id="stat-total">{{ number_format($totalActive) }}</p><p class="stat-label">Active</p></div>
+    {{-- Stats Cards (compact) --}}
+    <div class="mb-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+            <div class="w-7 h-7 rounded-md bg-emerald-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            </div>
+            <div class="flex items-baseline gap-1.5 min-w-0">
+                <p class="text-lg font-semibold text-emerald-600 leading-none tabular-nums" id="stat-total">{{ number_format($totalActive) }}</p>
+                <p class="text-xs text-gray-500 truncate">Active</p>
+            </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-emerald-100"><svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-            <div class="stat-content"><p class="stat-value" id="stat-answered">{{ number_format($answeredCount) }}</p><p class="stat-label">Answered</p></div>
+        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+            <div class="w-7 h-7 rounded-md bg-emerald-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="flex items-baseline gap-1.5 min-w-0">
+                <p class="text-lg font-semibold text-gray-900 leading-none tabular-nums" id="stat-answered">{{ number_format($answeredCount) }}</p>
+                <p class="text-xs text-gray-500 truncate">Answered</p>
+            </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-amber-100"><svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg></div>
-            <div class="stat-content"><p class="stat-value text-amber-600" id="stat-ringing">{{ number_format($ringingCount) }}</p><p class="stat-label">Ringing</p></div>
+        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+            <div class="w-7 h-7 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            </div>
+            <div class="flex items-baseline gap-1.5 min-w-0">
+                <p class="text-lg font-semibold text-amber-600 leading-none tabular-nums" id="stat-ringing">{{ number_format($ringingCount) }}</p>
+                <p class="text-xs text-gray-500 truncate">Ringing</p>
+            </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-blue-100"><svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg></div>
-            <div class="stat-content"><p class="stat-value" id="stat-inbound">{{ number_format($inboundActive) }}</p><p class="stat-label">Inbound</p></div>
+        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+            <div class="w-7 h-7 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
+            </div>
+            <div class="flex items-baseline gap-1.5 min-w-0">
+                <p class="text-lg font-semibold text-gray-900 leading-none tabular-nums" id="stat-inbound">{{ number_format($inboundActive) }}</p>
+                <p class="text-xs text-gray-500 truncate">Inbound</p>
+            </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon bg-purple-100"><svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg></div>
-            <div class="stat-content"><p class="stat-value" id="stat-outbound">{{ number_format($outboundActive) }}</p><p class="stat-label">Outbound</p></div>
+        <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+            <div class="w-7 h-7 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            </div>
+            <div class="flex items-baseline gap-1.5 min-w-0">
+                <p class="text-lg font-semibold text-gray-900 leading-none tabular-nums" id="stat-outbound">{{ number_format($outboundActive) }}</p>
+                <p class="text-xs text-gray-500 truncate">Outbound</p>
+            </div>
         </div>
     </div>
 
@@ -85,45 +110,44 @@
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-gray-200">
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Dir</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-10">SL</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SIP</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Caller</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Callee</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Start Time</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SIP</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Dir</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 </tr>
             </thead>
             <tbody id="live-calls-tbody">
                 @foreach ($calls as $call)
                     <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100">
-                        <td class="px-3 py-2">
-                            @if($call->call_state === 'answered')
-                                <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>
-                            @elseif($call->call_state === 'ringing')
-                                <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>Ringing</span>
-                            @else
-                                <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse"></span>Processing</span>
-                            @endif
-                        </td>
-                        <td class="px-3 py-2">
-                            @if($call->call_flow === 'trunk_to_sip')
-                                <span class="inline-flex items-center gap-1 text-xs font-medium text-blue-700"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>IN</span>
-                            @else
-                                <span class="inline-flex items-center gap-1 text-xs font-medium text-purple-700"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>OUT</span>
-                            @endif
-                        </td>
-                        <td class="px-3 py-2 font-mono text-gray-900 text-xs">{{ $call->caller }}</td>
-                        <td class="px-3 py-2 font-mono text-gray-900 text-xs">{{ $call->callee }}</td>
-                        <td class="px-3 py-2">
-                            <span class="font-medium text-xs {{ $call->call_state === 'answered' ? 'text-emerald-600' : 'text-gray-600' }}">{{ $call->call_start->diffForHumans(null, true) }}</span>
-                            <p class="text-xs text-gray-400">{{ $call->call_start->format('H:i:s') }}</p>
-                        </td>
+                        <td class="px-3 py-2 text-gray-400 tabular-nums">{{ $loop->iteration }}</td>
                         <td class="px-3 py-2">
                             @if($call->sipAccount)
                                 <a href="{{ route('admin.sip-accounts.show', $call->sipAccount) }}" class="text-indigo-600 hover:text-indigo-500 font-mono text-xs">{{ $call->sipAccount->username }}</a>
                             @else
                                 <span class="text-gray-300">—</span>
+                            @endif
+                        </td>
+                        <td class="px-3 py-2 text-xs text-gray-700">
+                            @if($call->sipAccount && $call->sipAccount->user)
+                                {{ Str::limit($call->sipAccount->user->name, 18) }}
+                            @else
+                                <span class="text-gray-300">—</span>
+                            @endif
+                        </td>
+                        <td class="px-3 py-2 font-mono text-gray-900 text-xs">{{ $call->caller }}</td>
+                        <td class="px-3 py-2 font-mono text-gray-900 text-xs">{{ $call->callee }}</td>
+                        <td class="px-3 py-2 text-xs text-gray-600 tabular-nums">{{ $call->call_start->format('H:i:s') }}</td>
+                        <td class="px-3 py-2">
+                            @if($call->call_state === 'answered')
+                                <span class="font-medium text-xs text-emerald-600">{{ $call->call_start->diffForHumans(null, true) }}</span>
+                            @else
+                                <span class="text-xs text-gray-400 italic">Ringing…</span>
                             @endif
                         </td>
                         <td class="px-3 py-2 text-xs text-gray-600">
@@ -133,6 +157,22 @@
                                 {{ Str::limit($call->outgoingTrunk->name, 15) }}
                             @else
                                 <span class="text-gray-300">—</span>
+                            @endif
+                        </td>
+                        <td class="px-3 py-2">
+                            @if($call->call_flow === 'trunk_to_sip')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">IN</span>
+                            @else
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700">OUT</span>
+                            @endif
+                        </td>
+                        <td class="px-3 py-2">
+                            @if($call->call_state === 'answered')
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>
+                            @elseif($call->call_state === 'ringing')
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>Ringing</span>
+                            @else
+                                <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse"></span>Processing</span>
                             @endif
                         </td>
                     </tr>
@@ -237,7 +277,9 @@
                 break;
             case 'call_end':
                 updateStats(data.stats);
-                removeCallRow(data.unique_id);
+                // The displayed row may be keyed by either leg's unique_id,
+                // so try unique_id first, then fall back to linked_id.
+                removeCallRow(data.unique_id, data.linked_id);
                 break;
             case 'pong':
                 break;
@@ -285,44 +327,62 @@
 
         const tr = document.createElement('tr');
         tr.id = 'call-' + call.unique_id;
+        if (call.linked_id) tr.dataset.linked = call.linked_id;
         tr.className = 'hover:bg-gray-50 transition-colors animate-fade-in';
 
         const statusBadge = call.state === 'answered'
-            ? '<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>'
-            : '<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>Ringing</span>';
+            ? '<span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>'
+            : '<span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>Ringing</span>';
 
         const dirBadge = call.call_flow === 'inbound'
-            ? '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-700">IN</span>'
-            : '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-purple-100 text-purple-700">OUT</span>';
+            ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">IN</span>'
+            : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700">OUT</span>';
 
         const durationEl = call.state === 'answered'
             ? '<span class="relative flex h-2 w-2 inline-block mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span><span class="font-medium text-green-600 call-duration" data-answered="' + (call.answered_at || '') + '">' + formatDuration(call.duration) + '</span>'
-            : '<span class="text-gray-400 italic">Ringing…</span>';
+            : '<span class="text-xs text-gray-400 italic">Ringing…</span>';
 
+        const startedTime = call.started_at
+            ? new Date(call.started_at * 1000).toLocaleTimeString('en-GB', { hour12: false })
+            : '—';
+
+        // Column order: SL · SIP · Client · Caller · Callee · Start Time · Duration · Trunk · Dir · Status
         tr.innerHTML = `
-            <td class="px-4 py-3">${statusBadge}</td>
-            <td class="px-4 py-3">${dirBadge}</td>
-            <td class="px-4 py-3"><span class="font-mono text-gray-900">${escapeHtml(call.caller || '—')}</span></td>
-            <td class="px-4 py-3"><span class="font-mono text-gray-900">${escapeHtml(call.callee || '—')}</span></td>
-            <td class="px-4 py-3">${durationEl}</td>
-            <td class="px-4 py-3"><span class="text-gray-600">${escapeHtml(call.sip_account || '—')}</span></td>
-            <td class="px-4 py-3"><span class="text-gray-600">${escapeHtml(call.trunk || '—')}</span></td>
+            <td class="px-3 py-2 text-gray-400 tabular-nums sl-cell">·</td>
+            <td class="px-3 py-2"><span class="text-indigo-600 font-mono text-xs">${escapeHtml(call.sip_account || '—')}</span></td>
+            <td class="px-3 py-2 text-xs text-gray-700">${escapeHtml(call.client || '—')}</td>
+            <td class="px-3 py-2 font-mono text-gray-900 text-xs">${escapeHtml(call.caller || '—')}</td>
+            <td class="px-3 py-2 font-mono text-gray-900 text-xs">${escapeHtml(call.callee || '—')}</td>
+            <td class="px-3 py-2 text-xs text-gray-600 tabular-nums">${escapeHtml(startedTime)}</td>
+            <td class="px-3 py-2">${durationEl}</td>
+            <td class="px-3 py-2 text-xs text-gray-600">${escapeHtml(call.trunk || '—')}</td>
+            <td class="px-3 py-2">${dirBadge}</td>
+            <td class="px-3 py-2 status-cell">${statusBadge}</td>
         `;
 
         callsTableBody.prepend(tr);
+        renumberRows();
         updateCallsCount();
+    }
+
+    function renumberRows() {
+        if (!callsTableBody) return;
+        Array.from(callsTableBody.children).forEach((tr, idx) => {
+            const sl = tr.querySelector('.sl-cell');
+            if (sl) sl.textContent = (idx + 1).toString();
+        });
     }
 
     function updateCallRow(call) {
         const row = document.getElementById('call-' + call.unique_id);
         if (row) {
-            // Update status badge to answered
-            const statusCell = row.querySelector('td:first-child');
+            // Status column is now the last cell
+            const statusCell = row.querySelector('.status-cell');
             if (statusCell) {
-                statusCell.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>';
+                statusCell.innerHTML = '<span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>';
             }
-            // Swap "Ringing…" → live billable duration ticker
-            const durationCell = row.querySelector('td:nth-child(5)');
+            // Duration is column 7 (1=SL, 2=SIP, 3=Client, 4=Caller, 5=Callee, 6=Start, 7=Duration)
+            const durationCell = row.querySelector('td:nth-child(7)');
             if (durationCell) {
                 durationCell.innerHTML = '<span class="relative flex h-2 w-2 inline-block mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span><span class="font-medium text-green-600 call-duration" data-answered="' + (call.answered_at || '') + '">' + formatDuration(call.duration) + '</span>';
             }
@@ -334,12 +394,17 @@
         }
     }
 
-    function removeCallRow(uniqueId) {
-        const row = document.getElementById('call-' + uniqueId);
+    function removeCallRow(uniqueId, linkedId) {
+        let row = document.getElementById('call-' + uniqueId);
+        if (!row && linkedId) {
+            // Row may be keyed by the other leg's unique_id; find by linked_id.
+            row = callsTableBody?.querySelector('tr[data-linked="' + linkedId + '"]');
+        }
         if (row) {
             row.classList.add('bg-red-50', 'opacity-50');
             setTimeout(() => {
                 row.remove();
+                renumberRows();
                 updateCallsCount();
                 // Show empty state if no more rows
                 if (callsTableBody && callsTableBody.children.length === 0) {
