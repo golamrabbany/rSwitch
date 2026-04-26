@@ -144,7 +144,7 @@ gather_configuration() {
     echo ""
 
     read -p "Proceed with installation? (Y/n): " -n 1 -r; echo
-    [[ $REPLY =~ ^[Nn]$ ]] && exit 0
+    if [[ $REPLY =~ ^[Nn]$ ]]; then exit 0; fi
 }
 
 # =============================================================================

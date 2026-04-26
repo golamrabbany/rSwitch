@@ -235,7 +235,7 @@
             <div class="detail-card">
                 <div class="detail-card-header flex items-center justify-between">
                     <h3 class="detail-card-title">Routing Rules</h3>
-                    <a href="{{ route('admin.trunk-routes.create', ['trunk_id' => $trunk->id]) }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                    <a href="{{ route('admin.trunk-routes.index', ['add' => 1, 'trunk_id' => $trunk->id]) }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-700">
                         + Add Route
                     </a>
                 </div>
@@ -340,7 +340,7 @@
                 </div>
                 <div class="detail-card-body space-y-2">
                     @if(in_array($trunk->direction, ['outgoing', 'both']))
-                    <a href="{{ route('admin.trunk-routes.create', ['trunk_id' => $trunk->id]) }}" class="quick-action-btn">
+                    <a href="{{ route('admin.trunk-routes.index', ['add' => 1, 'trunk_id' => $trunk->id]) }}" class="quick-action-btn">
                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                         </svg>

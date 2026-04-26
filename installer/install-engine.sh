@@ -101,7 +101,7 @@ gather_configuration() {
     echo ""
 
     read -p "Proceed with installation? (Y/n): " -n 1 -r; echo
-    [[ $REPLY =~ ^[Nn]$ ]] && exit 0
+    if [[ $REPLY =~ ^[Nn]$ ]]; then exit 0; fi
 }
 
 # =============================================================================
@@ -132,21 +132,28 @@ install_mysql() {
         apt-get install -y -qq mysql-server mysql-client; systemctl start mysql; systemctl enable mysql
     fi
 
-    # Secure MySQL
+    # Determine root auth: passwordless socket → debian.cnf → set new password.
+    MYSQL_ROOT_AUTH=""
     if mysql -u root -e "SELECT 1" &>/dev/null; then
         mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_PASS}_root';"
+        MYSQL_ROOT_AUTH="-u root -p${DB_PASS}_root"
+    elif [[ -f /etc/mysql/debian.cnf ]] && mysql --defaults-file=/etc/mysql/debian.cnf -e "SELECT 1" &>/dev/null; then
+        log_info "Using existing MySQL via /etc/mysql/debian.cnf"
+        MYSQL_ROOT_AUTH="--defaults-file=/etc/mysql/debian.cnf"
+    else
+        log_warning "MySQL root credentials not auto-detected; skipping DB/user creation."
+        log_warning "Manually create database '${DB_NAME}', user '${DB_USER}'@'localhost' and '${DB_USER}'@'${APP_SERVER_IP}'."
+        return 0
     fi
 
-    MYSQL_ROOT_PASS="${DB_PASS}_root"
-
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DELETE FROM mysql.user WHERE User='';" 2>/dev/null || true
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');" 2>/dev/null || true
+    mysql ${MYSQL_ROOT_AUTH} -e "DELETE FROM mysql.user WHERE User='';" 2>/dev/null || true
+    mysql ${MYSQL_ROOT_AUTH} -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');" 2>/dev/null || true
 
     # Create database
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    mysql ${MYSQL_ROOT_AUTH} -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
     # Create users: local + remote (app server)
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
+    mysql ${MYSQL_ROOT_AUTH} -e "
         CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
         GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';
         CREATE USER IF NOT EXISTS '${DB_USER}'@'${APP_SERVER_IP}' IDENTIFIED BY '${DB_PASS}';
@@ -708,8 +715,15 @@ install_python_services() {
     PYTHON_DB_PASS=$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | head -c 16)
 
     if [[ "$INSTALL_MYSQL" == "yes" ]]; then
-        MYSQL_ROOT_PASS="${DB_PASS}_root"
-        mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
+        # Reuse the auth determined in install_mysql() when possible.
+        if [[ -z "${MYSQL_ROOT_AUTH:-}" ]]; then
+            if [[ -f /etc/mysql/debian.cnf ]] && mysql --defaults-file=/etc/mysql/debian.cnf -e "SELECT 1" &>/dev/null; then
+                MYSQL_ROOT_AUTH="--defaults-file=/etc/mysql/debian.cnf"
+            else
+                MYSQL_ROOT_AUTH="-u root -p${DB_PASS}_root"
+            fi
+        fi
+        mysql ${MYSQL_ROOT_AUTH} -e "
             CREATE USER IF NOT EXISTS 'python_svc'@'localhost' IDENTIFIED BY '${PYTHON_DB_PASS}';
             GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO 'python_svc'@'localhost';
             FLUSH PRIVILEGES;

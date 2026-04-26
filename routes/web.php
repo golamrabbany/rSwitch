@@ -63,7 +63,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:super_admin', 
     Route::resource('trunks', Admin\TrunkController::class);
     Route::post('trunks/{trunk}/reprovision', [Admin\TrunkController::class, 'reprovision'])->name('trunks.reprovision');
     Route::post('trunk-routes/test', [Admin\TrunkRouteController::class, 'testRoute'])->name('trunk-routes.test');
-    Route::resource('trunk-routes', Admin\TrunkRouteController::class)->except(['show']);
+    Route::resource('trunk-routes', Admin\TrunkRouteController::class)->except(['create', 'edit']);
 
     Route::get('trunk-monitor', [Admin\TrunkMonitorController::class, 'index'])->name('trunk-monitor.index');
     Route::post('trunk-monitor/refresh', [Admin\TrunkMonitorController::class, 'refresh'])->name('trunk-monitor.refresh');

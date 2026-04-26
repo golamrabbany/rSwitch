@@ -45,12 +45,23 @@ class TrunkRouteController extends Controller
         return view('admin.trunk-routes.index', compact('routes', 'trunks'));
     }
 
-    public function create(Request $request)
+    public function show(TrunkRoute $trunkRoute)
     {
-        $trunks = Trunk::outgoing()->active()->orderBy('name')->get();
-        $selectedTrunkId = $request->query('trunk_id');
-
-        return view('admin.trunk-routes.create', compact('trunks', 'selectedTrunkId'));
+        return response()->json([
+            'id'             => $trunkRoute->id,
+            'trunk_id'       => $trunkRoute->trunk_id,
+            'prefix'         => $trunkRoute->prefix,
+            'priority'       => $trunkRoute->priority,
+            'weight'         => $trunkRoute->weight,
+            'status'         => $trunkRoute->status,
+            'remove_prefix'  => $trunkRoute->remove_prefix,
+            'add_prefix'     => $trunkRoute->add_prefix,
+            'mnp_enabled'    => (bool) $trunkRoute->mnp_enabled,
+            'time_start'     => $trunkRoute->time_start,
+            'time_end'       => $trunkRoute->time_end,
+            'timezone'       => $trunkRoute->timezone,
+            'days_of_week'   => $trunkRoute->days_of_week,
+        ]);
     }
 
     public function store(Request $request)
@@ -64,21 +75,21 @@ class TrunkRouteController extends Controller
 
         AuditService::logCreated($route, 'trunk_route.created');
 
-        $redirect = redirect()->route('admin.trunk-routes.index', ['prefix' => $route->prefix])
-            ->with('success', "Routing rule for prefix {$route->prefix} created.");
+        $message = "Routing rule for prefix {$route->prefix} created.";
+        $redirectUrl = route('admin.trunk-routes.index', ['prefix' => $route->prefix]);
 
-        if ($overlap) {
-            $redirect = $redirect->with('warning', $overlap);
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success'  => true,
+                'message'  => $message,
+                'warning'  => $overlap,
+                'redirect' => $redirectUrl,
+            ]);
         }
 
-        return $redirect;
-    }
-
-    public function edit(TrunkRoute $trunkRoute)
-    {
-        $trunks = Trunk::outgoing()->orderBy('name')->get();
-
-        return view('admin.trunk-routes.edit', compact('trunkRoute', 'trunks'));
+        return redirect($redirectUrl)
+            ->with('success', $message)
+            ->when($overlap, fn ($r) => $r->with('warning', $overlap));
     }
 
     public function update(Request $request, TrunkRoute $trunkRoute)
@@ -93,14 +104,21 @@ class TrunkRouteController extends Controller
 
         AuditService::logUpdated($trunkRoute, $original, 'trunk_route.updated');
 
-        $redirect = redirect()->route('admin.trunk-routes.index', ['prefix' => $trunkRoute->prefix])
-            ->with('success', "Routing rule for prefix {$trunkRoute->prefix} updated.");
+        $message = "Routing rule for prefix {$trunkRoute->prefix} updated.";
+        $redirectUrl = route('admin.trunk-routes.index', ['prefix' => $trunkRoute->prefix]);
 
-        if ($overlap) {
-            $redirect = $redirect->with('warning', $overlap);
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success'  => true,
+                'message'  => $message,
+                'warning'  => $overlap,
+                'redirect' => $redirectUrl,
+            ]);
         }
 
-        return $redirect;
+        return redirect($redirectUrl)
+            ->with('success', $message)
+            ->when($overlap, fn ($r) => $r->with('warning', $overlap));
     }
 
     public function destroy(TrunkRoute $trunkRoute)
@@ -237,9 +255,9 @@ class TrunkRouteController extends Controller
             $validated['time_end'] .= ':00';
         }
 
-        // Convert empty strings to null
-        $validated['time_start'] = $validated['time_start'] ?: null;
-        $validated['time_end'] = $validated['time_end'] ?: null;
+        // Convert empty strings/missing keys to null
+        $validated['time_start'] = ($validated['time_start'] ?? null) ?: null;
+        $validated['time_end'] = ($validated['time_end'] ?? null) ?: null;
     }
 
     /**

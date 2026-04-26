@@ -14,12 +14,12 @@
                 </svg>
                 Test Route
             </button>
-            <a href="{{ route('admin.trunk-routes.create') }}" class="btn-action-primary-admin">
+            <button type="button" onclick="document.dispatchEvent(new CustomEvent('open-route-form', {detail: {mode: 'create'}}))" class="btn-action-primary-admin">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
                 Add Routing Rule
-            </a>
+            </button>
         </div>
     </div>
 
@@ -243,6 +243,257 @@
         </div>
     </div>
 
+    {{-- Routing Rule Add/Edit Modal --}}
+    <div x-data="routeFormModal()"
+         @open-route-form.document="openForm($event.detail)"
+         x-init="autoOpenFromQuery()">
+        <div x-show="open" x-cloak class="relative z-50" role="dialog" aria-modal="true" @keydown.escape.window="close()">
+            <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm"></div>
+
+            <div class="fixed inset-0 overflow-y-auto">
+                <div class="flex min-h-full items-start justify-center p-4 pt-10" @click="close()">
+                    <div x-show="open" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                         @click.stop class="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+
+                        {{-- Header --}}
+                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-base font-semibold text-gray-900" x-text="mode === 'edit' ? 'Edit Routing Rule' : 'Add Routing Rule'"></h3>
+                                    <p class="text-xs text-gray-500" x-text="mode === 'edit' ? 'Update trunk routing configuration' : 'Define a new trunk routing rule'"></p>
+                                </div>
+                            </div>
+                            <button @click="close()" type="button" class="rounded-lg p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        {{-- Body --}}
+                        <div class="px-6 py-5 overflow-y-auto flex-1">
+                            {{-- Loading overlay (edit fetch) --}}
+                            <div x-show="loading" x-cloak class="text-center py-8 text-sm text-gray-500">Loading routing rule...</div>
+
+                            <form x-show="!loading" @submit.prevent="submit()" class="space-y-6">
+                                {{-- Route Target --}}
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Route Target</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="form-group">
+                                            <label class="form-label">Trunk</label>
+                                            <div class="relative">
+                                                <input type="text"
+                                                       x-model="trunkSearch"
+                                                       @focus="showTrunkDropdown = true"
+                                                       @click="showTrunkDropdown = true"
+                                                       @input="showTrunkDropdown = true; form.trunk_id = ''"
+                                                       @keydown.escape.stop="showTrunkDropdown = false"
+                                                       class="form-input pr-10"
+                                                       placeholder="Type to search trunks..."
+                                                       autocomplete="off">
+                                                <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                                                    <template x-if="form.trunk_id">
+                                                        <button type="button" @click="clearTrunk()" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </template>
+                                                    <template x-if="!form.trunk_id">
+                                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                                        </svg>
+                                                    </template>
+                                                </div>
+                                                <div x-show="showTrunkDropdown" x-cloak x-transition
+                                                     @click.outside="showTrunkDropdown = false"
+                                                     class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                    <template x-if="filteredTrunks.length === 0">
+                                                        <div class="px-4 py-3 text-sm text-gray-500">No trunks found</div>
+                                                    </template>
+                                                    <template x-for="trunk in filteredTrunks" :key="trunk.id">
+                                                        <button type="button" @click="selectTrunk(trunk)"
+                                                                class="w-full px-4 py-2.5 text-left hover:bg-indigo-50 flex items-center justify-between transition-colors"
+                                                                :class="{ 'bg-indigo-50': form.trunk_id == trunk.id }">
+                                                            <div>
+                                                                <span class="font-medium text-gray-900" x-text="trunk.name"></span>
+                                                                <span class="text-gray-500 ml-1" x-text="'(' + trunk.provider + ')'"></span>
+                                                            </div>
+                                                            <span class="text-xs px-2 py-0.5 rounded-full"
+                                                                  :class="trunk.direction === 'outgoing' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'"
+                                                                  x-text="trunk.direction"></span>
+                                                        </button>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <p class="form-hint">Only outgoing/both trunks are shown.</p>
+                                            <p x-show="errors.trunk_id" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.trunk_id?.[0]"></p>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Destination Prefix</label>
+                                            <input type="text" x-model="form.prefix" required class="form-input font-mono" placeholder="e.g. 88017, 44, 1">
+                                            <p class="form-hint">Numeric digits only. Longer prefix = more specific match.</p>
+                                            <p x-show="errors.prefix" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.prefix?.[0]"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Priority & Load Balancing --}}
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Priority &amp; Load Balancing</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="form-group">
+                                            <label class="form-label">Priority</label>
+                                            <input type="number" x-model.number="form.priority" required min="1" max="100" class="form-input">
+                                            <p class="form-hint">Lower = higher priority</p>
+                                            <p x-show="errors.priority" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.priority?.[0]"></p>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Weight</label>
+                                            <input type="number" x-model.number="form.weight" required min="1" max="1000" class="form-input">
+                                            <p class="form-hint">Load balancing weight</p>
+                                            <p x-show="errors.weight" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.weight?.[0]"></p>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Status</label>
+                                            <select x-model="form.status" required class="form-input">
+                                                <option value="active">Active</option>
+                                                <option value="disabled">Disabled</option>
+                                            </select>
+                                            <p x-show="errors.status" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.status?.[0]"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Dial Manipulation --}}
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Dial Manipulation</h4>
+                                    <div class="p-3 bg-amber-50 rounded-lg border border-amber-100 mb-3">
+                                        <p class="text-xs text-amber-700 font-mono">Remove Prefix → Add Prefix → MNP Dipping → Trunk Manipulation</p>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="form-group">
+                                            <label class="form-label">Remove Prefix</label>
+                                            <input type="text" x-model="form.remove_prefix" class="form-input font-mono" placeholder="e.g. 880" maxlength="20">
+                                            <p class="form-hint">Strip from the beginning of the dialed number</p>
+                                            <p x-show="errors.remove_prefix" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.remove_prefix?.[0]"></p>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Add Prefix</label>
+                                            <input type="text" x-model="form.add_prefix" class="form-input font-mono" placeholder="e.g. 0" maxlength="20">
+                                            <p class="form-hint">Prepend to the dialed number (after removal)</p>
+                                            <p x-show="errors.add_prefix" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.add_prefix?.[0]"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- BD MNP --}}
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-3">BD MNP</h4>
+                                    <label class="flex items-center gap-2">
+                                        <input type="checkbox" x-model="form.mnp_enabled" class="form-checkbox">
+                                        <span class="text-sm text-gray-700">Enable BD MNP auto-conversion</span>
+                                    </label>
+                                    <p class="form-hint">Auto-converts BD mobile numbers to MNP format. Non-BD numbers pass through unchanged.</p>
+                                    <div class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                        <p class="text-xs font-medium text-gray-600 mb-2">Operator Routing Map</p>
+                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                                            <span class="text-gray-500">013,017 <span class="text-indigo-600">→ 71</span> <span class="text-gray-400">GP</span></span>
+                                            <span class="text-gray-500">014,019 <span class="text-indigo-600">→ 91</span> <span class="text-gray-400">BL</span></span>
+                                            <span class="text-gray-500">015 <span class="text-indigo-600">→ 51</span> <span class="text-gray-400">TT</span></span>
+                                            <span class="text-gray-500">016,018 <span class="text-indigo-600">→ 81</span> <span class="text-gray-400">Robi</span></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Time-Based Routing --}}
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Time-Based Routing</h4>
+                                    <label class="flex items-center gap-2">
+                                        <input type="checkbox" x-model="timeBasedRouting" class="form-checkbox">
+                                        <span class="text-sm text-gray-700">Enable time window restriction</span>
+                                    </label>
+                                    <p class="form-hint">Leave unchecked for routes that are always active.</p>
+
+                                    <div x-show="timeBasedRouting" x-cloak class="space-y-4 mt-4">
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div class="form-group">
+                                                <label class="form-label">Start Time</label>
+                                                <input type="time" x-model="form.time_start" class="form-input">
+                                                <p class="form-hint">Inclusive (e.g. 06:00)</p>
+                                                <p x-show="errors.time_start" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.time_start?.[0]"></p>
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="form-label">End Time</label>
+                                                <input type="time" x-model="form.time_end" class="form-input">
+                                                <p class="form-hint">Exclusive (e.g. 18:00)</p>
+                                                <p x-show="errors.time_end" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.time_end?.[0]"></p>
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="form-label">Timezone</label>
+                                                <select x-model="form.timezone" class="form-input">
+                                                    <option value="UTC">UTC</option>
+                                                    <option value="Asia/Dhaka">Asia/Dhaka (UTC+6)</option>
+                                                    <option value="Europe/London">Europe/London</option>
+                                                    <option value="Europe/Berlin">Europe/Berlin</option>
+                                                    <option value="America/New_York">America/New_York</option>
+                                                    <option value="America/Chicago">America/Chicago</option>
+                                                    <option value="America/Los_Angeles">America/Los_Angeles</option>
+                                                    <option value="Asia/Kolkata">Asia/Kolkata (UTC+5:30)</option>
+                                                    <option value="Asia/Singapore">Asia/Singapore (UTC+8)</option>
+                                                    <option value="Australia/Sydney">Australia/Sydney</option>
+                                                </select>
+                                                <p x-show="errors.timezone" x-cloak class="text-xs text-red-600 mt-1" x-text="errors.timezone?.[0]"></p>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="flex items-center gap-2">
+                                                <input type="checkbox" x-model="dayRestriction" class="form-checkbox">
+                                                <span class="text-sm text-gray-700">Restrict to specific days</span>
+                                            </label>
+                                        </div>
+                                        <div x-show="dayRestriction" x-cloak>
+                                            <label class="form-label">Days of Week</label>
+                                            <div class="flex flex-wrap gap-4 mt-2">
+                                                <template x-for="day in [{v:'mon',l:'Mon'},{v:'tue',l:'Tue'},{v:'wed',l:'Wed'},{v:'thu',l:'Thu'},{v:'fri',l:'Fri'},{v:'sat',l:'Sat'},{v:'sun',l:'Sun'}]" :key="day.v">
+                                                    <label class="flex items-center gap-1.5">
+                                                        <input type="checkbox" :value="day.v" x-model="form.days" class="form-checkbox">
+                                                        <span class="text-sm text-gray-700" x-text="day.l"></span>
+                                                    </label>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Generic error --}}
+                                <div x-show="errors.message" x-cloak class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700" x-text="errors.message"></div>
+                            </form>
+                        </div>
+
+                        {{-- Footer --}}
+                        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+                            <button @click="close()" type="button" class="btn-secondary" :disabled="saving">Cancel</button>
+                            <button @click="submit()" type="button" class="btn-primary" :disabled="saving || loading">
+                                <span x-show="!saving" x-text="mode === 'edit' ? 'Save Changes' : 'Create Routing Rule'"></span>
+                                <span x-show="saving" x-cloak>Saving...</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Filter Card --}}
     <div class="filter-card mb-3">
         <form method="GET" class="filter-row flex-wrap">
@@ -348,11 +599,11 @@
                         </td>
                         <td class="px-3 py-2 text-center">
                             <div class="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                                <a href="{{ route('admin.trunk-routes.edit', $route) }}" class="p-1 rounded text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
+                                <button type="button" onclick="document.dispatchEvent(new CustomEvent('open-route-form', {detail: {mode: 'edit', id: {{ $route->id }}}}))" class="p-1 rounded text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Edit">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
-                                </a>
+                                </button>
                                 <form method="POST" action="{{ route('admin.trunk-routes.destroy', $route) }}" class="inline"
                                       onsubmit="return confirm('Delete this routing rule?')">
                                     @csrf
@@ -374,7 +625,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
                                 </svg>
                                 <p class="empty-text">No routing rules found</p>
-                                <a href="{{ route('admin.trunk-routes.create') }}" class="empty-link-admin">Create your first routing rule</a>
+                                <button type="button" onclick="document.dispatchEvent(new CustomEvent('open-route-form', {detail: {mode: 'create'}}))" class="empty-link-admin">Create your first routing rule</button>
                             </div>
                         </td>
                     </tr>
@@ -389,7 +640,181 @@
         </div>
     @endif
 
+    @php
+        $trunksForModal = $trunks->map(fn ($t) => [
+            'id' => $t->id,
+            'name' => $t->name,
+            'provider' => $t->provider,
+            'direction' => $t->direction,
+        ])->values();
+    @endphp
     <script>
+    function routeFormModal() {
+        const trunks = {!! $trunksForModal->toJson() !!};
+        const defaults = () => ({
+            trunk_id: '',
+            prefix: '',
+            priority: 1,
+            weight: 100,
+            status: 'active',
+            remove_prefix: '',
+            add_prefix: '',
+            mnp_enabled: false,
+            time_start: '',
+            time_end: '',
+            timezone: 'Asia/Dhaka',
+            days: [],
+        });
+        return {
+            open: false,
+            mode: 'create',
+            routeId: null,
+            loading: false,
+            saving: false,
+            errors: {},
+            trunks: trunks,
+            trunkSearch: '',
+            showTrunkDropdown: false,
+            timeBasedRouting: false,
+            dayRestriction: false,
+            form: defaults(),
+
+            get filteredTrunks() {
+                if (!this.trunkSearch) return this.trunks;
+                const s = this.trunkSearch.toLowerCase();
+                return this.trunks.filter(t => t.name.toLowerCase().includes(s) || t.provider.toLowerCase().includes(s));
+            },
+            selectTrunk(t) {
+                this.form.trunk_id = t.id;
+                this.trunkSearch = t.name + ' (' + t.provider + ')';
+                this.showTrunkDropdown = false;
+            },
+            clearTrunk() {
+                this.form.trunk_id = '';
+                this.trunkSearch = '';
+            },
+            setTrunkSearchFromId(id) {
+                const t = this.trunks.find(x => x.id == id);
+                this.trunkSearch = t ? (t.name + ' (' + t.provider + ')') : '';
+            },
+            resetForm(prefillTrunkId = null) {
+                this.form = defaults();
+                this.timeBasedRouting = false;
+                this.dayRestriction = false;
+                this.errors = {};
+                this.trunkSearch = '';
+                this.routeId = null;
+                if (prefillTrunkId) {
+                    this.form.trunk_id = parseInt(prefillTrunkId, 10);
+                    this.setTrunkSearchFromId(this.form.trunk_id);
+                }
+            },
+            populateForm(d) {
+                this.form = {
+                    trunk_id: d.trunk_id,
+                    prefix: d.prefix,
+                    priority: d.priority,
+                    weight: d.weight,
+                    status: d.status,
+                    remove_prefix: d.remove_prefix || '',
+                    add_prefix: d.add_prefix || '',
+                    mnp_enabled: !!d.mnp_enabled,
+                    time_start: d.time_start ? String(d.time_start).substring(0, 5) : '',
+                    time_end: d.time_end ? String(d.time_end).substring(0, 5) : '',
+                    timezone: d.timezone || 'UTC',
+                    days: d.days_of_week ? String(d.days_of_week).split(',') : [],
+                };
+                this.timeBasedRouting = !!d.time_start;
+                this.dayRestriction = !!d.days_of_week;
+                this.setTrunkSearchFromId(d.trunk_id);
+                this.errors = {};
+            },
+            async openForm(detail) {
+                this.errors = {};
+                if (detail.mode === 'edit') {
+                    this.mode = 'edit';
+                    this.routeId = detail.id;
+                    this.open = true;
+                    this.loading = true;
+                    try {
+                        const r = await fetch(`/admin/trunk-routes/${detail.id}`, {
+                            headers: { 'Accept': 'application/json' },
+                        });
+                        if (!r.ok) throw new Error('Failed to load');
+                        const data = await r.json();
+                        this.populateForm(data);
+                    } catch (e) {
+                        alert('Failed to load route: ' + e.message);
+                        this.close();
+                    } finally {
+                        this.loading = false;
+                    }
+                } else {
+                    this.mode = 'create';
+                    this.resetForm(detail.trunk_id || null);
+                    this.open = true;
+                }
+            },
+            autoOpenFromQuery() {
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('add') === '1') {
+                    this.openForm({ mode: 'create', trunk_id: params.get('trunk_id') });
+                }
+            },
+            close() {
+                if (this.saving) return;
+                this.open = false;
+                this.showTrunkDropdown = false;
+            },
+            async submit() {
+                if (this.saving || this.loading) return;
+                this.saving = true;
+                this.errors = {};
+                const url = this.mode === 'edit'
+                    ? `/admin/trunk-routes/${this.routeId}`
+                    : '{{ route("admin.trunk-routes.store") }}';
+                const method = this.mode === 'edit' ? 'PUT' : 'POST';
+                const payload = {
+                    trunk_id: this.form.trunk_id,
+                    prefix: this.form.prefix,
+                    priority: this.form.priority,
+                    weight: this.form.weight,
+                    status: this.form.status,
+                    remove_prefix: this.form.remove_prefix || '',
+                    add_prefix: this.form.add_prefix || '',
+                    mnp_enabled: this.form.mnp_enabled ? 1 : 0,
+                    time_start: this.timeBasedRouting ? (this.form.time_start || '') : '',
+                    time_end: this.timeBasedRouting ? (this.form.time_end || '') : '',
+                    timezone: this.timeBasedRouting ? (this.form.timezone || 'UTC') : 'UTC',
+                    days: (this.timeBasedRouting && this.dayRestriction) ? this.form.days : [],
+                };
+                try {
+                    const r = await fetch(url, {
+                        method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                    if (r.status === 422) {
+                        const data = await r.json();
+                        this.errors = data.errors || { message: data.message || 'Validation failed' };
+                        return;
+                    }
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    const data = await r.json();
+                    window.location.href = data.redirect || '{{ route("admin.trunk-routes.index") }}';
+                } catch (e) {
+                    this.errors = { message: 'Failed to save: ' + e.message };
+                } finally {
+                    this.saving = false;
+                }
+            },
+        };
+    }
+
     function routeTestTool() {
         return {
             open: false,
@@ -398,7 +823,7 @@
             },
             destination: '',
             testTime: '',
-            testTimezone: 'UTC',
+            testTimezone: 'Asia/Dhaka',
             result: null,
             loading: false,
             async testRoute() {

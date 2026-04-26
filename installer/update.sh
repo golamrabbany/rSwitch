@@ -334,7 +334,7 @@ main() {
     echo ""
     read -p "Continue with update? (Y/n): " -n 1 -r
     echo
-    [[ $REPLY =~ ^[Nn]$ ]] && exit 0
+    if [[ $REPLY =~ ^[Nn]$ ]]; then exit 0; fi
 
     backup_application
     enable_maintenance

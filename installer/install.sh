@@ -215,7 +215,7 @@ gather_configuration() {
 
     read -p "Proceed with installation? (Y/n): " -n 1 -r
     echo
-    [[ $REPLY =~ ^[Nn]$ ]] && exit 0
+    if [[ $REPLY =~ ^[Nn]$ ]]; then exit 0; fi
 }
 
 install_system_dependencies() {
@@ -441,30 +441,36 @@ install_mysql() {
         systemctl enable mysql
     fi
 
-    # Check if root can connect without password (fresh install)
+    # Determine how to talk to MySQL as root.
+    # Priority: passwordless socket → debian.cnf (Ubuntu/Debian) → set new password.
+    MYSQL_ROOT_AUTH=""
     if mysql -u root -e "SELECT 1" &>/dev/null; then
         log_info "Securing MySQL installation..."
         mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_PASS}_root';"
+        MYSQL_ROOT_AUTH="-u root -p${DB_PASS}_root"
+    elif [[ -f /etc/mysql/debian.cnf ]] && mysql --defaults-file=/etc/mysql/debian.cnf -e "SELECT 1" &>/dev/null; then
+        log_info "Using existing MySQL via /etc/mysql/debian.cnf (root password preserved)."
+        MYSQL_ROOT_AUTH="--defaults-file=/etc/mysql/debian.cnf"
     else
-        log_warning "MySQL root already has a password set, skipping root password change."
-        log_warning "You may need to manually create the database and user."
+        log_warning "MySQL root credentials not auto-detected."
+        log_warning "Skipping database/user creation — you must create database '${DB_NAME}' and user '${DB_USER}'@'localhost' manually."
+        log_warning "Then re-run installer or update .env DB_PASSWORD accordingly."
+        return 0
     fi
 
-    MYSQL_ROOT_PASS="${DB_PASS}_root"
-
-    # Clean up default users and databases
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DELETE FROM mysql.user WHERE User='';" 2>/dev/null || true
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');" 2>/dev/null || true
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DROP DATABASE IF EXISTS test;" 2>/dev/null || true
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';" 2>/dev/null || true
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "FLUSH PRIVILEGES;" 2>/dev/null || true
+    # Clean up default users and databases (best-effort)
+    mysql ${MYSQL_ROOT_AUTH} -e "DELETE FROM mysql.user WHERE User='';" 2>/dev/null || true
+    mysql ${MYSQL_ROOT_AUTH} -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');" 2>/dev/null || true
+    mysql ${MYSQL_ROOT_AUTH} -e "DROP DATABASE IF EXISTS test;" 2>/dev/null || true
+    mysql ${MYSQL_ROOT_AUTH} -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';" 2>/dev/null || true
+    mysql ${MYSQL_ROOT_AUTH} -e "FLUSH PRIVILEGES;" 2>/dev/null || true
 
     # Create application database and user
     log_info "Creating database and user..."
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
-    mysql -u root -p"${MYSQL_ROOT_PASS}" -e "FLUSH PRIVILEGES;"
+    mysql ${MYSQL_ROOT_AUTH} -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    mysql ${MYSQL_ROOT_AUTH} -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+    mysql ${MYSQL_ROOT_AUTH} -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
+    mysql ${MYSQL_ROOT_AUTH} -e "FLUSH PRIVILEGES;"
 
     # MySQL tuning for high-volume billing
     log_info "Applying MySQL performance tuning..."
