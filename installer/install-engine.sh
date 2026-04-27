@@ -174,10 +174,24 @@ EOF
 
     # MySQL tuning — buffer pool sized for shared host (Asterisk + Python here too).
     # 65% of RAM, capped at 32G so OS page cache and RTP buffers retain headroom.
-    # Override by editing /etc/mysql/mysql.conf.d/rswitch-tuning.cnf on dedicated DB servers.
+    # Override by editing /etc/mysql/conf.d/rswitch-tuning.cnf on dedicated DB servers.
     TOTAL_RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
     BUFFER_POOL_MB=$((TOTAL_RAM_MB * 65 / 100))
     [[ $BUFFER_POOL_MB -gt 32768 ]] && BUFFER_POOL_MB=32768
+
+    # systemd LimitNOFILE caps mysqld below the open_files_limit we'd set in
+    # tuning .cnf — without this drop-in, table_open_cache auto-shrinks and
+    # high-connection workloads run out of FDs.
+    if [[ -d /etc/systemd/system && -f /usr/lib/systemd/system/mysql.service ]]; then
+        mkdir -p /etc/systemd/system/mysql.service.d
+        cat > /etc/systemd/system/mysql.service.d/limits.conf << 'LIMEOF'
+[Service]
+LimitNOFILE=65535
+LimitNPROC=65535
+LIMEOF
+        systemctl daemon-reload
+    fi
+
     # On Ubuntu/Debian the default /etc/mysql/my.cnf is a MariaDB-shaped file
     # that includes /etc/mysql/conf.d/ and /etc/mysql/mariadb.conf.d/ — but NOT
     # /etc/mysql/mysql.conf.d/. Drop our tuning into conf.d/ so it is loaded
