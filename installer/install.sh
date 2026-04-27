@@ -1452,6 +1452,15 @@ server {
     gzip_proxied expired no-cache no-store private auth;
     gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/javascript application/json;
 
+    # rSwitch: Alertmanager UI — \${DOMAIN}/alertmanager/
+    location ^~ /alertmanager/ {
+        proxy_pass http://127.0.0.1:9093/alertmanager/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
     # rSwitch: Grafana proxy — \${DOMAIN}/grafana/
     # Grafana itself listens on 127.0.0.1:3000; this exposes it on the
     # public vhost gated by Grafana's own login. configure_monitoring()
@@ -1891,6 +1900,15 @@ server {
     gzip_proxied expired no-cache no-store private auth;
     gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/javascript application/json;
 
+    # rSwitch: Alertmanager UI — \${DOMAIN}/alertmanager/ (HTTPS vhost)
+    location ^~ /alertmanager/ {
+        proxy_pass http://127.0.0.1:9093/alertmanager/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
     # rSwitch: Grafana proxy — \${DOMAIN}/grafana/ (HTTPS vhost)
     location ^~ /grafana/ {
         proxy_pass http://127.0.0.1:3000;
@@ -2211,11 +2229,57 @@ scrape_configs:
     static_configs:
       - targets: ['127.0.0.1:8001']
         labels: { host: localhost }
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["127.0.0.1:9093"]
 EOF
     chown prometheus:prometheus /etc/prometheus/prometheus.yml
 
-    systemctl enable --now prometheus prometheus-node-exporter prometheus-mysqld-exporter prometheus-redis-exporter
-    systemctl restart prometheus prometheus-node-exporter prometheus-mysqld-exporter prometheus-redis-exporter
+    # 4a. Install bundled alert rules
+    mkdir -p /etc/prometheus/rules
+    if [[ -f "${SCRIPT_DIR}/templates/prometheus/rswitch.rules.yml" ]]; then
+        cp "${SCRIPT_DIR}/templates/prometheus/rswitch.rules.yml" /etc/prometheus/rules/rswitch.yml
+        chown -R prometheus:prometheus /etc/prometheus/rules
+    fi
+
+    # 4b. Install Alertmanager — null receiver until operator wires up
+    # Telegram/email/webhook in /etc/prometheus/alertmanager.yml.
+    apt-get install -y -qq prometheus-alertmanager 2>&1 | tail -3
+
+    cat > /etc/prometheus/alertmanager.yml <<'EOF'
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "null"
+  group_by: ["alertname", "severity"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: "null"
+      repeat_interval: 1h
+
+receivers:
+  - name: "null"
+    # No-op. Edit this file to wire Telegram, email, or webhook delivery.
+EOF
+    chown prometheus:prometheus /etc/prometheus/alertmanager.yml
+
+    # Disable cluster gossip + bind to localhost + serve under /alertmanager/.
+    cat > /etc/default/prometheus-alertmanager <<EOF
+ARGS="--web.listen-address=127.0.0.1:9093 --cluster.listen-address= --web.external-url=https://${DOMAIN:-localhost}/alertmanager/ --web.route-prefix=/alertmanager"
+EOF
+
+    systemctl enable --now prometheus prometheus-node-exporter prometheus-mysqld-exporter prometheus-redis-exporter prometheus-alertmanager
+    systemctl restart prometheus prometheus-node-exporter prometheus-mysqld-exporter prometheus-redis-exporter prometheus-alertmanager
 
     # 5. Grafana — Grafana apt repo (not in Ubuntu base)
     if ! command -v grafana-server >/dev/null 2>&1; then

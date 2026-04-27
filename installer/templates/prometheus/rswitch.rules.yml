@@ -1,0 +1,163 @@
+groups:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Infrastructure / exporters
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: rswitch.exporters
+    interval: 30s
+    rules:
+      - alert: ExporterDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Exporter {{ $labels.job }} ({{ $labels.instance }}) down"
+          description: |
+            Prometheus has been unable to scrape {{ $labels.job }}
+            on {{ $labels.instance }} for 2 minutes.
+            Metrics for this layer are missing — fix scrape target or
+            restart the exporter.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # rSwitch application
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: rswitch.app
+    interval: 30s
+    rules:
+      - alert: AMIDisconnected
+        expr: rswitch_ami_connected == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "rswitch-api lost AMI connection to Asterisk"
+          description: |
+            AMI listener has been disconnected from Asterisk for 1 minute.
+            New calls won't appear in the Active Calls UI; live monitoring
+            is degraded. Check rswitch-api logs and Asterisk AMI auth.
+
+      - alert: TrunkUnreachable
+        expr: rswitch_trunk_available == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Trunk {{ $labels.endpoint }} unreachable"
+          description: |
+            Trunk endpoint {{ $labels.endpoint }} has had qualify status
+            != Avail for 5 minutes. Outbound calls routing to it will
+            fail or fall back to a sibling trunk.
+
+      - alert: ActiveChannelsApproachingMaxcalls
+        expr: rswitch_active_channels > 1300
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Asterisk channels {{ $value }} — close to maxcalls=1500"
+          description: |
+            Asterisk fail-fast circuit breaker rejects new INVITEs
+            once channel count hits maxcalls=1500. Investigate growth
+            trend before it triggers.
+
+      - alert: AGILatencyP95High
+        expr: histogram_quantile(0.95, sum(rate(rswitch_agi_handler_seconds_bucket[5m])) by (le, script)) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AGI {{ $labels.script }} p95 latency above 250ms"
+          description: |
+            AGI handler for {{ $labels.script }} p95 latency has been
+            > 250ms for 5 minutes. Capacity cliff lives between 100 and
+            150 cps; investigate MySQL load, Redis health, or call rate.
+
+      - alert: AGILatencyP95Critical
+        expr: histogram_quantile(0.95, sum(rate(rswitch_agi_handler_seconds_bucket[5m])) by (le, script)) > 1.0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AGI {{ $labels.script }} p95 latency above 1s — calls failing"
+          description: |
+            AGI p95 > 1s means Asterisk Dial() will start hitting AGI
+            timeouts and rejecting calls. Past the cliff — needs
+            immediate investigation.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # MySQL
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: rswitch.mysql
+    interval: 30s
+    rules:
+      - alert: MySQLDown
+        expr: mysql_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL down on {{ $labels.instance }}"
+          description: "mysqld_exporter reports MySQL unreachable. All call routing, billing, and admin UI are broken until restored."
+
+      - alert: MySQLConnectionsHigh
+        expr: mysql_global_status_threads_connected > 600
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MySQL connections {{ $value }} of 800 in use"
+          description: |
+            Approaching the 800 max_connections cap. SQLAlchemy pools
+            on the API + Celery workers default to 50 each — at burst,
+            check for connection leaks or under-sized pools.
+
+      - alert: MySQLConnectionsCritical
+        expr: mysql_global_status_threads_connected > 750
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL near connection cap — {{ $value }} of 800"
+          description: "Risk of new connections being rejected — services will start failing."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Hosts (node_exporter)
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: rswitch.hosts
+    interval: 30s
+    rules:
+      - alert: DiskFreeLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|fuse.lxcfs"}) < 0.20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.host }} root disk free below 20%"
+          description: "{{ $value | humanizePercentage }} free on / — clean up CDR partitions, logs, or old artifacts."
+
+      - alert: DiskFreeCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|fuse.lxcfs"}) < 0.10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.host }} root disk free below 10%"
+          description: "{{ $value | humanizePercentage }} free on /. MySQL writes, log writes, and CDR inserts all at risk."
+
+      - alert: MemoryHighUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.host }} memory usage above 90%"
+          description: "Available memory < 10%. Risk of swapping or OOM."
+
+      - alert: LoadAverageHigh
+        expr: node_load5 / count(node_cpu_seconds_total{mode="idle"}) without (cpu, mode) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.host }} 5m load above 80% of CPU count"
+          description: "Sustained high load — Asterisk maxload (30) circuit breaker may engage on the engine."
