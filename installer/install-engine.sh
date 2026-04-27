@@ -172,9 +172,12 @@ install_mysql() {
 bind-address = 0.0.0.0
 EOF
 
-    # MySQL tuning
+    # MySQL tuning — buffer pool sized for shared host (Asterisk + Python here too).
+    # 65% of RAM, capped at 32G so OS page cache and RTP buffers retain headroom.
+    # Override by editing /etc/mysql/mysql.conf.d/rswitch-tuning.cnf on dedicated DB servers.
     TOTAL_RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
     BUFFER_POOL_MB=$((TOTAL_RAM_MB * 65 / 100))
+    [[ $BUFFER_POOL_MB -gt 32768 ]] && BUFFER_POOL_MB=32768
     if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then MYSQL_CONF_DIR="/etc/my.cnf.d"; else MYSQL_CONF_DIR="/etc/mysql/mysql.conf.d"; fi
     if [[ -f "${SCRIPT_DIR}/templates/mysql-tuning.cnf.template" ]]; then
         sed "s/__BUFFER_POOL_SIZE__/${BUFFER_POOL_MB}M/" "${SCRIPT_DIR}/templates/mysql-tuning.cnf.template" > "${MYSQL_CONF_DIR}/rswitch-tuning.cnf"

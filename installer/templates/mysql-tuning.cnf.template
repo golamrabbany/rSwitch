@@ -1,23 +1,28 @@
-# rSwitch MySQL Tuning — Optimized for high-volume VoIP billing
-# 10M+ calls/day with daily partitioned call_records
+# rSwitch MySQL Tuning — sized for 1000-1200 concurrent calls + 50-70 cps
+# Optimized for partitioned call_records and atomic balance updates.
 # Install to: /etc/mysql/mysql.conf.d/rswitch-tuning.cnf
 
 [mysqld]
 # ── InnoDB Buffer Pool ──
-# 65% of total RAM for dedicated DB server
-# Adjust based on actual server RAM
+# Sized to keep call_records hot indexes + ps_endpoints/auths/aors fully in RAM.
+# Installer caps at 32G on shared hosts (where Asterisk also runs); raise on
+# dedicated DB servers if your dataset outgrows this.
 innodb_buffer_pool_size = __BUFFER_POOL_SIZE__
 innodb_buffer_pool_instances = 8
 
-# ── Write Performance ──
-# flush_log_at_trx_commit = 2: flush to OS cache every commit, write to disk every second
-# Risk: lose last 1 second of data on power failure (acceptable for CDR — can rebuild from Asterisk)
-innodb_flush_log_at_trx_commit = 2
+# ── Write Performance — strict durability for billing ──
+# flush_log_at_trx_commit=1 + sync_binlog=1: every commit is fsync'd to disk.
+# CDR rows and balance deductions cannot be silently lost on host crash.
+# Costs ~30% IOPS vs lazy variants; the SSD + tuned io_capacity below covers it.
+innodb_flush_log_at_trx_commit = 1
+sync_binlog = 1
 innodb_flush_method = O_DIRECT
 
 # ── Redo Log ──
-# Large redo log reduces checkpoint frequency during write bursts
-innodb_log_file_size = 2G
+# Large capacity reduces checkpoint pressure during burst writes.
+# innodb_redo_log_capacity (MySQL 8.0.30+) replaces the older
+# innodb_log_files_in_group * innodb_log_file_size pair.
+innodb_redo_log_capacity = 4G
 innodb_log_buffer_size = 64M
 
 # ── I/O Threads ──
@@ -37,12 +42,17 @@ tmp_table_size = 256M
 max_heap_table_size = 256M
 
 # ── Connection Limits ──
-max_connections = 500
+# Sized for: 1 API (pool 50) + 12 celery workers × pool 50 + 200 Asterisk
+# realtime + 50 admin/UI = ~850 worst case. 800 hard cap with admin headroom.
+max_connections = 800
 max_connect_errors = 100000
 
-# ── Query Cache (disabled — InnoDB invalidates too often) ──
-query_cache_type = 0
-query_cache_size = 0
+# ── Threads ──
+# Avoid thread-create overhead during INVITE bursts.
+thread_cache_size = 200
+
+# ── File Handles ──
+open_files_limit = 65535
 
 # ── Sort and Join Buffers ──
 sort_buffer_size = 4M
@@ -51,8 +61,8 @@ read_buffer_size = 2M
 read_rnd_buffer_size = 4M
 
 # ── Table Cache ──
-table_open_cache = 4000
-table_definition_cache = 2000
+table_open_cache = 8000
+table_definition_cache = 4000
 
 # ── Binary Log (if replication needed) ──
 # Uncomment for master-slave replication
