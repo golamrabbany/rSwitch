@@ -287,6 +287,9 @@
                                             @case('NO ANSWER')
                                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">NA</span>
                                                 @break
+                                            @case('CANCEL')
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700" title="Caller hung up before answer">CXL</span>
+                                                @break
                                             @case('BUSY')
                                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">BSY</span>
                                                 @break

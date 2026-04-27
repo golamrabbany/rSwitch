@@ -107,7 +107,7 @@
                                 @case('NO ANSWER') <span class="badge badge-warning">No Answer</span> @break
                                 @case('BUSY') <span class="badge badge-warning">Busy</span> @break
                                 @case('FAILED') <span class="badge badge-danger">Failed</span> @break
-                                @case('CANCEL') <span class="badge badge-gray">Cancel</span> @break
+                                @case('CANCEL') <span class="badge badge-gray" title="Caller hung up before answer">Cancelled</span> @break
                                 @default <span class="badge badge-gray">{{ $r->disposition }}</span>
                             @endswitch
                         </td>

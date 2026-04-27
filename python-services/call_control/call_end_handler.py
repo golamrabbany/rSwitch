@@ -24,12 +24,14 @@ from call_control.agi_protocol import AgiConnection
 
 logger = logging.getLogger(__name__)
 
-# Map Asterisk DIALSTATUS to CDR disposition
+# Map Asterisk DIALSTATUS to CDR disposition. CANCEL stays distinct from
+# NO ANSWER so the UI can show "Cancelled" (caller hung up before answer)
+# vs "No Answer" (callee never picked up / rang out).
 DIALSTATUS_MAP = {
     "ANSWER": "ANSWERED",
     "BUSY": "BUSY",
     "NOANSWER": "NO ANSWER",
-    "CANCEL": "NO ANSWER",
+    "CANCEL": "CANCEL",
     "CONGESTION": "FAILED",
     "CHANUNAVAIL": "FAILED",
     "DONTCALL": "FAILED",

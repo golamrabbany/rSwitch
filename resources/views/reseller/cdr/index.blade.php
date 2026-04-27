@@ -155,7 +155,7 @@
                                     <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">FAILED</span>
                                     @break
                                 @case('CANCEL')
-                                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">CANCEL</span>
+                                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800" title="Caller hung up before answer">Cancelled</span>
                                     @break
                                 @default
                                     <span class="text-gray-400">—</span>

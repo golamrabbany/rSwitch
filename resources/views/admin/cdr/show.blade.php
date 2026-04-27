@@ -21,7 +21,7 @@
                         @case('NO ANSWER') <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>No Answer</span> @break
                         @case('BUSY') <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Busy</span> @break
                         @case('FAILED') <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Failed</span> @break
-                        @case('CANCEL') <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Cancel</span> @break
+                        @case('CANCEL') <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-600" title="Caller hung up before answer"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Cancelled</span> @break
                     @endswitch
                     <span class="text-gray-300">|</span>
                     <span class="badge badge-gray">{{ ucfirst(str_replace('_', ' ', $record->call_flow)) }}</span>

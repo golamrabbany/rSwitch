@@ -124,6 +124,7 @@
                             @switch($r->disposition)
                                 @case('ANSWERED') <span class="badge badge-success">Answered</span> @break
                                 @case('NO ANSWER') <span class="badge badge-warning">No Answer</span> @break
+                                @case('CANCEL') <span class="badge badge-gray" title="Caller hung up before answer">Cancelled</span> @break
                                 @case('BUSY') <span class="badge badge-warning">Busy</span> @break
                                 @case('FAILED') <span class="badge badge-danger">Failed</span> @break
                                 @default <span class="badge badge-gray">{{ $r->disposition }}</span>
