@@ -493,6 +493,19 @@ install_mysql() {
         "${SCRIPT_DIR}/templates/mysql-tuning.cnf.template" \
         > "${MYSQL_CONF_DIR}/rswitch-tuning.cnf"
 
+    # systemd LimitNOFILE caps mysqld's open_files_limit regardless of what
+    # the .cnf says. Without this drop-in, MySQL silently shrinks
+    # table_open_cache and runs out of FDs under high connection load.
+    if [[ -d /etc/systemd/system && -f /usr/lib/systemd/system/mysql.service ]]; then
+        mkdir -p /etc/systemd/system/mysql.service.d
+        cat > /etc/systemd/system/mysql.service.d/limits.conf << 'LIMEOF'
+[Service]
+LimitNOFILE=65535
+LimitNPROC=65535
+LIMEOF
+        systemctl daemon-reload
+    fi
+
     systemctl restart mysql 2>/dev/null || systemctl restart mysqld 2>/dev/null
     log_info "innodb_buffer_pool_size set to ${BUFFER_POOL_SIZE} (65% of ${TOTAL_RAM_MB}MB RAM)"
 
@@ -1480,12 +1493,22 @@ configure_supervisor() {
     if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
         WEB_USER="nginx"
         SUPERVISOR_CONF_DIR="/etc/supervisord.d"
+        SUPERVISORD_CONF="/etc/supervisord.conf"
     else
         WEB_USER="www-data"
         SUPERVISOR_CONF_DIR="/etc/supervisor/conf.d"
+        SUPERVISORD_CONF="/etc/supervisor/supervisord.conf"
     fi
 
     mkdir -p $SUPERVISOR_CONF_DIR
+
+    # Raise supervisord's own FD/proc limits so all children inherit them.
+    # supervisord defaults to soft NOFILE=1024; with 1000+ concurrent calls
+    # each holding multiple sockets, that exhausts within minutes.
+    # Per-program minfds= is silently ignored — must set at [supervisord] level.
+    if [[ -f "$SUPERVISORD_CONF" ]] && ! grep -qE "^minfds=" "$SUPERVISORD_CONF"; then
+        sed -i "/^\[supervisord\]/a minfds=65536\nminprocs=4096" "$SUPERVISORD_CONF"
+    fi
 
     cat > ${SUPERVISOR_CONF_DIR}/rswitch.conf << EOF
 [program:rswitch-worker]
@@ -1537,7 +1560,7 @@ stdout_logfile=/var/log/rswitch-python-api.out.log
 stopwaitsecs=10
 
 [program:rswitch-celery]
-command=${INSTALL_DIR}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 4
+command=${INSTALL_DIR}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 12
 directory=${INSTALL_DIR}/python-services
 environment=PYTHONPATH="${INSTALL_DIR}/python-services"
 user=${WEB_USER}
