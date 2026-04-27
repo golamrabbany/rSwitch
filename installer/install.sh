@@ -476,12 +476,17 @@ install_mysql() {
     log_info "Applying MySQL performance tuning..."
     TOTAL_RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
     BUFFER_POOL_MB=$((TOTAL_RAM_MB * 65 / 100))
+    [[ $BUFFER_POOL_MB -gt 32768 ]] && BUFFER_POOL_MB=32768
     BUFFER_POOL_SIZE="${BUFFER_POOL_MB}M"
 
+    # /etc/mysql/conf.d/ is the universal include directory on Ubuntu/Debian
+    # (read by both MySQL and MariaDB layouts of /etc/mysql/my.cnf).
+    # /etc/mysql/mysql.conf.d/ is NOT read on systems where my.cnf is the
+    # MariaDB-shaped sample (Ubuntu 22.04+).
     if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
         MYSQL_CONF_DIR="/etc/my.cnf.d"
     else
-        MYSQL_CONF_DIR="/etc/mysql/mysql.conf.d"
+        MYSQL_CONF_DIR="/etc/mysql/conf.d"
     fi
 
     sed "s/__BUFFER_POOL_SIZE__/${BUFFER_POOL_SIZE}/" \

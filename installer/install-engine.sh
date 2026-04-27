@@ -178,7 +178,11 @@ EOF
     TOTAL_RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
     BUFFER_POOL_MB=$((TOTAL_RAM_MB * 65 / 100))
     [[ $BUFFER_POOL_MB -gt 32768 ]] && BUFFER_POOL_MB=32768
-    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then MYSQL_CONF_DIR="/etc/my.cnf.d"; else MYSQL_CONF_DIR="/etc/mysql/mysql.conf.d"; fi
+    # On Ubuntu/Debian the default /etc/mysql/my.cnf is a MariaDB-shaped file
+    # that includes /etc/mysql/conf.d/ and /etc/mysql/mariadb.conf.d/ — but NOT
+    # /etc/mysql/mysql.conf.d/. Drop our tuning into conf.d/ so it is loaded
+    # regardless of whether the MySQL or MariaDB layout is in effect.
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then MYSQL_CONF_DIR="/etc/my.cnf.d"; else MYSQL_CONF_DIR="/etc/mysql/conf.d"; fi
     if [[ -f "${SCRIPT_DIR}/templates/mysql-tuning.cnf.template" ]]; then
         sed "s/__BUFFER_POOL_SIZE__/${BUFFER_POOL_MB}M/" "${SCRIPT_DIR}/templates/mysql-tuning.cnf.template" > "${MYSQL_CONF_DIR}/rswitch-tuning.cnf"
     fi
