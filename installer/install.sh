@@ -1613,8 +1613,8 @@ configure_firewall() {
         firewall-cmd --permanent --add-port=5060/tcp
         firewall-cmd --permanent --add-port=5061/tcp
 
-        # Allow RTP
-        firewall-cmd --permanent --add-port=10000-30000/udp
+        # Allow RTP (range matches rtp.conf.template rtpend=40000)
+        firewall-cmd --permanent --add-port=10000-40000/udp
 
         # Reload firewall
         firewall-cmd --reload
@@ -1634,8 +1634,8 @@ configure_firewall() {
         ufw allow 5060/tcp
         ufw allow 5061/tcp
 
-        # Allow RTP
-        ufw allow 10000:30000/udp
+        # Allow RTP (range matches rtp.conf.template rtpend=40000)
+        ufw allow 10000:40000/udp
 
         # Reload firewall
         ufw reload
@@ -2079,6 +2079,146 @@ print_completion() {
 }
 
 # =============================================================================
+# Monitoring stack (Prometheus + Grafana + 3 exporters, all on this host)
+# =============================================================================
+
+configure_monitoring() {
+    log_step "Installing monitoring stack (Prometheus + Grafana + exporters)"
+
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        log_warning "Monitoring auto-install only supported on Debian/Ubuntu — skipping."
+        return
+    fi
+
+    export DEBIAN_FRONTEND=noninteractive
+
+    # 1. Exporters
+    apt-get install -y -qq \
+        prometheus prometheus-node-exporter \
+        prometheus-mysqld-exporter prometheus-redis-exporter 2>&1 | tail -3
+
+    # 2. mysqld_exporter MySQL user via debian-sys-maint
+    if [[ -f /etc/mysql/debian.cnf ]]; then
+        EXPORTER_PW=$(openssl rand -hex 16)
+        mysql --defaults-file=/etc/mysql/debian.cnf <<SQL
+CREATE USER IF NOT EXISTS 'mysql_exporter'@'localhost' IDENTIFIED BY '${EXPORTER_PW}' WITH MAX_USER_CONNECTIONS 3;
+ALTER USER 'mysql_exporter'@'localhost' IDENTIFIED BY '${EXPORTER_PW}';
+GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'mysql_exporter'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+        cat > /var/lib/prometheus/.my.cnf <<CNF
+[client]
+user=mysql_exporter
+password=${EXPORTER_PW}
+host=127.0.0.1
+CNF
+        chown prometheus:prometheus /var/lib/prometheus/.my.cnf
+        chmod 600 /var/lib/prometheus/.my.cnf
+        sed -i 's|^ARGS=.*|ARGS="--config.my-cnf=/var/lib/prometheus/.my.cnf"|' /etc/default/prometheus-mysqld-exporter
+    fi
+
+    # 3. redis_exporter — read pw from /etc/redis/redis.conf if set
+    REDIS_PW=$(grep -oP "(?<=^requirepass )[^ ]+" /etc/redis/redis.conf 2>/dev/null | head -1)
+    if [[ -n "$REDIS_PW" ]]; then
+        cat > /etc/default/prometheus-redis-exporter <<EOF
+ARGS="--redis.addr=redis://127.0.0.1:6379 --redis.password=${REDIS_PW}"
+EOF
+    else
+        cat > /etc/default/prometheus-redis-exporter <<EOF
+ARGS="--redis.addr=redis://127.0.0.1:6379"
+EOF
+    fi
+    chmod 600 /etc/default/prometheus-redis-exporter
+
+    # 4. Prometheus scrape config (all targets local — single-host install)
+    cat > /etc/prometheus/prometheus.yml <<'EOF'
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['127.0.0.1:9090']
+
+  - job_name: node
+    static_configs:
+      - targets: ['127.0.0.1:9100']
+        labels: { host: localhost }
+
+  - job_name: mysqld
+    static_configs:
+      - targets: ['127.0.0.1:9104']
+        labels: { host: localhost }
+
+  - job_name: redis
+    static_configs:
+      - targets: ['127.0.0.1:9121']
+        labels: { host: localhost }
+EOF
+    chown prometheus:prometheus /etc/prometheus/prometheus.yml
+
+    systemctl enable --now prometheus prometheus-node-exporter prometheus-mysqld-exporter prometheus-redis-exporter
+    systemctl restart prometheus prometheus-node-exporter prometheus-mysqld-exporter prometheus-redis-exporter
+
+    # 5. Grafana — Grafana apt repo (not in Ubuntu base)
+    if ! command -v grafana-server >/dev/null 2>&1; then
+        apt-get install -y -qq apt-transport-https software-properties-common gnupg wget 2>&1 | tail -3
+        mkdir -p /etc/apt/keyrings
+        wget -qO- https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+        apt-get update -qq 2>&1 | tail -3
+        apt-get install -y -qq grafana 2>&1 | tail -3
+    fi
+    systemctl enable --now grafana-server
+    sleep 4
+
+    # 6. Reset admin password to a known value, save to credentials file
+    GRAFANA_PW=$(openssl rand -hex 12)
+    grafana cli --homepath /usr/share/grafana --config /etc/grafana/grafana.ini admin reset-admin-password "${GRAFANA_PW}" >/dev/null 2>&1 || true
+    sleep 2
+
+    # 7. Add Prometheus datasource via API
+    curl -s -u "admin:${GRAFANA_PW}" -H "Content-Type: application/json" -X POST \
+        http://127.0.0.1:3000/api/datasources -d '{
+        "name": "Prometheus",
+        "type": "prometheus",
+        "url": "http://127.0.0.1:9090",
+        "access": "proxy",
+        "isDefault": true
+    }' >/dev/null
+
+    # 8. Import bundled dashboards
+    for dash in node-exporter-full mysql-overview redis; do
+        if [[ -f "${SCRIPT_DIR}/templates/grafana/${dash}.json" ]]; then
+            python3 - "${SCRIPT_DIR}/templates/grafana/${dash}.json" <<PY > /tmp/grafana_import.json
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["id"] = None
+d["uid"] = None
+print(json.dumps({
+    "dashboard": d, "overwrite": True, "folderId": 0,
+    "inputs": [
+        {"name": "DS_PROMETHEUS", "type": "datasource", "pluginId": "prometheus", "value": "Prometheus"},
+        {"name": "DS_PROM",       "type": "datasource", "pluginId": "prometheus", "value": "Prometheus"}
+    ]
+}))
+PY
+            curl -s -u "admin:${GRAFANA_PW}" -H "Content-Type: application/json" -X POST \
+                http://127.0.0.1:3000/api/dashboards/import -d @/tmp/grafana_import.json >/dev/null
+            rm -f /tmp/grafana_import.json
+        fi
+    done
+
+    # Save Grafana password to the credentials file (writes happen at the end via save_credentials)
+    GRAFANA_ADMIN_PASSWORD="${GRAFANA_PW}"
+    export GRAFANA_ADMIN_PASSWORD
+
+    log_success "Monitoring stack ready: Grafana on http://127.0.0.1:3000 (admin / ${GRAFANA_PW})"
+    log_info "Access via SSH tunnel: ssh -L 3000:127.0.0.1:3000 root@<this-server>"
+}
+
+# =============================================================================
 # Main Installation
 # =============================================================================
 
@@ -2104,6 +2244,7 @@ main() {
     configure_supervisor
     configure_firewall
     configure_fail2ban
+    configure_monitoring
     configure_ssl
     create_admin_user
     save_credentials

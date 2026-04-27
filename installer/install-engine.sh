@@ -831,21 +831,87 @@ configure_firewall() {
         systemctl start firewalld; systemctl enable firewalld
         firewall-cmd --permanent --add-service=ssh
         firewall-cmd --permanent --add-port=5060/udp; firewall-cmd --permanent --add-port=5060/tcp; firewall-cmd --permanent --add-port=5061/tcp
-        firewall-cmd --permanent --add-port=10000-30000/udp
+        firewall-cmd --permanent --add-port=10000-40000/udp
         firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='${APP_SERVER_IP}' port port='8001' protocol='tcp' accept"
         firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='${APP_SERVER_IP}' port port='5038' protocol='tcp' accept"
         [[ "$INSTALL_MYSQL" == "yes" ]] && firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='${APP_SERVER_IP}' port port='3306' protocol='tcp' accept"
+        # Prometheus scrape ports — node_exporter, mysqld_exporter, redis_exporter
+        for port in 9100 9104 9121; do
+            firewall-cmd --permanent --add-rich-rule="rule family='ipv4' source address='${APP_SERVER_IP}' port port='${port}' protocol='tcp' accept"
+        done
         firewall-cmd --reload
     else
         ufw --force enable; ufw allow ssh
         ufw allow 5060/udp; ufw allow 5060/tcp; ufw allow 5061/tcp
-        ufw allow 10000:30000/udp
+        ufw allow 10000:40000/udp
         ufw allow from ${APP_SERVER_IP} to any port 8001
         ufw allow from ${APP_SERVER_IP} to any port 5038
         [[ "$INSTALL_MYSQL" == "yes" ]] && ufw allow from ${APP_SERVER_IP} to any port 3306
+        # Prometheus scrape ports — node_exporter, mysqld_exporter, redis_exporter
+        ufw allow from ${APP_SERVER_IP} to any port 9100 proto tcp
+        ufw allow from ${APP_SERVER_IP} to any port 9104 proto tcp
+        ufw allow from ${APP_SERVER_IP} to any port 9121 proto tcp
         ufw reload
     fi
-    log_success "Firewall configured (SIP + RTP + API/AMI from ${APP_SERVER_IP})"
+    log_success "Firewall configured (SIP + RTP + API/AMI + Prometheus from ${APP_SERVER_IP})"
+}
+
+configure_monitoring_exporters() {
+    log_step "Installing Prometheus exporters (node, mysqld, redis)"
+
+    if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+        log_warning "Prometheus exporters auto-install only supported on Debian/Ubuntu — skipping."
+        return
+    fi
+
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        prometheus-node-exporter \
+        prometheus-mysqld-exporter \
+        prometheus-redis-exporter 2>&1 | tail -3
+
+    # mysqld_exporter: dedicated read-only MySQL user via debian-sys-maint
+    if [[ "$INSTALL_MYSQL" == "yes" && -f /etc/mysql/debian.cnf ]]; then
+        EXPORTER_PW=$(openssl rand -hex 16)
+        mysql --defaults-file=/etc/mysql/debian.cnf <<SQL
+CREATE USER IF NOT EXISTS 'mysql_exporter'@'localhost' IDENTIFIED BY '${EXPORTER_PW}' WITH MAX_USER_CONNECTIONS 3;
+ALTER USER 'mysql_exporter'@'localhost' IDENTIFIED BY '${EXPORTER_PW}';
+GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'mysql_exporter'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+        cat > /var/lib/prometheus/.my.cnf <<CNF
+[client]
+user=mysql_exporter
+password=${EXPORTER_PW}
+host=127.0.0.1
+CNF
+        chown prometheus:prometheus /var/lib/prometheus/.my.cnf
+        chmod 600 /var/lib/prometheus/.my.cnf
+        sed -i 's|^ARGS=.*|ARGS="--config.my-cnf=/var/lib/prometheus/.my.cnf"|' /etc/default/prometheus-mysqld-exporter
+    else
+        log_warning "mysqld_exporter installed but MySQL credentials not configured — set up manually if needed"
+    fi
+
+    # redis_exporter: read pw from /etc/redis/redis.conf if present
+    REDIS_PW=$(grep -oP "(?<=^requirepass )[^ ]+" /etc/redis/redis.conf 2>/dev/null | head -1)
+    if [[ -n "$REDIS_PW" ]]; then
+        cat > /etc/default/prometheus-redis-exporter <<EOF
+ARGS="--redis.addr=redis://127.0.0.1:6379 --redis.password=${REDIS_PW}"
+EOF
+    else
+        cat > /etc/default/prometheus-redis-exporter <<EOF
+ARGS="--redis.addr=redis://127.0.0.1:6379"
+EOF
+    fi
+    chmod 600 /etc/default/prometheus-redis-exporter
+
+    systemctl enable --now prometheus-node-exporter prometheus-mysqld-exporter prometheus-redis-exporter
+    systemctl restart prometheus-node-exporter prometheus-mysqld-exporter prometheus-redis-exporter
+
+    log_success "Prometheus exporters running on :9100 (node), :9104 (mysqld), :9121 (redis)"
+    log_info "Add these targets to your monitoring host's prometheus.yml:"
+    log_info "  - ${APP_SERVER_IP:-<this-ip>}:9100  (node)"
+    log_info "  - ${APP_SERVER_IP:-<this-ip>}:9104  (mysqld)"
+    log_info "  - ${APP_SERVER_IP:-<this-ip>}:9121  (redis)"
 }
 
 configure_fail2ban() {
@@ -960,6 +1026,7 @@ main() {
     install_asterisk; configure_odbc; configure_asterisk
     install_python_services; configure_supervisor
     configure_firewall; configure_fail2ban
+    configure_monitoring_exporters
     save_credentials; print_completion
 }
 main "$@"
