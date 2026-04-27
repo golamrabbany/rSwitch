@@ -769,13 +769,21 @@ EOF
 configure_asterisk() {
     log_step "Configuring Asterisk for rSwitch"
 
-    # PJSIP configuration
+    # PJSIP configuration — sized for 1000-1200 concurrent calls + 50-70 cps
+    # [system] threadpool: default max=50 chokes at ~50 concurrent INVITEs.
     cat > /etc/asterisk/pjsip.conf << 'EOF'
 [global]
 type=global
 max_initial_qualify_time=4
 keep_alive_interval=30
 user_agent=rSwitch 2.01
+
+[system]
+type=system
+threadpool_initial_size=80
+threadpool_auto_increment=40
+threadpool_max_size=400
+threadpool_idle_timeout=60
 
 [transport-udp]
 type=transport
@@ -826,11 +834,11 @@ contact=realtime,ps_contacts
 identify=realtime,ps_endpoint_id_ips
 EOF
 
-    # RTP configuration (optimized for 1000+ calls)
+    # RTP configuration — 30000 ports = 7500 RTP/RTCP pairs (1000-1200 concurrent + margin)
     cat > /etc/asterisk/rtp.conf << 'EOF'
 [general]
 rtpstart=10000
-rtpend=30000
+rtpend=40000
 strictrtp=yes
 icesupport=no
 stunaddr=

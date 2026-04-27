@@ -324,13 +324,21 @@ configure_asterisk() {
     # AMI Secret
     AMI_SECRET=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)
 
-    # PJSIP
+    # PJSIP — sized for 1000-1200 concurrent calls + 50-70 cps
+    # [system] threadpool: default max=50 chokes at ~50 concurrent INVITEs.
     cat > /etc/asterisk/pjsip.conf << 'EOF'
 [global]
 type=global
 max_initial_qualify_time=4
 keep_alive_interval=30
 user_agent=rSwitch 2.01
+
+[system]
+type=system
+threadpool_initial_size=80
+threadpool_auto_increment=40
+threadpool_max_size=400
+threadpool_idle_timeout=60
 
 [transport-udp]
 type=transport
@@ -369,11 +377,11 @@ contact=realtime,ps_contacts
 identify=realtime,ps_endpoint_id_ips
 EOF
 
-    # RTP
+    # RTP — 30000 ports = 7500 RTP/RTCP pairs, sized for 1000-1200 concurrent
     cat > /etc/asterisk/rtp.conf << 'EOF'
 [general]
 rtpstart=10000
-rtpend=30000
+rtpend=40000
 strictrtp=yes
 icesupport=no
 EOF
@@ -975,7 +983,7 @@ Python API:
 
 Firewall:
   SIP:             5060/5061 (open)
-  RTP:             10000-30000 (open)
+  RTP:             10000-40000 (open)
   API (8001):      ${APP_SERVER_IP} only
   AMI (5038):      ${APP_SERVER_IP} only
   MySQL (3306):    ${APP_SERVER_IP} only
