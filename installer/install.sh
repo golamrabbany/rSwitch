@@ -2155,6 +2155,11 @@ scrape_configs:
     static_configs:
       - targets: ['127.0.0.1:9121']
         labels: { host: localhost }
+
+  - job_name: rswitch-api
+    static_configs:
+      - targets: ['127.0.0.1:8001']
+        labels: { host: localhost }
 EOF
     chown prometheus:prometheus /etc/prometheus/prometheus.yml
 
