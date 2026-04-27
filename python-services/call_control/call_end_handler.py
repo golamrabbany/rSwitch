@@ -79,13 +79,12 @@ def _update_cdr(session, uuid: str, duration: int, billsec: int,
 class CallEndHandler:
     """Handles call completion and CDR update via AGI.
 
-    Migrated to off-loop DB execution: every DB statement runs in a
-    short-lived session via shared.database.db_thread() so the asyncio
-    event loop stays responsive at 50-70 cps. The legacy `session` arg
-    is accepted for compat with agi_server's dispatcher and ignored.
+    Off-loop DB execution: every statement runs in a short-lived session
+    via shared.database.db_thread() so the asyncio event loop stays
+    responsive at 50-70 cps.
     """
 
-    async def handle(self, agi: AgiConnection, session=None) -> None:
+    async def handle(self, agi: AgiConnection) -> None:
         try:
             await self._process(agi)
         except Exception as e:

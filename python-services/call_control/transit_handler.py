@@ -16,20 +16,59 @@ import logging
 import uuid as uuid_lib
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from call_control.agi_protocol import AgiConnection
+from shared.database import db_thread
 
 logger = logging.getLogger(__name__)
 
 
+def _select_transit_routes(session, dest: str, incoming_trunk_id: int):
+    return session.execute(
+        text("""
+            SELECT tr.id, tr.prefix, tr.priority, tr.weight, tr.trunk_id,
+                   tr.remove_prefix, tr.add_prefix, t.tech_prefix,
+                   t.name as trunk_name, t.id as tid,
+                   t.cli_mode, t.cli_override_number, t.max_channels as trunk_max_channels
+            FROM trunk_routes tr
+            JOIN trunks t ON tr.trunk_id = t.id
+            WHERE tr.status = 'active'
+            AND t.status = 'active'
+            AND t.direction IN ('outgoing', 'both')
+            AND t.health_status != 'down'
+            AND t.id != :incoming_trunk_id
+            AND :dest LIKE CONCAT(tr.prefix, '%')
+            ORDER BY LENGTH(tr.prefix) DESC, tr.priority ASC, tr.weight DESC
+        """),
+        {"dest": dest, "incoming_trunk_id": incoming_trunk_id},
+    ).fetchall()
+
+
+def _insert_transit_cdr(session, payload: dict) -> None:
+    session.execute(
+        text("""
+            INSERT INTO call_records
+            (uuid, user_id, call_flow, caller, callee, destination,
+             incoming_trunk_id, outgoing_trunk_id,
+             call_start, disposition, status, created_at)
+            VALUES
+            (:uuid, 0, 'trunk_to_trunk', :caller, :callee, :destination,
+             :incoming_trunk_id, :outgoing_trunk_id,
+             NOW(), 'ANSWERED', 'in_progress', NOW())
+        """),
+        payload,
+    )
+
+
 class TransitCallHandler:
-    """Handles trunk-to-trunk transit call routing."""
+    """Handles trunk-to-trunk transit call routing.
+
+    Sync DB calls are off-loaded via shared.database.db_thread.
+    """
 
     async def handle(
         self,
         agi: AgiConnection,
-        session: Session,
         incoming_trunk_id: int,
         caller_id: str,
         extension: str,
@@ -39,7 +78,7 @@ class TransitCallHandler:
         Called by InboundCallHandler when no DID matches.
         """
         try:
-            return await self._process(agi, session, incoming_trunk_id, caller_id, extension)
+            return await self._process(agi, incoming_trunk_id, caller_id, extension)
         except Exception as e:
             logger.error(f"Transit handler error: {e}", exc_info=True)
             return False
@@ -47,7 +86,6 @@ class TransitCallHandler:
     async def _process(
         self,
         agi: AgiConnection,
-        session: Session,
         incoming_trunk_id: int,
         caller_id: str,
         extension: str,
@@ -55,24 +93,7 @@ class TransitCallHandler:
         await agi.verbose(f"rSwitch: Transit check {caller_id} -> {extension} (incoming trunk {incoming_trunk_id})")
 
         # 1. Find outgoing trunk route for the destination
-        routes = session.execute(
-            text("""
-                SELECT tr.id, tr.prefix, tr.priority, tr.weight, tr.trunk_id,
-                       tr.remove_prefix, tr.add_prefix, t.tech_prefix,
-                       t.name as trunk_name, t.id as tid,
-                       t.cli_mode, t.cli_override_number, t.max_channels as trunk_max_channels
-                FROM trunk_routes tr
-                JOIN trunks t ON tr.trunk_id = t.id
-                WHERE tr.status = 'active'
-                AND t.status = 'active'
-                AND t.direction IN ('outgoing', 'both')
-                AND t.health_status != 'down'
-                AND t.id != :incoming_trunk_id
-                AND :dest LIKE CONCAT(tr.prefix, '%')
-                ORDER BY LENGTH(tr.prefix) DESC, tr.priority ASC, tr.weight DESC
-            """),
-            {"dest": extension, "incoming_trunk_id": incoming_trunk_id},
-        ).fetchall()
+        routes = await db_thread(lambda s: _select_transit_routes(s, extension, incoming_trunk_id))
 
         if not routes:
             await agi.verbose(f"rSwitch: No transit route for {extension}")
@@ -117,29 +138,17 @@ class TransitCallHandler:
         elif primary.cli_mode == "hide":
             cli_num = extension
 
-        # 5. Create CDR
+        # 5. Create CDR (off-loop, commits via get_session() ctx manager)
         cdr_uuid = str(uuid_lib.uuid4())
-        session.execute(
-            text("""
-                INSERT INTO call_records
-                (uuid, user_id, call_flow, caller, callee, destination,
-                 incoming_trunk_id, outgoing_trunk_id,
-                 call_start, disposition, status, created_at)
-                VALUES
-                (:uuid, 0, 'trunk_to_trunk', :caller, :callee, :destination,
-                 :incoming_trunk_id, :outgoing_trunk_id,
-                 NOW(), 'ANSWERED', 'in_progress', NOW())
-            """),
-            {
-                "uuid": cdr_uuid,
-                "caller": caller_id,
-                "callee": extension,
-                "destination": dial_number,
-                "incoming_trunk_id": incoming_trunk_id,
-                "outgoing_trunk_id": primary.tid,
-            },
-        )
-        session.commit()
+        payload = {
+            "uuid": cdr_uuid,
+            "caller": caller_id,
+            "callee": extension,
+            "destination": dial_number,
+            "incoming_trunk_id": incoming_trunk_id,
+            "outgoing_trunk_id": primary.tid,
+        }
+        await db_thread(lambda s: _insert_transit_cdr(s, payload))
 
         # 6. Set channel variables
         await agi.set_variable("ROUTE_ACTION", "DIAL")
@@ -151,7 +160,7 @@ class TransitCallHandler:
 
         # Max duration for transit calls — 4 hours cap (no balance-based limit)
         await agi.set_variable("RSWITCH_MAX_DURATION", "14400")
-        await agi.verbose(f"rSwitch: Transit max_duration=14400s (4h cap)")
+        await agi.verbose("rSwitch: Transit max_duration=14400s (4h cap)")
 
         await agi.verbose(
             f"rSwitch: Transit {extension} via {primary.trunk_name} "

@@ -20,19 +20,17 @@ Flow:
 
 import json
 import logging
-import os
 import re
 import time
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 import redis as redis_lib
-from sqlalchemy import text, func
-from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from call_control.agi_protocol import AgiConnection
+from shared.database import db_thread
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +110,217 @@ def _get_redis() -> redis_lib.Redis:
     return redis_lib.Redis(connection_pool=_redis_pool)
 
 
-class OutboundCallHandler:
-    """Handles outbound call routing decisions via AGI."""
+# ─── DB query helpers (run via db_thread) ─────────────────────────────────────
 
-    async def handle(self, agi: AgiConnection, session: Session) -> None:
+def _select_sip_account(session, username: str):
+    return session.execute(
+        text("""
+            SELECT s.id, s.user_id, s.username, s.caller_id_name, s.caller_id_number,
+                   s.random_caller_id, s.max_channels, s.allow_p2p, s.allow_recording,
+                   s.status as sip_status,
+                   u.id as uid, u.name, u.role, u.parent_id, u.status as user_status,
+                   u.billing_type, u.balance, u.credit_limit, u.rate_group_id,
+                   u.min_balance_for_calls, u.daily_spend_limit, u.daily_call_limit,
+                   u.destination_whitelist_enabled
+            FROM sip_accounts s
+            JOIN users u ON s.user_id = u.id
+            WHERE s.username = :username
+            LIMIT 1
+        """),
+        {"username": username},
+    ).first()
+
+
+def _select_whitelist_match(session, user_id: int, dest: str):
+    return session.execute(
+        text("""
+            SELECT 1 FROM destination_list_entries e
+            JOIN destination_lists d ON e.destination_list_id = d.id
+            WHERE d.user_id = :user_id AND d.type = 'whitelist'
+            AND :dest LIKE CONCAT(e.prefix, '%')
+            LIMIT 1
+        """),
+        {"user_id": user_id, "dest": dest},
+    ).first()
+
+
+def _select_reseller(session, parent_id: int):
+    return session.execute(
+        text("""
+            SELECT id, role, balance, credit_limit, billing_type, rate_group_id
+            FROM users WHERE id = :pid LIMIT 1
+        """),
+        {"pid": parent_id},
+    ).first()
+
+
+def _select_rate(session, rate_group_id: int, dest: str):
+    return session.execute(
+        text("""
+            SELECT rate_per_minute FROM rates
+            WHERE rate_group_id = :rg_id
+            AND status = 'active'
+            AND effective_date <= CURDATE()
+            AND (end_date IS NULL OR end_date > CURDATE())
+            AND :dest LIKE CONCAT(prefix, '%')
+            ORDER BY LENGTH(prefix) DESC
+            LIMIT 1
+        """),
+        {"rg_id": rate_group_id, "dest": dest},
+    ).first()
+
+
+def _select_daily_stats(session, user_id: int, today_start: datetime):
+    return session.execute(
+        text("""
+            SELECT COUNT(*) as call_count, COALESCE(SUM(total_cost), 0) as total_spend
+            FROM call_records
+            WHERE user_id = :user_id AND call_start >= :today
+        """),
+        {"user_id": user_id, "today": today_start},
+    ).first()
+
+
+def _select_internal_target(session, ext: str):
+    return session.execute(
+        text("""
+            SELECT s.id, s.username, s.user_id FROM sip_accounts s
+            WHERE s.username = :ext AND s.status = 'active'
+            LIMIT 1
+        """),
+        {"ext": ext},
+    ).first()
+
+
+def _select_ps_contact(session, ext: str):
+    return session.execute(
+        text("SELECT id FROM ps_contacts WHERE endpoint = :ext LIMIT 1"),
+        {"ext": ext},
+    ).first()
+
+
+def _select_outbound_routes(session, dest: str):
+    return session.execute(
+        text("""
+            SELECT tr.id, tr.prefix, tr.priority, tr.weight, tr.trunk_id,
+                   tr.remove_prefix, tr.add_prefix, t.tech_prefix,
+                   tr.mnp_enabled,
+                   tr.time_start, tr.time_end, tr.days_of_week, tr.timezone,
+                   t.name as trunk_name, t.id as tid, t.direction as trunk_direction,
+                   t.cli_mode, t.cli_override_number, t.max_channels as trunk_max_channels
+            FROM trunk_routes tr
+            JOIN trunks t ON tr.trunk_id = t.id
+            WHERE tr.status = 'active'
+            AND t.status = 'active'
+            AND t.direction IN ('outgoing', 'both')
+            AND :dest LIKE CONCAT(tr.prefix, '%')
+            ORDER BY LENGTH(tr.prefix) DESC, tr.priority ASC, tr.weight DESC
+        """),
+        {"dest": dest},
+    ).fetchall()
+
+
+def _insert_p2p_cdr(session, payload: dict, registered: bool) -> None:
+    """Insert P2P CDR. registered=True means in_progress (callee live);
+    False means immediately FAILED (callee not registered)."""
+    if registered:
+        session.execute(
+            text("""
+                INSERT INTO call_records
+                (uuid, sip_account_id, user_id, reseller_id, call_flow,
+                 caller, callee, src_ip, user_agent,
+                 call_start, disposition, status, created_at)
+                VALUES
+                (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
+                 :caller, :callee, :src_ip, :user_agent,
+                 NOW(), 'ANSWERED', 'in_progress', NOW())
+            """),
+            payload,
+        )
+    else:
+        session.execute(
+            text("""
+                INSERT INTO call_records
+                (uuid, sip_account_id, user_id, reseller_id, call_flow,
+                 caller, callee, src_ip, user_agent,
+                 call_start, call_end, duration, billsec,
+                 disposition, hangup_cause, status, created_at)
+                VALUES
+                (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
+                 :caller, :callee, :src_ip, :user_agent,
+                 NOW(), NOW(), 0, 0,
+                 'FAILED', 'CALLEE_NOT_REGISTERED', 'unbillable', NOW())
+            """),
+            payload,
+        )
+
+
+def _insert_no_route_cdr(session, payload: dict) -> None:
+    session.execute(
+        text("""
+            INSERT INTO call_records
+            (uuid, sip_account_id, user_id, reseller_id, call_flow,
+             caller, callee, destination, src_ip, user_agent,
+             call_start, call_end, duration, billsec,
+             disposition, hangup_cause, status, created_at)
+            VALUES
+            (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
+             :caller, :callee, :callee, :src_ip, :user_agent,
+             NOW(), NOW(), 0, 0,
+             'FAILED', 'NO_ROUTE_FOUND', 'unbillable', NOW())
+        """),
+        payload,
+    )
+
+
+def _insert_unreachable_cdr(session, payload: dict) -> None:
+    session.execute(
+        text("""
+            INSERT INTO call_records
+            (uuid, sip_account_id, user_id, reseller_id, call_flow,
+             caller, callee, destination, outgoing_trunk_id,
+             src_ip, user_agent,
+             call_start, disposition, status, hangup_cause, created_at)
+            VALUES
+            (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
+             :caller, :callee, :destination, :trunk_id,
+             :src_ip, :user_agent,
+             NOW(), 'UNREACHABLE', 'completed', 503, NOW())
+        """),
+        payload,
+    )
+
+
+def _insert_outbound_cdr(session, payload: dict) -> None:
+    session.execute(
+        text("""
+            INSERT INTO call_records
+            (uuid, sip_account_id, user_id, reseller_id, call_flow,
+             caller, callee, destination, outgoing_trunk_id,
+             src_ip, user_agent,
+             call_start, disposition, status, created_at)
+            VALUES
+            (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
+             :caller, :callee, :destination, :trunk_id,
+             :src_ip, :user_agent,
+             NOW(), 'ANSWERED', 'in_progress', NOW())
+        """),
+        payload,
+    )
+
+
+# ─── Handler ──────────────────────────────────────────────────────────────────
+
+class OutboundCallHandler:
+    """Handles outbound call routing decisions via AGI.
+
+    Sync DB calls run off-loop via shared.database.db_thread so the
+    asyncio event loop stays responsive at 50-70 cps.
+    """
+
+    async def handle(self, agi: AgiConnection) -> None:
         try:
-            await self._process(agi, session)
+            await self._process(agi)
         except Exception as e:
             logger.error(f"Outbound handler error: {e}", exc_info=True)
             await agi.set_variable("ROUTE_ACTION", "REJECT")
@@ -133,7 +336,7 @@ class OutboundCallHandler:
             except Exception as e:
                 logger.debug(f"mark_call_rejected failed: {e}")
 
-    async def _process(self, agi: AgiConnection, session: Session) -> None:
+    async def _process(self, agi: AgiConnection) -> None:
         channel = agi.get_channel()
         extension = agi.get_extension()
         caller_id = agi.get_caller_id()
@@ -156,22 +359,7 @@ class OutboundCallHandler:
         username = match.group(1)
 
         # 2. Look up SIP account and user
-        row = session.execute(
-            text("""
-                SELECT s.id, s.user_id, s.username, s.caller_id_name, s.caller_id_number,
-                       s.random_caller_id, s.max_channels, s.allow_p2p, s.allow_recording,
-                       s.status as sip_status,
-                       u.id as uid, u.name, u.role, u.parent_id, u.status as user_status,
-                       u.billing_type, u.balance, u.credit_limit, u.rate_group_id,
-                       u.min_balance_for_calls, u.daily_spend_limit, u.daily_call_limit,
-                       u.destination_whitelist_enabled
-                FROM sip_accounts s
-                JOIN users u ON s.user_id = u.id
-                WHERE s.username = :username
-                LIMIT 1
-            """),
-            {"username": username},
-        ).first()
+        row = await db_thread(lambda s: _select_sip_account(s, username))
 
         if not row:
             await agi.verbose(f"rSwitch: SIP account {username} not found")
@@ -179,22 +367,13 @@ class OutboundCallHandler:
             return
 
         if row.sip_status != "active" or row.user_status != "active":
-            await agi.verbose(f"rSwitch: Account/user suspended")
+            await agi.verbose("rSwitch: Account/user suspended")
             await agi.set_variable("ROUTE_ACTION", "REJECT")
             return
 
         # 3. Check destination whitelist/blacklist
         if row.destination_whitelist_enabled:
-            allowed = session.execute(
-                text("""
-                    SELECT 1 FROM destination_list_entries e
-                    JOIN destination_lists d ON e.destination_list_id = d.id
-                    WHERE d.user_id = :user_id AND d.type = 'whitelist'
-                    AND :dest LIKE CONCAT(e.prefix, '%')
-                    LIMIT 1
-                """),
-                {"user_id": row.uid, "dest": extension},
-            ).first()
+            allowed = await db_thread(lambda s: _select_whitelist_match(s, row.uid, extension))
             if not allowed:
                 await agi.verbose("rSwitch: Destination not in whitelist")
                 await agi.set_variable("ROUTE_ACTION", "REJECT")
@@ -227,13 +406,7 @@ class OutboundCallHandler:
 
         # 4b. Reseller rate_group + balance check (for clients under resellers)
         if row.parent_id:
-            reseller = session.execute(
-                text("""
-                    SELECT id, role, balance, credit_limit, billing_type, rate_group_id
-                    FROM users WHERE id = :pid LIMIT 1
-                """),
-                {"pid": row.parent_id},
-            ).first()
+            reseller = await db_thread(lambda s: _select_reseller(s, row.parent_id))
 
             # Only check if parent is a reseller (not super_admin)
             if reseller and reseller.role == 'reseller':
@@ -259,19 +432,7 @@ class OutboundCallHandler:
         # 4c. Credit control: calculate max call duration for prepaid users
         rate_per_minute = Decimal("0")
         if row.rate_group_id and row.billing_type == "prepaid":
-            rate_row = session.execute(
-                text("""
-                    SELECT rate_per_minute FROM rates
-                    WHERE rate_group_id = :rg_id
-                    AND status = 'active'
-                    AND effective_date <= CURDATE()
-                    AND (end_date IS NULL OR end_date > CURDATE())
-                    AND :dest LIKE CONCAT(prefix, '%')
-                    ORDER BY LENGTH(prefix) DESC
-                    LIMIT 1
-                """),
-                {"rg_id": row.rate_group_id, "dest": extension},
-            ).first()
+            rate_row = await db_thread(lambda s: _select_rate(s, row.rate_group_id, extension))
 
             if rate_row:
                 rate_per_minute = Decimal(str(rate_row.rate_per_minute))
@@ -288,14 +449,7 @@ class OutboundCallHandler:
         # 5. Check daily limits
         if row.daily_call_limit or row.daily_spend_limit:
             today_start = datetime.now().replace(hour=0, minute=0, second=0)
-            stats = session.execute(
-                text("""
-                    SELECT COUNT(*) as call_count, COALESCE(SUM(total_cost), 0) as total_spend
-                    FROM call_records
-                    WHERE user_id = :user_id AND call_start >= :today
-                """),
-                {"user_id": row.uid, "today": today_start},
-            ).first()
+            stats = await db_thread(lambda s: _select_daily_stats(s, row.uid, today_start))
 
             if row.daily_call_limit and stats.call_count >= row.daily_call_limit:
                 await agi.verbose("rSwitch: Daily call limit reached")
@@ -308,14 +462,7 @@ class OutboundCallHandler:
                 return
 
         # 6. Check for internal SIP-to-SIP call
-        internal_target = session.execute(
-            text("""
-                SELECT s.id, s.username, s.user_id FROM sip_accounts s
-                WHERE s.username = :ext AND s.status = 'active'
-                LIMIT 1
-            """),
-            {"ext": extension},
-        ).first()
+        internal_target = await db_thread(lambda s: _select_internal_target(s, extension))
 
         if internal_target:
             if not row.allow_p2p:
@@ -324,39 +471,23 @@ class OutboundCallHandler:
                 return
 
             # Check if callee is registered (has contact in ps_contacts)
-            contact = session.execute(
-                text("SELECT id FROM ps_contacts WHERE endpoint = :ext LIMIT 1"),
-                {"ext": extension},
-            ).first()
+            contact = await db_thread(lambda s: _select_ps_contact(s, extension))
 
-            # Create CDR regardless of registration status
             cdr_uuid = str(uuid.uuid4())
+            payload = {
+                "uuid": cdr_uuid,
+                "sip_id": row.id,
+                "user_id": row.uid,
+                "reseller_id": row.parent_id,
+                "caller": caller_id,
+                "callee": extension,
+                "src_ip": src_ip,
+                "user_agent": user_agent,
+            }
 
             if contact:
                 # Callee is registered — normal P2P call
-                session.execute(
-                    text("""
-                        INSERT INTO call_records
-                        (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                         caller, callee, src_ip, user_agent,
-                         call_start, disposition, status, created_at)
-                        VALUES
-                        (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
-                         :caller, :callee, :src_ip, :user_agent,
-                         NOW(), 'ANSWERED', 'in_progress', NOW())
-                    """),
-                    {
-                        "uuid": cdr_uuid,
-                        "sip_id": row.id,
-                        "user_id": row.uid,
-                        "reseller_id": row.parent_id,
-                        "caller": caller_id,
-                        "callee": extension,
-                        "src_ip": src_ip,
-                        "user_agent": user_agent,
-                    },
-                )
-                session.commit()
+                await db_thread(lambda s: _insert_p2p_cdr(s, payload, registered=True))
 
                 await agi.set_variable("ROUTE_ACTION", "DIAL_INTERNAL")
                 await agi.set_variable("ROUTE_DIAL_STRING", f"PJSIP/{extension}")
@@ -368,31 +499,7 @@ class OutboundCallHandler:
                 await agi.verbose(f"rSwitch: Internal call to {extension}")
             else:
                 # Callee NOT registered — play wrong_number, CDR with FAILED
-                session.execute(
-                    text("""
-                        INSERT INTO call_records
-                        (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                         caller, callee, src_ip, user_agent,
-                         call_start, call_end, duration, billsec,
-                         disposition, hangup_cause, status, created_at)
-                        VALUES
-                        (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_sip',
-                         :caller, :callee, :src_ip, :user_agent,
-                         NOW(), NOW(), 0, 0,
-                         'FAILED', 'CALLEE_NOT_REGISTERED', 'unbillable', NOW())
-                    """),
-                    {
-                        "uuid": cdr_uuid,
-                        "sip_id": row.id,
-                        "user_id": row.uid,
-                        "reseller_id": row.parent_id,
-                        "caller": caller_id,
-                        "callee": extension,
-                        "src_ip": src_ip,
-                        "user_agent": user_agent,
-                    },
-                )
-                session.commit()
+                await db_thread(lambda s: _insert_p2p_cdr(s, payload, registered=False))
 
                 await agi.set_variable("CDR_UUID", cdr_uuid)
 
@@ -406,53 +513,22 @@ class OutboundCallHandler:
             return
 
         # 7. Select trunk via route selection
-        routes = session.execute(
-            text("""
-                SELECT tr.id, tr.prefix, tr.priority, tr.weight, tr.trunk_id,
-                       tr.remove_prefix, tr.add_prefix, t.tech_prefix,
-                       tr.mnp_enabled,
-                       tr.time_start, tr.time_end, tr.days_of_week, tr.timezone,
-                       t.name as trunk_name, t.id as tid, t.direction as trunk_direction,
-                       t.cli_mode, t.cli_override_number, t.max_channels as trunk_max_channels
-                FROM trunk_routes tr
-                JOIN trunks t ON tr.trunk_id = t.id
-                WHERE tr.status = 'active'
-                AND t.status = 'active'
-                AND t.direction IN ('outgoing', 'both')
-                AND :dest LIKE CONCAT(tr.prefix, '%')
-                ORDER BY LENGTH(tr.prefix) DESC, tr.priority ASC, tr.weight DESC
-            """),
-            {"dest": extension},
-        ).fetchall()
+        routes = await db_thread(lambda s: _select_outbound_routes(s, extension))
 
         if not routes:
             # No trunk route — create CDR with FAILED and play wrong_number
             cdr_uuid = str(uuid.uuid4())
-            session.execute(
-                text("""
-                    INSERT INTO call_records
-                    (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                     caller, callee, destination, src_ip, user_agent,
-                     call_start, call_end, duration, billsec,
-                     disposition, hangup_cause, status, created_at)
-                    VALUES
-                    (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
-                     :caller, :callee, :callee, :src_ip, :user_agent,
-                     NOW(), NOW(), 0, 0,
-                     'FAILED', 'NO_ROUTE_FOUND', 'unbillable', NOW())
-                """),
-                {
-                    "uuid": cdr_uuid,
-                    "sip_id": row.id,
-                    "user_id": row.uid,
-                    "reseller_id": row.parent_id,
-                    "caller": caller_id,
-                    "callee": extension,
-                    "src_ip": src_ip,
-                    "user_agent": user_agent,
-                },
-            )
-            session.commit()
+            payload = {
+                "uuid": cdr_uuid,
+                "sip_id": row.id,
+                "user_id": row.uid,
+                "reseller_id": row.parent_id,
+                "caller": caller_id,
+                "callee": extension,
+                "src_ip": src_ip,
+                "user_agent": user_agent,
+            }
+            await db_thread(lambda s: _insert_no_route_cdr(s, payload))
 
             await agi.set_variable("CDR_UUID", cdr_uuid)
 
@@ -488,33 +564,20 @@ class OutboundCallHandler:
             else:
                 # No reachable trunk — record CDR honestly and reject.
                 cdr_uuid = str(uuid.uuid4())
-                session.execute(
-                    text("""
-                        INSERT INTO call_records
-                        (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                         caller, callee, destination, outgoing_trunk_id,
-                         src_ip, user_agent,
-                         call_start, disposition, status, hangup_cause, created_at)
-                        VALUES
-                        (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
-                         :caller, :callee, :destination, :trunk_id,
-                         :src_ip, :user_agent,
-                         NOW(), 'UNREACHABLE', 'completed', 503, NOW())
-                    """),
-                    {
-                        "uuid": cdr_uuid,
-                        "sip_id": row.id,
-                        "user_id": row.uid,
-                        "reseller_id": row.parent_id,
-                        "caller": caller_id,
-                        "callee": extension,
-                        "destination": extension,
-                        "trunk_id": primary.tid,
-                        "src_ip": src_ip,
-                        "user_agent": user_agent,
-                    },
-                )
-                session.commit()
+                payload = {
+                    "uuid": cdr_uuid,
+                    "sip_id": row.id,
+                    "user_id": row.uid,
+                    "reseller_id": row.parent_id,
+                    "caller": caller_id,
+                    "callee": extension,
+                    "destination": extension,
+                    "trunk_id": primary.tid,
+                    "src_ip": src_ip,
+                    "user_agent": user_agent,
+                }
+                await db_thread(lambda s: _insert_unreachable_cdr(s, payload))
+
                 await agi.set_variable("CDR_UUID", cdr_uuid)
                 await agi.set_variable("ROUTE_ACTION", "REJECT")
                 await agi.set_variable("ROUTE_REJECT_REASON", "trunk_unreachable")
@@ -577,33 +640,19 @@ class OutboundCallHandler:
 
         # 11. Create CDR
         cdr_uuid = str(uuid.uuid4())
-        session.execute(
-            text("""
-                INSERT INTO call_records
-                (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                 caller, callee, destination, outgoing_trunk_id,
-                 src_ip, user_agent,
-                 call_start, disposition, status, created_at)
-                VALUES
-                (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
-                 :caller, :callee, :destination, :trunk_id,
-                 :src_ip, :user_agent,
-                 NOW(), 'ANSWERED', 'in_progress', NOW())
-            """),
-            {
-                "uuid": cdr_uuid,
-                "sip_id": row.id,
-                "user_id": row.uid,
-                "reseller_id": row.parent_id,
-                "caller": caller_id,
-                "callee": extension,
-                "destination": dial_number,
-                "trunk_id": primary.tid,
-                "src_ip": src_ip,
-                "user_agent": user_agent,
-            },
-        )
-        session.commit()
+        payload = {
+            "uuid": cdr_uuid,
+            "sip_id": row.id,
+            "user_id": row.uid,
+            "reseller_id": row.parent_id,
+            "caller": caller_id,
+            "callee": extension,
+            "destination": dial_number,
+            "trunk_id": primary.tid,
+            "src_ip": src_ip,
+            "user_agent": user_agent,
+        }
+        await db_thread(lambda s: _insert_outbound_cdr(s, payload))
 
         # 12. Set channel variables for dialplan
         await agi.set_variable("ROUTE_ACTION", "DIAL")

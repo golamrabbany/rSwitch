@@ -15,28 +15,57 @@ Channel variables expected:
 """
 
 import logging
+import re
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from call_control.agi_protocol import AgiConnection
+from shared.database import db_thread
 
 logger = logging.getLogger(__name__)
 
 
-class ForwardCallHandler:
-    """Creates a CDR for forwarded calls to external numbers."""
+def _select_user_balance(session, user_id: int):
+    return session.execute(
+        text("SELECT balance, credit_limit, billing_type FROM users WHERE id = :uid LIMIT 1"),
+        {"uid": user_id},
+    ).first()
 
-    async def handle(self, agi: AgiConnection, session: Session) -> None:
+
+def _insert_forward_cdr(session, payload: dict) -> None:
+    session.execute(
+        text("""
+            INSERT INTO call_records
+            (uuid, sip_account_id, user_id, reseller_id, call_flow,
+             caller, callee, destination, forwarded_from, outgoing_trunk_id,
+             call_start, disposition, status, created_at)
+            VALUES
+            (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
+             :caller, :callee, :destination, :fwd_from, :trunk_id,
+             NOW(), 'ANSWERED', 'in_progress', NOW())
+        """),
+        payload,
+    )
+
+
+class ForwardCallHandler:
+    """Creates a CDR for forwarded calls to external numbers.
+
+    Sync DB calls are off-loaded via shared.database.db_thread so the
+    asyncio event loop stays responsive under load.
+    """
+
+    async def handle(self, agi: AgiConnection) -> None:
         try:
-            await self._process(agi, session)
+            await self._process(agi)
         except Exception as e:
             logger.error(f"Forward handler error: {e}", exc_info=True)
             # Don't block the forward — just skip CDR creation
             await agi.set_variable("FORWARD_CDR_UUID", "")
 
-    async def _process(self, agi: AgiConnection, session: Session) -> None:
+    async def _process(self, agi: AgiConnection) -> None:
         forward_from = await agi.get_variable("FORWARD_FROM") or ""
         forward_dest = await agi.get_variable("FORWARD_DEST") or ""
         dial_string = await agi.get_variable("FORWARD_DIAL_STRING") or ""
@@ -63,13 +92,9 @@ class ForwardCallHandler:
 
         # Check balance
         if user_id:
-            user = session.execute(
-                text("SELECT balance, credit_limit, billing_type FROM users WHERE id = :uid LIMIT 1"),
-                {"uid": int(user_id)},
-            ).first()
+            user = await db_thread(lambda s: _select_user_balance(s, int(user_id)))
 
             if user and user.billing_type == 'prepaid':
-                from decimal import Decimal
                 available = Decimal(str(user.balance or 0)) + Decimal(str(user.credit_limit or 0))
                 if available <= 0:
                     await agi.verbose(f"rSwitch: Forward blocked — insufficient balance for user {user_id}")
@@ -79,37 +104,24 @@ class ForwardCallHandler:
 
         # Extract trunk ID from dial string: PJSIP/number@trunk-both-{id}
         trunk_id = None
-        import re
         trunk_match = re.search(r"trunk-(?:outgoing|both|incoming)-(\d+)", dial_string)
         if trunk_match:
             trunk_id = int(trunk_match.group(1))
 
         # Create CDR for the forwarded outbound leg
         cdr_uuid = str(uuid.uuid4())
-        session.execute(
-            text("""
-                INSERT INTO call_records
-                (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                 caller, callee, destination, forwarded_from, outgoing_trunk_id,
-                 call_start, disposition, status, created_at)
-                VALUES
-                (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
-                 :caller, :callee, :destination, :fwd_from, :trunk_id,
-                 NOW(), 'ANSWERED', 'in_progress', NOW())
-            """),
-            {
-                "uuid": cdr_uuid,
-                "sip_id": int(sip_id) if sip_id else None,
-                "user_id": int(user_id) if user_id else None,
-                "reseller_id": int(reseller_id) if reseller_id else None,
-                "caller": caller_id,
-                "callee": forward_dest,
-                "destination": forward_dest,
-                "fwd_from": forward_from,
-                "trunk_id": trunk_id,
-            },
-        )
-        session.commit()
+        payload = {
+            "uuid": cdr_uuid,
+            "sip_id": int(sip_id) if sip_id else None,
+            "user_id": int(user_id) if user_id else None,
+            "reseller_id": int(reseller_id) if reseller_id else None,
+            "caller": caller_id,
+            "callee": forward_dest,
+            "destination": forward_dest,
+            "fwd_from": forward_from,
+            "trunk_id": trunk_id,
+        }
+        await db_thread(lambda s: _insert_forward_cdr(s, payload))
 
         await agi.set_variable("FORWARD_CDR_UUID", cdr_uuid)
         await agi.verbose(f"rSwitch: Forward CDR {cdr_uuid} created — will be billed to user {user_id}")

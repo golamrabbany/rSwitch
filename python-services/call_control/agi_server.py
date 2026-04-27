@@ -9,12 +9,12 @@ Scripts:
 - route_inbound  → InboundCallHandler
 - call_end       → CallEndHandler
 - broadcast_call → BroadcastCallHandler
+- forward_call   → ForwardCallHandler
 """
 
 import asyncio
 import logging
 
-from shared.database import get_sync_session_factory
 from call_control.agi_protocol import AgiConnection
 from call_control.outbound_handler import OutboundCallHandler
 from call_control.inbound_handler import InboundCallHandler
@@ -35,10 +35,10 @@ _forward = ForwardCallHandler()
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     """Handle a single AGI connection from Asterisk.
 
-    Migrated handlers (those using shared.database.db_thread) ignore the
-    `session` arg and check out their own per-transaction sessions via the
-    asyncio default thread pool. The session created here is kept for the
-    handlers still on the legacy sync-in-loop path until they are migrated.
+    No DB session is opened here — handlers offload sync DB work via
+    shared.database.db_thread(), which checks out a fresh session per
+    transactional unit. This keeps the asyncio event loop responsive
+    even under sustained 50-70 cps load.
     """
     peer = writer.get_extra_info("peername")
     conn = AgiConnection(reader, writer)
@@ -49,27 +49,19 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
         script = conn.get_script()
         logger.info(f"AGI request: script={script}, channel={conn.get_channel()}")
 
-        # Legacy session for handlers not yet migrated to db_thread.
-        # Migrated handlers accept it as a no-op kwarg and ignore it.
-        session_factory = get_sync_session_factory()
-        session = session_factory()
-
-        try:
-            if script == "route_outbound":
-                await _outbound.handle(conn, session)
-            elif script == "route_inbound":
-                await _inbound.handle(conn, session)
-            elif script == "call_end":
-                await _call_end.handle(conn, session)
-            elif script == "broadcast_call":
-                await _broadcast.handle(conn, session)
-            elif script == "forward_call":
-                await _forward.handle(conn, session)
-            else:
-                logger.warning(f"Unknown AGI script: {script}")
-                await conn.verbose(f"rSwitch: Unknown script '{script}'")
-        finally:
-            session.close()
+        if script == "route_outbound":
+            await _outbound.handle(conn)
+        elif script == "route_inbound":
+            await _inbound.handle(conn)
+        elif script == "call_end":
+            await _call_end.handle(conn)
+        elif script == "broadcast_call":
+            await _broadcast.handle(conn)
+        elif script == "forward_call":
+            await _forward.handle(conn)
+        else:
+            logger.warning(f"Unknown AGI script: {script}")
+            await conn.verbose(f"rSwitch: Unknown script '{script}'")
 
     except Exception as e:
         logger.error(f"AGI connection error from {peer}: {e}", exc_info=True)
