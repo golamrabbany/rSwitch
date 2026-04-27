@@ -756,8 +756,15 @@ EOF
 configure_supervisor() {
     log_step "Configuring Supervisor (Python services only)"
 
-    [[ "$OS" == "centos" || "$OS" == "almalinux" ]] && { WEB_USER="root"; SUPERVISOR_CONF_DIR="/etc/supervisord.d"; } || { WEB_USER="www-data"; SUPERVISOR_CONF_DIR="/etc/supervisor/conf.d"; }
+    [[ "$OS" == "centos" || "$OS" == "almalinux" ]] && { WEB_USER="root"; SUPERVISOR_CONF_DIR="/etc/supervisord.d"; SUPERVISORD_CONF="/etc/supervisord.conf"; } || { WEB_USER="www-data"; SUPERVISOR_CONF_DIR="/etc/supervisor/conf.d"; SUPERVISORD_CONF="/etc/supervisor/supervisord.conf"; }
     mkdir -p $SUPERVISOR_CONF_DIR
+
+    # Raise supervisord's own FD/proc limits so all children inherit them.
+    # supervisord defaults to soft NOFILE=1024; with 1000+ concurrent calls
+    # each holding multiple sockets, that exhausts within minutes.
+    if [[ -f "$SUPERVISORD_CONF" ]] && ! grep -qE "^minfds=" "$SUPERVISORD_CONF"; then
+        sed -i "/^\[supervisord\]/a minfds=65536\nminprocs=4096" "$SUPERVISORD_CONF"
+    fi
 
     cat > ${SUPERVISOR_CONF_DIR}/rswitch-engine.conf << EOF
 [program:rswitch-api]
@@ -772,7 +779,7 @@ stdout_logfile=/var/log/rswitch-python-api.out.log
 stopwaitsecs=10
 
 [program:rswitch-celery]
-command=${INSTALL_DIR}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 4
+command=${INSTALL_DIR}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 12
 directory=${INSTALL_DIR}/python-services
 environment=PYTHONPATH="${INSTALL_DIR}/python-services"
 user=${WEB_USER}

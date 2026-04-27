@@ -44,11 +44,12 @@ stdout_logfile_backups=3
 
 ; --- Python Services (Billing Engine + Call Control + Live Monitoring) ---
 
-; FD limit raised via ulimit before exec because supervisor's program-level
-; minfds= is ignored by standard supervisor. Each call may hold AGI socket
-; + DB + Redis FDs; 1024 (default) exhausts under load.
+; FD limits are inherited from supervisord itself. The installer adds
+; minfds=65536/minprocs=4096 to /etc/supervisor/supervisord.conf so
+; all children get the higher limit; per-program ulimit wrappers and
+; per-program minfds= directives are silently ignored by standard supervisord.
 [program:rswitch-api]
-command=/bin/bash -c "ulimit -n 65536 && exec {{INSTALL_DIR}}/python-services/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8001 --workers 1"
+command={{INSTALL_DIR}}/python-services/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8001 --workers 1
 directory={{INSTALL_DIR}}/python-services
 environment=PYTHONPATH="{{INSTALL_DIR}}/python-services"
 user=www-data
@@ -61,7 +62,7 @@ stdout_logfile_backups=3
 stopwaitsecs=10
 
 [program:rswitch-celery]
-command=/bin/bash -c "ulimit -n 65536 && exec {{INSTALL_DIR}}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 12"
+command={{INSTALL_DIR}}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 12
 directory={{INSTALL_DIR}}/python-services
 environment=PYTHONPATH="{{INSTALL_DIR}}/python-services"
 user=www-data
