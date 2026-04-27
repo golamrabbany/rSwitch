@@ -2330,7 +2330,7 @@ PY
     }' >/dev/null
 
     # 8. Import bundled dashboards
-    for dash in node-exporter-full mysql-overview redis; do
+    for dash in node-exporter-full mysql-overview redis rswitch-overview; do
         if [[ -f "${SCRIPT_DIR}/templates/grafana/${dash}.json" ]]; then
             python3 - "${SCRIPT_DIR}/templates/grafana/${dash}.json" <<PY > /tmp/grafana_import.json
 import json, sys
