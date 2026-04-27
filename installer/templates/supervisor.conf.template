@@ -56,9 +56,12 @@ stdout_logfile=/var/log/rswitch-python-api.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=3
 stopwaitsecs=10
+; Raised for high concurrency: each call may hold AGI socket + DB + Redis FDs.
+minfds=65536
+minprocs=4096
 
 [program:rswitch-celery]
-command={{INSTALL_DIR}}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 4
+command={{INSTALL_DIR}}/python-services/venv/bin/celery -A celery_app worker -l info -Q billing,monitoring,broadcast -c 12
 directory={{INSTALL_DIR}}/python-services
 environment=PYTHONPATH="{{INSTALL_DIR}}/python-services"
 user=www-data
@@ -69,6 +72,8 @@ stdout_logfile=/var/log/rswitch-celery.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=3
 stopwaitsecs=30
+minfds=65536
+minprocs=4096
 
 [program:rswitch-celery-beat]
 command={{INSTALL_DIR}}/python-services/venv/bin/celery -A celery_app beat -l info

@@ -1140,10 +1140,10 @@ net.core.wmem_max = 26214400
 net.core.rmem_default = 1048576
 net.core.wmem_default = 1048576
 net.core.somaxconn = 4096
-net.core.netdev_max_backlog = 5000
+net.core.netdev_max_backlog = 10000
 
-# TCP tuning
-net.ipv4.tcp_max_syn_backlog = 4096
+# TCP tuning — syn backlog raised for 50-70 cps signaling bursts
+net.ipv4.tcp_max_syn_backlog = 8192
 net.ipv4.tcp_tw_reuse = 1
 net.ipv4.tcp_fin_timeout = 15
 
@@ -1157,8 +1157,8 @@ net.netfilter.nf_conntrack_max = 262144
 net.netfilter.nf_conntrack_udp_timeout = 30
 net.netfilter.nf_conntrack_udp_timeout_stream = 60
 
-# File handles
-fs.file-max = 262144
+# File handles — raised for 1000+ concurrent calls
+fs.file-max = 524288
 SYSEOF
     sysctl -p /etc/sysctl.d/99-rswitch-asterisk.conf 2>/dev/null || true
     log_success "Kernel tuning applied"

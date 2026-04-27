@@ -16,6 +16,16 @@ disable_tcp_switch=yes
 taskprocessor_overload_trigger=global
 taskprocessor_overload_trigger_count=500
 
+; Threadpool sizing for the SIP signaling worker pool.
+; Default (max=50) bottlenecks at ~50 cps — INVITEs queue and time out.
+; Sized for 50-70 cps + 1000-1200 concurrent calls with safety margin.
+[system]
+type=system
+threadpool_initial_size=80
+threadpool_auto_increment=40
+threadpool_max_size=400
+threadpool_idle_timeout=60
+
 ; UDP Transport — with QoS for voice traffic prioritization
 [transport-udp]
 type=transport

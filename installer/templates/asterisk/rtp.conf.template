@@ -2,9 +2,10 @@
 ; Optimized for high call volume (3000+ concurrent calls)
 
 [general]
-; Port range: 10,000 ports = 5,000 concurrent calls (2 ports per call)
+; Port range: 30,000 ports = 7,500 concurrent calls (4 ports per call: RTP+RTCP each direction).
+; Sized for 1000-1200 concurrent with margin for stuck-port leaks.
 rtpstart=10000
-rtpend=20000
+rtpend=40000
 
 ; Security: enforce symmetric RTP
 strictrtp=yes

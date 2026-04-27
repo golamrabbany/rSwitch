@@ -662,15 +662,17 @@ EOF
     systemctl daemon-reload
     systemctl enable asterisk
 
-    # Kernel tuning
+    # Kernel tuning — sized for 1000+ concurrent calls and 50-70 cps signaling burst
     cat > /etc/sysctl.d/99-rswitch-asterisk.conf << 'EOF'
 net.core.rmem_max = 26214400
 net.core.wmem_max = 26214400
 net.core.somaxconn = 4096
+net.core.netdev_max_backlog = 10000
 net.ipv4.tcp_tw_reuse = 1
 net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_max_syn_backlog = 8192
 net.ipv4.udp_mem = 65536 131072 262144
-fs.file-max = 262144
+fs.file-max = 524288
 EOF
     sysctl -p /etc/sysctl.d/99-rswitch-asterisk.conf 2>/dev/null || true
 
