@@ -2087,6 +2087,24 @@ EOF
 
     cat >> $CREDS_FILE << EOF
 
+Monitoring (Prometheus + Grafana + Alertmanager)
+────────────────────────────────────────────────
+Grafana URL:      https://${DOMAIN}/grafana/
+Grafana Admin:    admin
+Grafana Password: ${GRAFANA_ADMIN_PASSWORD:-(not set — installer ran without configure_monitoring)}
+Alertmanager URL: https://${DOMAIN}/alertmanager/
+
+Pre-imported dashboards:
+  - rSwitch Overview     (start here — app metrics + active calls + alerts)
+  - Node Exporter Full   (system: CPU/RAM/disk/network)
+  - MySQL Overview       (connections, queries, buffer pool)
+  - Redis                (broker, cache, keyspace)
+
+Alert rules: 13 across rswitch.exporters / rswitch.app / rswitch.mysql /
+rswitch.hosts. Currently using a null receiver — alerts fire and appear
+in the Alertmanager UI but no notification is delivered until you wire up
+Telegram, email, or webhook in /etc/prometheus/alertmanager.yml.
+
 ╔══════════════════════════════════════════════════════════════════╗
 ║  IMPORTANT: Delete this file after saving credentials securely! ║
 ╚══════════════════════════════════════════════════════════════════╝
@@ -2115,6 +2133,19 @@ print_completion() {
     echo -e "  ${CYAN}Admin Email:${NC}     ${ADMIN_EMAIL}"
     echo -e "  ${CYAN}Admin Password:${NC}  ${ADMIN_PASSWORD}"
     echo ""
+
+    if [[ -n "${GRAFANA_ADMIN_PASSWORD:-}" ]]; then
+        if [[ "$SSL_TYPE" == "skip" ]]; then
+            echo -e "  ${CYAN}Grafana:${NC}         http://${DOMAIN}/grafana/"
+            echo -e "  ${CYAN}Alertmanager:${NC}    http://${DOMAIN}/alertmanager/"
+        else
+            echo -e "  ${CYAN}Grafana:${NC}         https://${DOMAIN}/grafana/"
+            echo -e "  ${CYAN}Alertmanager:${NC}    https://${DOMAIN}/alertmanager/"
+        fi
+        echo -e "  ${CYAN}Grafana Login:${NC}   admin / ${GRAFANA_ADMIN_PASSWORD}"
+        echo ""
+    fi
+
     echo -e "  ${YELLOW}Credentials saved to:${NC} /root/rswitch-credentials.txt"
     echo ""
     echo -e "  ${CYAN}Next Steps:${NC}"
