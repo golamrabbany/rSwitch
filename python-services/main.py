@@ -369,6 +369,27 @@ async def health_check():
 
 
 # ─────────────────────────────────────────────────────
+# Prometheus metrics
+# ─────────────────────────────────────────────────────
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus scrape endpoint.
+
+    Refreshes AMI-driven gauges (active calls, registered contacts, WS clients,
+    AMI connectivity, trunk reachability) on each scrape; AGI-handler counters
+    and latency histograms are updated in-place by the request handler.
+
+    Behind the firewall — :8001 is restricted to APP_SERVER_IP only.
+    """
+    from fastapi.responses import Response
+    from monitoring.metrics import render_metrics
+    body, content_type = render_metrics()
+    return Response(content=body, media_type=content_type)
+
+
+# ─────────────────────────────────────────────────────
 # Redis subscriber — listen for Laravel events
 # ─────────────────────────────────────────────────────
 

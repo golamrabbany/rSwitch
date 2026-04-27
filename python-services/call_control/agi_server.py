@@ -21,6 +21,7 @@ from call_control.inbound_handler import InboundCallHandler
 from call_control.call_end_handler import CallEndHandler
 from call_control.broadcast_handler import BroadcastCallHandler
 from call_control.forward_handler import ForwardCallHandler
+from monitoring.metrics import agi_request_timer
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,12 @@ _forward = ForwardCallHandler()
 
 
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    """Handle a single AGI connection from Asterisk."""
+    """Handle a single AGI connection from Asterisk.
+
+    Each request's end-to-end latency and outcome (success / error /
+    unknown_script) is recorded into Prometheus via agi_request_timer
+    so the /metrics endpoint exposes it for scraping.
+    """
     peer = writer.get_extra_info("peername")
     conn = AgiConnection(reader, writer)
 
@@ -44,27 +50,29 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
         script = conn.get_script()
         logger.info(f"AGI request: script={script}, channel={conn.get_channel()}")
 
-        # Get database session
-        session_factory = get_sync_session_factory()
-        session = session_factory()
+        with agi_request_timer(script) as timer:
+            # Get database session
+            session_factory = get_sync_session_factory()
+            session = session_factory()
 
-        try:
-            # Route to handler
-            if script == "route_outbound":
-                await _outbound.handle(conn, session)
-            elif script == "route_inbound":
-                await _inbound.handle(conn, session)
-            elif script == "call_end":
-                await _call_end.handle(conn, session)
-            elif script == "broadcast_call":
-                await _broadcast.handle(conn, session)
-            elif script == "forward_call":
-                await _forward.handle(conn, session)
-            else:
-                logger.warning(f"Unknown AGI script: {script}")
-                await conn.verbose(f"rSwitch: Unknown script '{script}'")
-        finally:
-            session.close()
+            try:
+                # Route to handler
+                if script == "route_outbound":
+                    await _outbound.handle(conn, session)
+                elif script == "route_inbound":
+                    await _inbound.handle(conn, session)
+                elif script == "call_end":
+                    await _call_end.handle(conn, session)
+                elif script == "broadcast_call":
+                    await _broadcast.handle(conn, session)
+                elif script == "forward_call":
+                    await _forward.handle(conn, session)
+                else:
+                    timer.outcome = "unknown_script"
+                    logger.warning(f"Unknown AGI script: {script}")
+                    await conn.verbose(f"rSwitch: Unknown script '{script}'")
+            finally:
+                session.close()
 
     except Exception as e:
         logger.error(f"AGI connection error from {peer}: {e}", exc_info=True)
