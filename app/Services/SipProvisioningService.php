@@ -27,12 +27,18 @@ class SipProvisioningService
             $codec = self::DEFAULT_CODEC;
 
             // ps_endpoints
+            // identify_by:
+            //   password → null (PJSIP default, matches by username from auth)
+            //   ip       → 'ip'  (only IP can identify; no auth challenge after match)
+            //   both     → 'ip'  (only IP can identify, then password is also required —
+            //                    enforces strict "IP + Password" both-required matching)
             DB::table('ps_endpoints')->updateOrInsert(
                 ['id' => $id],
                 [
                     'transport' => 'transport-udp',
                     'aors' => $id,
                     'auth' => in_array($sip->auth_type, ['password', 'both']) ? $id : null,
+                    'identify_by' => in_array($sip->auth_type, ['ip', 'both']) ? 'ip' : null,
                     'context' => 'from-internal',
                     'disallow' => 'all',
                     'allow' => $codec,
