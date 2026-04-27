@@ -28,17 +28,18 @@ class SipProvisioningService
 
             // ps_endpoints
             // identify_by:
-            //   password → null (PJSIP default, matches by username from auth)
-            //   ip       → 'ip'  (only IP can identify; no auth challenge after match)
-            //   both     → 'ip'  (only IP can identify, then password is also required —
-            //                    enforces strict "IP + Password" both-required matching)
+            //   password → 'username' (PJSIP default — matches by auth username)
+            //   ip       → 'ip'       (only IP can identify; no auth challenge after match)
+            //   both     → 'ip'       (only IP can identify, then password is also required —
+            //                          enforces strict "IP + Password" both-required matching)
+            // Column is NOT NULL in ps_endpoints, so always pass a real value.
             DB::table('ps_endpoints')->updateOrInsert(
                 ['id' => $id],
                 [
                     'transport' => 'transport-udp',
                     'aors' => $id,
                     'auth' => in_array($sip->auth_type, ['password', 'both']) ? $id : null,
-                    'identify_by' => in_array($sip->auth_type, ['ip', 'both']) ? 'ip' : null,
+                    'identify_by' => in_array($sip->auth_type, ['ip', 'both']) ? 'ip' : 'username',
                     'context' => 'from-internal',
                     'disallow' => 'all',
                     'allow' => $codec,
