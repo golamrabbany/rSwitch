@@ -71,6 +71,10 @@ class AMIListener:
         self.settings = get_settings()
         self.manager: Optional[Manager] = None
         self._active_calls: dict[str, ActiveCall] = {}  # unique_id → ActiveCall
+        # linked_id → unique_id of the leg that owns the UI row. Every
+        # call_start/answered/end broadcast for a given linked_id is keyed
+        # to this uid so the JS only ever creates/updates one row per call.
+        self._displayed_uid: dict[str, str] = {}
         self._registered_contacts: dict[str, dict] = {}  # username → {ip, port, user_agent, registered_at}
         self._sip_to_client: dict[str, str] = {}  # sip username → owning user's name
         self._sip_client_loaded_at: float = 0.0
@@ -181,6 +185,8 @@ class AMIListener:
                     # Only add if it looks like a real channel
                     if call.caller or call.callee or 'PJSIP' in channel:
                         self._active_calls[uid] = call
+                        # First leg per linked_id owns the UI row.
+                        self._displayed_uid.setdefault(call.linked_id, uid)
 
             count = len(self._active_calls)
             if count > 0:
@@ -260,17 +266,14 @@ class AMIListener:
             call.sip_account = channel.split("/")[1].split("-")[0] if "/" in channel else ""
             call.client = self._lookup_client(call.sip_account)
 
-        # Detect if this is a secondary leg of an already-tracked call.
-        # Asterisk creates 2 channels per call (caller leg + dialed leg),
-        # both share the same Linkedid. Only the first one becomes a UI row.
-        is_secondary_leg = any(
-            other.linked_id == linked_id and other.unique_id != uid
-            for other in self._active_calls.values()
-        )
-
+        # Asterisk creates 2 channels per call (caller leg + dialed leg)
+        # sharing one Linkedid. The first leg owns the UI row; subsequent
+        # legs feed updates into it without spawning a second row.
+        is_secondary_leg = linked_id in self._displayed_uid
         self._active_calls[uid] = call
 
         if not is_secondary_leg:
+            self._displayed_uid[linked_id] = uid
             await self._broadcast({
                 "type": "call_start",
                 "call": call.to_dict(),
@@ -281,6 +284,33 @@ class AMIListener:
             f"New channel: uid={uid}, linked={linked_id}, "
             f"secondary={is_secondary_leg}, caller={call.caller}, callee={call.callee}"
         )
+
+    def _displayed_leg(self, linked_id: str) -> Optional[ActiveCall]:
+        """Return the leg whose unique_id is broadcast as the UI row for
+        this linked_id, or None if no row has been broadcast yet."""
+        uid = self._displayed_uid.get(linked_id)
+        return self._active_calls.get(uid) if uid else None
+
+    @staticmethod
+    def _is_meaningful(value: str) -> bool:
+        return bool(value) and value not in ("<unknown>", "s")
+
+    def _mirror_to_displayed(self, leg: ActiveCall) -> ActiveCall:
+        """Mirror state + any richer caller/callee data from this leg onto
+        the displayed leg for its linked_id, so subsequent broadcasts of
+        the displayed leg reflect the latest call state. Returns the leg
+        whose to_dict() should be broadcast (displayed if known, else self)."""
+        displayed = self._displayed_leg(leg.linked_id)
+        if displayed is None or displayed is leg:
+            return leg
+        if leg.state == "answered" and displayed.state != "answered":
+            displayed.state = "answered"
+            displayed.answered_at = leg.answered_at
+        if self._is_meaningful(leg.caller) and not self._is_meaningful(displayed.caller):
+            displayed.caller = leg.caller
+        if self._is_meaningful(leg.callee) and not self._is_meaningful(displayed.callee):
+            displayed.callee = leg.callee
+        return displayed
 
     async def _on_new_state(self, manager, event):
         """Channel state changed — typically ringing → answered."""
@@ -298,9 +328,10 @@ class AMIListener:
                 if connected and connected != "<unknown>":
                     call.callee = connected
 
+                broadcast_leg = self._mirror_to_displayed(call)
                 await self._broadcast({
                     "type": "call_answered",
-                    "call": call.to_dict(),
+                    "call": broadcast_leg.to_dict(),
                     "stats": self.get_stats(),
                 })
             elif state == "ringing":
@@ -316,9 +347,10 @@ class AMIListener:
                 call.state = "answered"
                 call.answered_at = time.time()
 
+                broadcast_leg = self._mirror_to_displayed(call)
                 await self._broadcast({
                     "type": "call_answered",
-                    "call": call.to_dict(),
+                    "call": broadcast_leg.to_dict(),
                     "stats": self.get_stats(),
                 })
 
@@ -330,6 +362,8 @@ class AMIListener:
         if not call:
             return
 
+        displayed_uid = self._displayed_uid.get(call.linked_id)
+
         # Only emit call_end when the LAST leg of this linked call is gone.
         # The UI key is the leg that was broadcast as call_start (the first leg
         # for this linked_id). If other legs remain, this hangup is silent.
@@ -338,10 +372,23 @@ class AMIListener:
             for other in self._active_calls.values()
         )
 
-        if not other_legs_remain:
+        if other_legs_remain:
+            # If the leg that owned the UI row dropped first, hand the row
+            # over to a remaining sibling so future state changes still
+            # update it and the eventual call_end can clear it.
+            if displayed_uid == uid:
+                sibling = next(
+                    (c for c in self._active_calls.values() if c.linked_id == call.linked_id),
+                    None,
+                )
+                if sibling:
+                    self._displayed_uid[call.linked_id] = sibling.unique_id
+                    self._mirror_to_displayed(call)
+        else:
+            self._displayed_uid.pop(call.linked_id, None)
             await self._broadcast({
                 "type": "call_end",
-                "unique_id": uid,
+                "unique_id": displayed_uid or uid,
                 "linked_id": call.linked_id,
                 "caller": call.caller,
                 "callee": call.callee,
@@ -581,26 +628,26 @@ class AMIListener:
     # ─────────────────────────────────────────────────────
 
     def _dedupe_legs(self) -> list[ActiveCall]:
-        """One Asterisk call has 2 legs (caller + dialed). Group by linked_id
-        and keep the most informative leg per call."""
-        by_linked: dict[str, ActiveCall] = {}
+        """One Asterisk call has 2 legs (caller + dialed). Return the leg
+        that owns the UI row per linked_id (tracked via _displayed_uid),
+        so snapshots key rows the same way live events do."""
+        result: list[ActiveCall] = []
+        seen_links: set[str] = set()
 
-        def score(c: ActiveCall) -> tuple:
-            # Higher = better representative. Prefer answered, real caller/callee, oldest.
-            real_caller = bool(c.caller and c.caller != "<unknown>")
-            real_callee = bool(c.callee and c.callee not in ("<unknown>", "s", ""))
-            return (
-                1 if c.state == "answered" else 0,
-                int(real_caller) + int(real_callee),
-                -c.started_at,  # earlier started_at wins ties
-            )
+        for linked_id, displayed_uid in self._displayed_uid.items():
+            leg = self._active_calls.get(displayed_uid)
+            if leg is not None and linked_id not in seen_links:
+                result.append(leg)
+                seen_links.add(linked_id)
 
+        # Fallback for any leg lacking a displayed mapping (shouldn't happen
+        # in steady state but keeps recovery from partial loads safe).
         for call in self._active_calls.values():
-            existing = by_linked.get(call.linked_id)
-            if existing is None or score(call) > score(existing):
-                by_linked[call.linked_id] = call
+            if call.linked_id not in seen_links:
+                seen_links.add(call.linked_id)
+                result.append(call)
 
-        return list(by_linked.values())
+        return result
 
     def get_active_calls_list(self) -> list[dict]:
         """Return active calls as dicts, deduped by linked_id (one per call)."""
@@ -637,9 +684,10 @@ class AMIListener:
         call = self._active_calls.pop(unique_id, None)
         if not call:
             return
+        displayed_uid = self._displayed_uid.pop(call.linked_id, None) or unique_id
         await self._broadcast({
             "type": "call_end",
-            "unique_id": unique_id,
+            "unique_id": displayed_uid,
             "linked_id": call.linked_id,
             "caller": call.caller,
             "callee": call.callee,
