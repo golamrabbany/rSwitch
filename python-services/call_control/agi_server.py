@@ -33,23 +33,28 @@ _forward = ForwardCallHandler()
 
 
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    """Handle a single AGI connection from Asterisk."""
+    """Handle a single AGI connection from Asterisk.
+
+    Migrated handlers (those using shared.database.db_thread) ignore the
+    `session` arg and check out their own per-transaction sessions via the
+    asyncio default thread pool. The session created here is kept for the
+    handlers still on the legacy sync-in-loop path until they are migrated.
+    """
     peer = writer.get_extra_info("peername")
     conn = AgiConnection(reader, writer)
 
     try:
-        # Parse AGI environment
         await conn.parse()
 
         script = conn.get_script()
         logger.info(f"AGI request: script={script}, channel={conn.get_channel()}")
 
-        # Get database session
+        # Legacy session for handlers not yet migrated to db_thread.
+        # Migrated handlers accept it as a no-op kwarg and ignore it.
         session_factory = get_sync_session_factory()
         session = session_factory()
 
         try:
-            # Route to handler
             if script == "route_outbound":
                 await _outbound.handle(conn, session)
             elif script == "route_inbound":

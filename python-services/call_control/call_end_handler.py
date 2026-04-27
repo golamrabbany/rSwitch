@@ -13,14 +13,12 @@ Flow:
 """
 
 import logging
-import os
-from datetime import datetime
 
 import redis as redis_lib
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from call_control.agi_protocol import AgiConnection
+from shared.database import db_thread
 
 logger = logging.getLogger(__name__)
 
@@ -40,16 +38,60 @@ DIALSTATUS_MAP = {
 }
 
 
-class CallEndHandler:
-    """Handles call completion and CDR update via AGI."""
+def _select_cdr(session, uuid: str):
+    return session.execute(
+        text("SELECT id, call_flow, status, disposition FROM call_records WHERE uuid = :uuid LIMIT 1"),
+        {"uuid": uuid},
+    ).first()
 
-    async def handle(self, agi: AgiConnection, session: Session) -> None:
+
+def _select_wall_seconds(session, uuid: str) -> int:
+    return int(session.execute(
+        text("SELECT TIMESTAMPDIFF(SECOND, call_start, NOW()) AS s FROM call_records WHERE uuid = :uuid"),
+        {"uuid": uuid},
+    ).scalar() or 0)
+
+
+def _update_cdr(session, uuid: str, duration: int, billsec: int,
+                disposition: str, hangup_cause: str, status: str) -> None:
+    session.execute(
+        text("""
+            UPDATE call_records SET
+                call_end = NOW(),
+                duration = :duration,
+                billsec = :billsec,
+                disposition = :disposition,
+                hangup_cause = :hangup_cause,
+                status = :status
+            WHERE uuid = :uuid
+        """),
+        {
+            "uuid": uuid,
+            "duration": duration,
+            "billsec": billsec,
+            "disposition": disposition,
+            "hangup_cause": hangup_cause,
+            "status": status,
+        },
+    )
+
+
+class CallEndHandler:
+    """Handles call completion and CDR update via AGI.
+
+    Migrated to off-loop DB execution: every DB statement runs in a
+    short-lived session via shared.database.db_thread() so the asyncio
+    event loop stays responsive at 50-70 cps. The legacy `session` arg
+    is accepted for compat with agi_server's dispatcher and ignored.
+    """
+
+    async def handle(self, agi: AgiConnection, session=None) -> None:
         try:
-            await self._process(agi, session)
+            await self._process(agi)
         except Exception as e:
             logger.error(f"CallEnd handler error: {e}", exc_info=True)
 
-    async def _process(self, agi: AgiConnection, session: Session) -> None:
+    async def _process(self, agi: AgiConnection) -> None:
         # 1. Get CDR UUID
         cdr_uuid = await agi.get_variable("CDR_UUID")
         if not cdr_uuid:
@@ -65,7 +107,6 @@ class CallEndHandler:
         dialed_str = await agi.get_variable("DIALEDTIME") or ""
         # Legacy fallbacks (older calls / different dialplan paths).
         duration_str = answered_str or await agi.get_variable("CALL_DURATION") or "0"
-        billsec_str = answered_str or await agi.get_variable("CALL_BILLSEC") or "0"
         hangup_cause = await agi.get_variable("HANGUPCAUSE") or ""
 
         billsec = int(answered_str) if answered_str.isdigit() else 0
@@ -77,12 +118,8 @@ class CallEndHandler:
         # 3. Map to disposition
         disposition = DIALSTATUS_MAP.get(dial_status.upper(), "FAILED")
 
-        # 4. Determine status
-        # Check call flow to decide billing status
-        cdr = session.execute(
-            text("SELECT id, call_flow, status, disposition FROM call_records WHERE uuid = :uuid LIMIT 1"),
-            {"uuid": cdr_uuid},
-        ).first()
+        # 4. Look up the CDR (off-loop)
+        cdr = await db_thread(lambda s: _select_cdr(s, cdr_uuid))
 
         if not cdr:
             await agi.verbose(f"rSwitch: CDR {cdr_uuid} not found")
@@ -105,11 +142,7 @@ class CallEndHandler:
         # compute wall-clock seconds from call_start. Slightly overcounts
         # because it includes ring time, but better than billing 0.
         if billsec == 0 and disposition == "ANSWERED":
-            wall = session.execute(
-                text("SELECT TIMESTAMPDIFF(SECOND, call_start, NOW()) AS s "
-                     "FROM call_records WHERE uuid = :uuid"),
-                {"uuid": cdr_uuid},
-            ).scalar() or 0
+            wall = await db_thread(lambda s: _select_wall_seconds(s, cdr_uuid))
             wall = max(0, int(wall))
             if wall > 0:
                 logger.warning(
@@ -118,32 +151,13 @@ class CallEndHandler:
                 )
                 billsec = wall
                 duration = max(duration, wall)
-                # Re-evaluate billing status now that we have a non-zero billsec.
                 if cdr.call_flow != "sip_to_sip":
                     status = "in_progress"
 
-        # 5. Update CDR
-        session.execute(
-            text("""
-                UPDATE call_records SET
-                    call_end = NOW(),
-                    duration = :duration,
-                    billsec = :billsec,
-                    disposition = :disposition,
-                    hangup_cause = :hangup_cause,
-                    status = :status
-                WHERE uuid = :uuid
-            """),
-            {
-                "uuid": cdr_uuid,
-                "duration": duration,
-                "billsec": billsec,
-                "disposition": disposition,
-                "hangup_cause": hangup_cause,
-                "status": status,
-            },
-        )
-        session.commit()
+        # 5. Update CDR (off-loop, commits via get_session() ctx manager)
+        await db_thread(lambda s: _update_cdr(
+            s, cdr_uuid, duration, billsec, disposition, hangup_cause, status
+        ))
 
         logger.info(
             f"CDR {cdr_uuid}: {disposition} duration={duration}s "
