@@ -1456,7 +1456,7 @@ server {
     # Grafana itself listens on 127.0.0.1:3000; this exposes it on the
     # public vhost gated by Grafana's own login. configure_monitoring()
     # sets serve_from_sub_path = true so Grafana generates URLs under /grafana/.
-    location /grafana/ {
+    location ^~ /grafana/ {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -1465,7 +1465,7 @@ server {
     }
 
     # Grafana Live (WebSocket for live dashboards)
-    location /grafana/api/live/ {
+    location ^~ /grafana/api/live/ {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -1892,14 +1892,14 @@ server {
     gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/javascript application/json;
 
     # rSwitch: Grafana proxy — \${DOMAIN}/grafana/ (HTTPS vhost)
-    location /grafana/ {
+    location ^~ /grafana/ {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
-    location /grafana/api/live/ {
+    location ^~ /grafana/api/live/ {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
