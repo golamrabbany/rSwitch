@@ -1452,6 +1452,30 @@ server {
     gzip_proxied expired no-cache no-store private auth;
     gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/javascript application/json;
 
+    # rSwitch: Grafana proxy — \${DOMAIN}/grafana/
+    # Grafana itself listens on 127.0.0.1:3000; this exposes it on the
+    # public vhost gated by Grafana's own login. configure_monitoring()
+    # sets serve_from_sub_path = true so Grafana generates URLs under /grafana/.
+    location /grafana/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Grafana Live (WebSocket for live dashboards)
+    location /grafana/api/live/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
@@ -1867,6 +1891,25 @@ server {
     gzip_proxied expired no-cache no-store private auth;
     gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/javascript application/json;
 
+    # rSwitch: Grafana proxy — \${DOMAIN}/grafana/ (HTTPS vhost)
+    location /grafana/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+    location /grafana/api/live/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
@@ -2183,7 +2226,28 @@ EOF
         apt-get update -qq 2>&1 | tail -3
         apt-get install -y -qq grafana 2>&1 | tail -3
     fi
+    # Configure Grafana to serve under /grafana/ sub-path so it works behind
+    # the public nginx vhost at https://${DOMAIN}/grafana/. Listens only on
+    # localhost; nginx proxies the public traffic to it.
+    if [[ -n "${DOMAIN:-}" ]]; then
+        python3 - /etc/grafana/grafana.ini "${DOMAIN}" <<'PY'
+import sys, re
+path, domain = sys.argv[1], sys.argv[2]
+text = open(path).read()
+server_body = f"""protocol = http
+http_addr = 127.0.0.1
+http_port = 3000
+domain = {domain}
+root_url = https://{domain}/grafana/
+serve_from_sub_path = true
+"""
+text = re.sub(r"\[server\]\n(.*?)(?=\n\[|\Z)", "[server]\n" + server_body, text, count=1, flags=re.DOTALL)
+open(path, "w").write(text)
+PY
+    fi
+
     systemctl enable --now grafana-server
+    systemctl restart grafana-server
     sleep 4
 
     # 6. Reset admin password to a known value, save to credentials file
