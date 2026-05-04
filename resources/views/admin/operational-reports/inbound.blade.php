@@ -243,7 +243,7 @@
 
                                 {{-- Caller + User --}}
                                 <td class="px-3 py-2">
-                                    <span class="font-mono text-gray-900">{{ $call->caller }}</span>
+                                    <span class="font-mono text-gray-900">{{ $call->caller_id ?? $call->caller }}</span>
                                     @if($call->user)
                                         <div class="text-xs text-gray-400">{{ Str::limit($call->user->name, 20) }}</div>
                                     @endif
