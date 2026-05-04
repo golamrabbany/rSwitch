@@ -59,9 +59,15 @@ class InboundCallHandler:
         raw_caller = agi.get_caller_id()  # Original from trunk (may be MNP)
         clean_caller = _reverse_bd_mnp(raw_caller)  # Reversed for display
 
-        # Set clean caller ID on channel for phone display
+        # Set clean caller ID on channel for phone display.
+        # Both num AND name are updated: many SIP phones render the
+        # From-header display-name (CALLERID(name)) prominently and only
+        # fall back to the user URI part (CALLERID(num)) when the name is
+        # empty. Updating only num would leave the raw MNP string from the
+        # trunk's display-name visible on the customer's phone.
         if clean_caller != raw_caller:
             await agi.set_variable("CALLERID(num)", clean_caller)
+            await agi.set_variable("CALLERID(name)", clean_caller)
             await agi.verbose(f"rSwitch: MNP reverse {raw_caller} -> {clean_caller}")
 
         caller_id = raw_caller  # Keep raw in caller_id variable for CDR
