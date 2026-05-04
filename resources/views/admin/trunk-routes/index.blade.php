@@ -558,7 +558,7 @@
             </thead>
             <tbody>
                 @forelse ($routes as $route)
-                    <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group {{ !$loop->first && $route->prefix !== $routes[$loop->index - 1]->prefix ? '!border-t-2 !border-t-gray-300' : '' }}">
+                    <tr class="{{ $loop->even ? 'bg-gray-50/50' : 'bg-white' }} hover:bg-indigo-50/50 transition-all border-b border-gray-100 group">
                         <td class="px-3 py-2 text-gray-400 tabular-nums text-center">{{ $routes->firstItem() + $loop->index }}</td>
                         <td class="px-3 py-2">
                             <span class="font-mono font-medium text-gray-900">{{ $route->prefix }}</span>
