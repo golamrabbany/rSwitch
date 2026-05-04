@@ -145,9 +145,21 @@
                         <td class="px-3 py-2 text-xs text-gray-600 tabular-nums">{{ $call->call_start->format('H:i:s') }}</td>
                         <td class="px-3 py-2">
                             @if($call->call_state === 'answered')
-                                <span class="font-medium text-xs text-emerald-600">{{ $call->call_start->diffForHumans(null, true) }}</span>
+                                <span class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-emerald-600 tabular-nums">
+                                    <span class="relative flex h-2 w-2 shrink-0">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    {{ $call->call_start->diffForHumans(null, true) }}
+                                </span>
                             @else
-                                <span class="text-xs text-gray-400 italic">Ringing…</span>
+                                <span class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs italic text-amber-600">
+                                    <span class="relative flex h-2 w-2 shrink-0">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                    </span>
+                                    Ringing…
+                                </span>
                             @endif
                         </td>
                         <td class="px-3 py-2 text-xs text-gray-600">
@@ -350,8 +362,8 @@
             : '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700">OUT</span>';
 
         const durationEl = call.state === 'answered'
-            ? '<span class="relative flex h-2 w-2 inline-block mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span><span class="font-medium text-green-600 call-duration" data-answered="' + (call.answered_at || '') + '">' + formatDuration(call.duration) + '</span>'
-            : '<span class="text-xs text-gray-400 italic">Ringing…</span>';
+            ? '<span class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-emerald-600 tabular-nums"><span class="relative flex h-2 w-2 shrink-0"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span><span class="call-duration" data-answered="' + (call.answered_at || '') + '">' + formatDuration(call.duration) + '</span></span>'
+            : '<span class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs italic text-amber-600"><span class="relative flex h-2 w-2 shrink-0"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span></span>Ringing…</span>';
 
         const startedTime = call.started_at
             ? new Date(call.started_at * 1000).toLocaleTimeString('en-GB', { hour12: false })
@@ -395,7 +407,7 @@
             // Duration is column 7 (1=SL, 2=SIP, 3=Client, 4=Caller, 5=Callee, 6=Start, 7=Duration)
             const durationCell = row.querySelector('td:nth-child(7)');
             if (durationCell) {
-                durationCell.innerHTML = '<span class="relative flex h-2 w-2 inline-block mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span><span class="font-medium text-green-600 call-duration" data-answered="' + (call.answered_at || '') + '">' + formatDuration(call.duration) + '</span>';
+                durationCell.innerHTML = '<span class="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-emerald-600 tabular-nums"><span class="relative flex h-2 w-2 shrink-0"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span><span class="call-duration" data-answered="' + (call.answered_at || '') + '">' + formatDuration(call.duration) + '</span></span>';
             }
             // Flash green briefly
             row.classList.add('bg-emerald-50');
