@@ -82,6 +82,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Display Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Storage stays in UTC (matches what the Python engine writes to MySQL).
+    | This timezone is applied at read time so users see local clock values
+    | (e.g. CDR call times rendered in BST, not UTC).
+    |
+    */
+
+    'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Asia/Dhaka'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

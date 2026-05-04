@@ -35,6 +35,20 @@ class CallRecord extends Model
         ];
     }
 
+    /**
+     * Datetimes are stored in UTC (the Python engine writes UTC) but displayed
+     * in the configured local timezone. The Carbon instance stays TZ-aware, so
+     * Carbon math (diffForHumans, comparisons) still works against now().
+     */
+    protected function asDateTime($value)
+    {
+        $carbon = parent::asDateTime($value);
+
+        return $carbon
+            ? $carbon->setTimezone(config('app.display_timezone', config('app.timezone', 'UTC')))
+            : $carbon;
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
