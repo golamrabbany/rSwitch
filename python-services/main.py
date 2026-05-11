@@ -25,7 +25,7 @@ from pydantic import BaseModel
 # Configure root logger so logger.info() in handlers (AGI, billing, AMI) is visible.
 # Override with LOG_LEVEL env (default INFO).
 logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO"),
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 
