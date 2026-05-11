@@ -247,11 +247,18 @@ class ImportWeblinkDelta extends Command
 
         $defaultPassword = Hash::make('ChangeMe123!');
         $usedEmails = [];
+        $usedUsernames = [];
 
         // Pre-load existing emails for dedup
         $existingEmails = [];
         foreach (DB::table('users')->pluck('email') as $e) {
             $existingEmails[strtolower($e)] = true;
+        }
+
+        // Pre-load existing usernames so we don't violate the UNIQUE constraint
+        $existingUsernames = [];
+        foreach (DB::table('users')->whereNotNull('username')->pluck('username') as $u) {
+            $existingUsernames[$u] = true;
         }
 
         $total = count($rows);
@@ -286,10 +293,13 @@ class ImportWeblinkDelta extends Command
                     $createdAt = now()->toDateTimeString();
                 }
 
+                $username = $this->resolveUniqueUsername($row, $usedUsernames, $existingUsernames);
+
                 if (!$dryRun) {
                     $newId = DB::table('users')->insertGetId([
                         'name' => $row->account_name ?: $row->username ?: 'User ' . $row->id,
                         'email' => $email,
+                        'username' => $username,
                         'password' => $defaultPassword,
                         'role' => $role,
                         'parent_id' => null, // resolved below
@@ -305,6 +315,9 @@ class ImportWeblinkDelta extends Command
                     ]);
                     $this->accountToUserId[$accountId] = $newId;
                     $existingEmails[strtolower($email)] = true;
+                    if ($username !== null) {
+                        $existingUsernames[$username] = true;
+                    }
                 } else {
                     // Negative placeholder lets later phases skip cleanly
                     $this->accountToUserId[$accountId] = -$accountId;
@@ -336,6 +349,24 @@ class ImportWeblinkDelta extends Command
         }
 
         $this->info("  Users updated: {$this->stats['users_updated']}, inserted: {$this->stats['users_inserted']}, skipped: {$this->stats['users_skipped']}");
+    }
+
+    /**
+     * Pick a unique username for a new user. Pulls from accounts.username (the
+     * WebLink login id, usually phone-number-like). Returns null if blank, too
+     * long, or already taken — those users keep email-only login.
+     */
+    private function resolveUniqueUsername(object $row, array &$usedUsernames, array &$existingUsernames): ?string
+    {
+        $username = trim((string) ($row->username ?? ''));
+        if ($username === '' || mb_strlen($username) > 100) {
+            return null;
+        }
+        if (isset($existingUsernames[$username]) || isset($usedUsernames[$username])) {
+            return null;
+        }
+        $usedUsernames[$username] = true;
+        return $username;
     }
 
     private function buildUniqueEmail(object $row, array &$usedEmails, array &$existingEmails): string

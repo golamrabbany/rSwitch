@@ -72,17 +72,17 @@
                 </div>
 
                 <form @submit.prevent="submitCredentials">
-                    {{-- Email --}}
+                    {{-- Email or Username --}}
                     <div class="mb-4">
-                        <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                        <label for="identifier" class="block text-sm font-medium text-gray-700 mb-2">Email or Username</label>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                 </svg>
                             </div>
-                            <input x-model="email" type="email" id="email" required autofocus autocomplete="username"
-                                   placeholder="you@example.com"
+                            <input x-model="identifier" type="text" id="identifier" required autofocus autocomplete="username"
+                                   placeholder="you@example.com or 09647xxxxx"
                                    class="block w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
                         </div>
                     </div>
@@ -255,7 +255,7 @@
         function loginApp() {
             return {
                 step: 'credentials',
-                email: '',
+                identifier: '',
                 password: '',
                 remember: false,
                 otp: '',
@@ -280,7 +280,7 @@
                                 'Accept': 'application/json',
                             },
                             body: JSON.stringify({
-                                email: this.email,
+                                identifier: this.identifier,
                                 password: this.password,
                                 remember: this.remember,
                             }),
@@ -289,6 +289,11 @@
                         const data = await res.json();
 
                         if (data.success) {
+                            // Users with no real email skip OTP and get a redirect immediately
+                            if (data.redirect) {
+                                window.location.href = data.redirect;
+                                return;
+                            }
                             this.maskedEmail = data.masked_email;
                             this.otpDisplay = data.otp_display;
                             this.step = 'otp';
