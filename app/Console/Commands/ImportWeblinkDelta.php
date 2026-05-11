@@ -314,7 +314,9 @@ class ImportWeblinkDelta extends Command
                         'updated_at' => now()->toDateTimeString(),
                     ]);
                     $this->accountToUserId[$accountId] = $newId;
-                    $existingEmails[strtolower($email)] = true;
+                    if ($email !== null) {
+                        $existingEmails[strtolower($email)] = true;
+                    }
                     if ($username !== null) {
                         $existingUsernames[$username] = true;
                     }
@@ -369,13 +371,18 @@ class ImportWeblinkDelta extends Command
         return $username;
     }
 
-    private function buildUniqueEmail(object $row, array &$usedEmails, array &$existingEmails): string
+    /**
+     * Pick a unique email for a new user, or return null if the source has none.
+     * The schema now allows NULL email, so accounts without a real email
+     * upstream simply land as NULL — no synthetic placeholder required.
+     */
+    private function buildUniqueEmail(object $row, array &$usedEmails, array &$existingEmails): ?string
     {
         $email = trim((string) ($row->email ?? ''));
         $email = preg_replace('/_del_[A-Z]$/', '', $email);
 
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $email = 'user_' . $row->id . '@weblink.import';
+            return null;
         }
 
         $key = strtolower($email);
