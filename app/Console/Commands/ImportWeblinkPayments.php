@@ -289,7 +289,7 @@ class ImportWeblinkPayments extends Command
     {
         $key = strtolower(trim((string) $source));
         return match ($key) {
-            'bkash' => 'bkash',
+            'bkash' => 'online_bkash',
             'bank', 'bank transfer' => 'bank_transfer',
             'paypal' => 'online_paypal',
             'sslcommerz', 'ssl', 'ssl commerz' => 'online_sslcommerz',
