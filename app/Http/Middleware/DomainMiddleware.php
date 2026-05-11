@@ -11,8 +11,10 @@ class DomainMiddleware
     /**
      * Restrict access based on domain.
      *
-     * domain:admin — these routes only accessible on admin domain
-     * domain:client — these routes only accessible on client domain
+     * domain:admin  — only served from admin domain (keeps admin URLs off the
+     *                 customer-facing host)
+     * domain:client — served from BOTH domains; admin domain is treated as a
+     *                 superset so impersonation can stay on a single host
      *
      * If domains are not configured, middleware is bypassed (single-domain mode).
      */
@@ -21,23 +23,12 @@ class DomainMiddleware
         $adminDomain = config('app.admin_domain');
         $clientDomain = config('app.client_domain');
 
-        // If domains not configured, skip (single-domain mode)
         if (!$adminDomain || !$clientDomain) {
             return $next($request);
         }
 
-        $currentHost = $request->getHost();
-
-        if ($type === 'admin') {
-            // Admin routes: block if accessed from client domain
-            if ($currentHost === $clientDomain) {
-                abort(403, 'Admin panel is not accessible from this domain.');
-            }
-        } elseif ($type === 'client') {
-            // Client/reseller routes: block if accessed from admin domain
-            if ($currentHost === $adminDomain) {
-                abort(403, 'Client panel is not accessible from this domain.');
-            }
+        if ($type === 'admin' && $request->getHost() === $clientDomain) {
+            abort(403, 'Admin panel is not accessible from this domain.');
         }
 
         return $next($request);
