@@ -633,9 +633,13 @@ class ImportWeblinkDelta extends Command
 
     private function phaseF_upsertSipAccounts(bool $dryRun): void
     {
-        $this->info('Phase F: Upserting SIP accounts...');
+        $this->info('Phase F: Upserting SIP accounts (active-only — status=1)...');
 
-        $rows = DB::select("SELECT * FROM `{$this->tempDb}`.`sipusers` WHERE type='friend' AND status != -1 ORDER BY id");
+        // Only sync ACTIVE SIPs from source. Suspended sipusers (status=0)
+        // are deliberately excluded — they accumulate as dead-weight realtime
+        // entries that Asterisk has to maintain, and they don't represent
+        // callable customers.
+        $rows = DB::select("SELECT * FROM `{$this->tempDb}`.`sipusers` WHERE type='friend' AND status = 1 ORDER BY id");
 
         foreach ($rows as $row) {
             $username = trim($row->name);
