@@ -22,7 +22,7 @@ class SystemSetting extends Model
             return static::find($key);
         });
 
-        if (!$setting) {
+        if (!$setting || $setting->value === null) {
             return $default;
         }
 
