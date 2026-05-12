@@ -109,31 +109,29 @@
 
             {{-- Reseller Filter --}}
             @if($resellers->count() > 0)
-                <div class="relative">
+                <div class="relative"
+                     @click.outside="resellerOpen = false"
+                     @keydown.escape.window="resellerOpen = false">
                     <input type="hidden" name="reseller_id" :value="resellerId">
-                    <div class="relative">
-                        <input type="text"
-                               x-model="resellerSearch"
-                               @focus="resellerOpen = true"
-                               @click="resellerOpen = true"
-                               @input="resellerOpen = true; resellerId = ''"
-                               placeholder="Filter by Reseller..."
-                               class="filter-input pr-9 w-48"
-                               :class="resellerId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
-                               autocomplete="off">
-                        <button type="button"
-                                x-show="resellerSearch" x-cloak
-                                @click="clearReseller()"
-                                class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 hover:text-indigo-700 transition-colors">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </div>
+                    <input type="text"
+                           x-model="resellerSearch"
+                           @focus="resellerOpen = true"
+                           @input="resellerOpen = true; resellerId = ''"
+                           placeholder="Filter by Reseller..."
+                           class="filter-input pr-9 w-48"
+                           :class="resellerId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
+                           autocomplete="off">
+                    <button type="button"
+                            x-show="resellerSearch" x-cloak
+                            @click="clearReseller()"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 hover:text-indigo-700 transition-colors">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
                     <div x-show="resellerOpen"
                          x-cloak
-                         @click.away="resellerOpen = false"
-                         x-transition
+                         x-transition.opacity.duration.150ms
                          class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
                         <template x-if="filteredResellers.length === 0">
                             <div class="px-4 py-3 text-sm text-gray-500 text-center">No resellers match.</div>
@@ -155,32 +153,44 @@
             @endif
 
             {{-- Client Filter (AJAX search) --}}
-            <div class="relative">
+            <div class="relative"
+                 @click.outside="clientOpen = false"
+                 @keydown.escape.window="clientOpen = false">
                 <input type="hidden" name="client_id" :value="clientId">
-                <div class="relative">
-                    <input type="text"
-                           x-model="clientSearch"
-                           @focus="clientOpen = true"
-                           @click="clientOpen = true"
-                           @input="clientOpen = true; clientId = ''; searchClients()"
-                           placeholder="Filter by Client..."
-                           class="filter-input pr-9 w-48"
-                           :class="clientId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
-                           autocomplete="off">
-                    <button type="button"
-                            x-show="clientSearch" x-cloak
-                            @click="clearClient()"
-                            class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 hover:text-indigo-700 transition-colors">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-                <div x-show="clientOpen && clientResults.length > 0"
+                <input type="text"
+                       x-model="clientSearch"
+                       @focus="clientOpen = true"
+                       @input="clientOpen = true; clientId = ''; searchClients()"
+                       placeholder="Filter by Client..."
+                       class="filter-input pr-9 w-48"
+                       :class="clientId ? 'border-indigo-500 ring-1 ring-indigo-500' : ''"
+                       autocomplete="off">
+                <button type="button"
+                        x-show="clientSearch" x-cloak
+                        @click="clearClient()"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 hover:text-indigo-700 transition-colors">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+                <div x-show="clientOpen"
                      x-cloak
-                     @click.away="clientOpen = false"
-                     x-transition
+                     x-transition.opacity.duration.150ms
                      class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+                    <template x-if="clientLoading">
+                        <div class="px-4 py-3 text-sm text-gray-500 text-center">
+                            <span class="inline-flex items-center gap-2">
+                                <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" class="opacity-75"/></svg>
+                                Searching…
+                            </span>
+                        </div>
+                    </template>
+                    <template x-if="!clientLoading && clientSearch.length < 2">
+                        <div class="px-4 py-3 text-sm text-gray-400 text-center">Type at least 2 characters…</div>
+                    </template>
+                    <template x-if="!clientLoading && clientSearch.length >= 2 && clientResults.length === 0">
+                        <div class="px-4 py-3 text-sm text-gray-500 text-center">No clients match.</div>
+                    </template>
                     <template x-for="client in clientResults" :key="client.id">
                         <button type="button"
                                 @click="selectClient(client)"
@@ -193,23 +203,6 @@
                             </div>
                         </button>
                     </template>
-                </div>
-                <div x-show="clientOpen && clientLoading" x-cloak
-                     class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
-                    <span class="inline-flex items-center gap-2">
-                        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" class="opacity-75"/></svg>
-                        Searching…
-                    </span>
-                </div>
-                <div x-show="clientOpen && !clientLoading && clientSearch.length >= 2 && clientResults.length === 0" x-cloak
-                     @click.away="clientOpen = false"
-                     class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
-                    No clients match.
-                </div>
-                <div x-show="clientOpen && clientSearch.length > 0 && clientSearch.length < 2 && !clientLoading" x-cloak
-                     @click.away="clientOpen = false"
-                     class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-400">
-                    Type at least 2 characters…
                 </div>
             </div>
 
