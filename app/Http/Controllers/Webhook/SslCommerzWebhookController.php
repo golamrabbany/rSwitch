@@ -35,6 +35,7 @@ class SslCommerzWebhookController extends Controller
 
         if ($status !== 'VALID' && $status !== 'VALIDATED') {
             $payment->update(['status' => 'failed', 'notes' => "SSLCommerz status: {$status}", 'gateway_response' => $request->all()]);
+            $creditService->logFailedAttempt($payment, "Payment {$status} via SSLCommerz (#{$payment->id})");
             return response('OK', 200);
         }
 
@@ -44,6 +45,7 @@ class SslCommerzWebhookController extends Controller
         if (!in_array($validation['status'] ?? '', ['VALID', 'VALIDATED'])) {
             Log::warning('SSLCommerz validation failed', ['val_id' => $valId, 'response' => $validation]);
             $payment->update(['status' => 'failed', 'notes' => 'SSLCommerz validation failed', 'gateway_response' => $validation]);
+            $creditService->logFailedAttempt($payment, "Payment validation failed via SSLCommerz (#{$payment->id})");
             return response('Validation failed', 200);
         }
 
@@ -51,6 +53,7 @@ class SslCommerzWebhookController extends Controller
         if ((float) ($validation['amount'] ?? 0) != (float) $payment->amount) {
             Log::warning('SSLCommerz amount mismatch', ['expected' => $payment->amount, 'got' => $validation['amount'] ?? 0]);
             $payment->update(['status' => 'failed', 'notes' => 'Amount mismatch']);
+            $creditService->logFailedAttempt($payment, "Payment amount mismatch via SSLCommerz (#{$payment->id})");
             return response('Amount mismatch', 200);
         }
 
