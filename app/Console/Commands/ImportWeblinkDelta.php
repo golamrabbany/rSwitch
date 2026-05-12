@@ -356,9 +356,11 @@ class ImportWeblinkDelta extends Command
                     ? '$md5$' . md5($cleartext)
                     : $defaultPassword;
 
+                $displayName = trim((string) ($row->account_name ?: $row->username ?: 'User ' . $row->id));
+
                 if (!$dryRun) {
                     $newId = DB::table('users')->insertGetId([
-                        'name' => $row->account_name ?: $row->username ?: 'User ' . $row->id,
+                        'name' => $displayName,
                         'email' => $email,
                         'username' => $username,
                         'password' => $userPassword,
