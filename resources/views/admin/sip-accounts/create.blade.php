@@ -43,10 +43,10 @@
         ownerLoading: false,
         ownerDebounce: null,
         kycError: '',
-        username: @json($displayUsername ?? ''),
-        callerIdNumber: '{{ old('caller_id_number') }}',
+        username: '{{ addslashes($displayUsername ?? '') }}',
+        callerIdNumber: '{{ addslashes(old('caller_id_number', '')) }}',
         syncCallerId: true,
-        sipPrefix: @json($sipPrefix ?? ''),
+        sipPrefix: '{{ addslashes($sipPrefix ?? '') }}',
         searchOwners() {
             clearTimeout(this.ownerDebounce);
             this.ownerDebounce = setTimeout(() => {
