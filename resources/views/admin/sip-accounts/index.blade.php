@@ -97,6 +97,15 @@
             this.clientSearch = '';
             this.clientId = '';
             this.clientResults = [];
+        },
+
+        secondaryLine(item) {
+            const name = (item.name || '').toLowerCase().trim();
+            const u = (item.username || '').trim();
+            const e = (item.email || '').trim();
+            if (u && u.toLowerCase() !== name) return u;
+            if (e && e.toLowerCase() !== name) return e;
+            return '';
         }
     }">
         <form method="GET" class="filter-row flex-wrap">
@@ -132,19 +141,20 @@
                     <div x-show="resellerOpen"
                          x-cloak
                          x-transition.opacity.duration.150ms
-                         class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+                         class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto"
+                         style="max-height: 244px;">
                         <template x-if="filteredResellers.length === 0">
                             <div class="px-4 py-3 text-sm text-gray-500 text-center">No resellers match.</div>
                         </template>
                         <template x-for="reseller in filteredResellers" :key="reseller.id">
                             <button type="button"
                                     @click="selectReseller(reseller)"
-                                    class="w-full px-4 py-2.5 text-left hover:bg-indigo-50 flex items-center gap-3 border-b border-gray-50 last:border-b-0">
-                                <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                                    class="w-full px-3 py-2 text-left hover:bg-indigo-50 flex items-center gap-3 border-b border-gray-50 last:border-b-0">
+                                <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold flex-shrink-0"
                                      x-text="(reseller.name || '?').charAt(0).toUpperCase()"></div>
-                                <div class="min-w-0 flex-1">
+                                <div class="min-w-0 flex-1 leading-tight">
                                     <div class="text-sm font-medium text-gray-900 truncate" x-text="reseller.name || 'Unnamed'"></div>
-                                    <div class="text-xs text-gray-500 truncate" x-text="reseller.username || reseller.email || '—'"></div>
+                                    <div x-show="secondaryLine(reseller)" class="text-xs text-gray-500 truncate" x-text="secondaryLine(reseller)"></div>
                                 </div>
                             </button>
                         </template>
@@ -176,7 +186,8 @@
                 <div x-show="clientOpen"
                      x-cloak
                      x-transition.opacity.duration.150ms
-                     class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+                     class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto"
+                     style="max-height: 244px;">
                     <template x-if="clientLoading">
                         <div class="px-4 py-3 text-sm text-gray-500 text-center">
                             <span class="inline-flex items-center gap-2">
@@ -194,12 +205,12 @@
                     <template x-for="client in clientResults" :key="client.id">
                         <button type="button"
                                 @click="selectClient(client)"
-                                class="w-full px-4 py-2.5 text-left hover:bg-indigo-50 flex items-center gap-3 border-b border-gray-50 last:border-b-0">
-                            <div class="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                                class="w-full px-3 py-2 text-left hover:bg-indigo-50 flex items-center gap-3 border-b border-gray-50 last:border-b-0">
+                            <div class="w-7 h-7 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-semibold flex-shrink-0"
                                  x-text="(client.name || '?').charAt(0).toUpperCase()"></div>
-                            <div class="min-w-0 flex-1">
+                            <div class="min-w-0 flex-1 leading-tight">
                                 <div class="text-sm font-medium text-gray-900 truncate" x-text="client.name || 'Unnamed'"></div>
-                                <div class="text-xs text-gray-500 truncate" x-text="client.username || client.email || '—'"></div>
+                                <div x-show="secondaryLine(client)" class="text-xs text-gray-500 truncate" x-text="secondaryLine(client)"></div>
                             </div>
                         </button>
                     </template>
