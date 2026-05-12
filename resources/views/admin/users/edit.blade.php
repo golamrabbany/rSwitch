@@ -73,12 +73,6 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="form-group mt-4">
-                            <label class="form-label">Email <span class="text-gray-400 font-normal">(optional)</span></label>
-                            <input type="email" name="email" value="{{ old('email', $user->email) }}" class="form-input" placeholder="user@example.com">
-                            <p class="form-hint">For OTP, password reset, and email notifications. Leave blank if not available.</p>
-                            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-                        </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">
                                 <label class="form-label">New Password</label>
@@ -91,6 +85,12 @@
                                 <input type="password" name="password_confirmation" class="form-input" placeholder="Confirm new password">
                                 <p class="form-hint">Re-enter to confirm new password</p>
                             </div>
+                        </div>
+                        <div class="form-group mt-4">
+                            <label class="form-label">Email <span class="text-gray-400 font-normal">(optional)</span></label>
+                            <input type="email" name="email" value="{{ old('email', $user->email) }}" class="form-input" placeholder="user@example.com">
+                            <p class="form-hint">For OTP, password reset, and email notifications. Leave blank if not available.</p>
+                            <x-input-error :messages="$errors->get('email')" class="mt-2" />
                         </div>
                     </div>
                 </div>

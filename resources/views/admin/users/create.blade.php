@@ -115,12 +115,6 @@
                                 <p class="form-hint">Login identifier — letters, digits, dots, dashes</p>
                                 <x-input-error :messages="$errors->get('username')" class="mt-2" />
                             </div>
-                            <div class="form-group md:col-span-2">
-                                <label class="form-label">Email <span class="text-gray-400 font-normal">(optional)</span></label>
-                                <input type="email" name="email" value="{{ old('email') }}" class="form-input" placeholder="user@example.com">
-                                <p class="form-hint">For OTP, password reset, and email notifications. Leave blank if not available.</p>
-                                <x-input-error :messages="$errors->get('email')" class="mt-2" />
-                            </div>
                             <div class="form-group">
                                 <label class="form-label">Password</label>
                                 <input type="password" name="password" required class="form-input" placeholder="Min 8 characters">
@@ -131,6 +125,12 @@
                                 <label class="form-label">Confirm Password</label>
                                 <input type="password" name="password_confirmation" required class="form-input" placeholder="Confirm password">
                                 <p class="form-hint">Re-enter password to confirm</p>
+                            </div>
+                            <div class="form-group md:col-span-2">
+                                <label class="form-label">Email <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <input type="email" name="email" value="{{ old('email') }}" class="form-input" placeholder="user@example.com">
+                                <p class="form-hint">For OTP, password reset, and email notifications. Leave blank if not available.</p>
+                                <x-input-error :messages="$errors->get('email')" class="mt-2" />
                             </div>
                         </div>
                     </div>
