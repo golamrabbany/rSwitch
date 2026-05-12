@@ -157,7 +157,11 @@ class PaymentController extends Controller
 
         if ($status !== 'success') {
             $payment->update(['status' => 'failed', 'notes' => "bKash status: {$status}"]);
-            $creditService->logFailedAttempt($payment, "Payment {$status} via bKash (#{$payment->id})");
+            $isCancel = in_array(strtolower((string) $status), ['cancel', 'cancelled', 'canceled'], true);
+            $message = "Payment " . ($isCancel ? 'cancelled' : "{$status}") . " via bKash (#{$payment->id})";
+            $isCancel
+                ? $creditService->logCancelledAttempt($payment, $message)
+                : $creditService->logFailedAttempt($payment, $message);
             return redirect()->route('reseller.payments.create')->with('error', 'Payment was cancelled or failed.');
         }
 

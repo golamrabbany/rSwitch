@@ -86,11 +86,28 @@ class PaymentCreditService
     }
 
     /**
-     * Record a non-monetary transaction for a payment that ended in failed/cancelled
-     * status, so the user's transaction history reflects the attempt. Idempotent —
-     * skips if a transaction already exists for this payment reference.
+     * Record a non-monetary transaction when a payment ends in failed status
+     * (gateway error, validation error, amount mismatch, etc).
      */
     public function logFailedAttempt(Payment $payment, string $description): void
+    {
+        $this->logTerminalAttempt($payment, 'payment_failed', $description);
+    }
+
+    /**
+     * Record a non-monetary transaction when the user cancelled the payment
+     * (chose to abandon at the gateway).
+     */
+    public function logCancelledAttempt(Payment $payment, string $description): void
+    {
+        $this->logTerminalAttempt($payment, 'payment_cancelled', $description);
+    }
+
+    /**
+     * Idempotent insert into transactions for a non-monetary payment outcome.
+     * Skips if a transaction already exists for the payment reference.
+     */
+    private function logTerminalAttempt(Payment $payment, string $type, string $description): void
     {
         $exists = DB::table('transactions')
             ->where('reference_type', 'payment')
@@ -108,7 +125,7 @@ class PaymentCreditService
 
         DB::table('transactions')->insert([
             'user_id' => $user->id,
-            'type' => 'payment_failed',
+            'type' => $type,
             'amount' => 0,
             'balance_after' => $user->balance,
             'reference_type' => 'payment',

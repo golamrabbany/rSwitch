@@ -35,7 +35,11 @@ class SslCommerzWebhookController extends Controller
 
         if ($status !== 'VALID' && $status !== 'VALIDATED') {
             $payment->update(['status' => 'failed', 'notes' => "SSLCommerz status: {$status}", 'gateway_response' => $request->all()]);
-            $creditService->logFailedAttempt($payment, "Payment {$status} via SSLCommerz (#{$payment->id})");
+            $isCancel = strcasecmp($status, 'CANCELLED') === 0;
+            $message = "Payment " . ($isCancel ? 'cancelled' : strtolower($status)) . " via SSLCommerz (#{$payment->id})";
+            $isCancel
+                ? $creditService->logCancelledAttempt($payment, $message)
+                : $creditService->logFailedAttempt($payment, $message);
             return response('OK', 200);
         }
 
@@ -105,10 +109,10 @@ class SslCommerzWebhookController extends Controller
 
         if ($payment->status === 'pending') {
             $payment->update(['status' => 'failed', 'notes' => "SSLCommerz {$type}"]);
-            app(PaymentCreditService::class)->logFailedAttempt(
-                $payment,
-                "Payment {$type} via SSLCommerz (#{$payment->id})"
-            );
+            $service = app(PaymentCreditService::class);
+            $type === 'cancel'
+                ? $service->logCancelledAttempt($payment, "Payment cancelled via SSLCommerz (#{$payment->id})")
+                : $service->logFailedAttempt($payment, "Payment failed via SSLCommerz (#{$payment->id})");
         }
 
         return view('payments.gateway-result', [
