@@ -254,7 +254,7 @@ Route::prefix('recharge-admin')->name('recharge-admin.')->middleware(['auth', 'r
 });
 
 // Reseller routes
-Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller', 'domain:client'])->group(function () {
+Route::prefix('reseller')->name('reseller.')->middleware(['auth', 'role:reseller', 'domain:reseller'])->group(function () {
     Route::get('dashboard', Reseller\DashboardController::class)->name('dashboard');
 
     Route::middleware('kyc.approved')->group(function () {

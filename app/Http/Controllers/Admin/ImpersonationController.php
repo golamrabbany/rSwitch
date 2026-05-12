@@ -49,18 +49,17 @@ class ImpersonationController extends Controller
         // Login as the target user
         Auth::login($user);
 
-        // Redirect to appropriate dashboard based on role. The admin domain
-        // is a superset (DomainMiddleware allows client routes here), so
-        // impersonation stays on whichever host the admin started from.
-        $route = match ($user->role) {
-            'admin' => route('admin.dashboard'),
-            'recharge_admin' => route('recharge-admin.dashboard'),
-            'reseller' => route('reseller.dashboard'),
-            'client' => route('client.dashboard'),
-            default => route('dashboard'),
+        // Each role has its own subdomain now, so cross-host redirect.
+        $path = match ($user->role) {
+            'admin' => route('admin.dashboard', [], false),
+            'recharge_admin' => route('recharge-admin.dashboard', [], false),
+            'reseller' => route('reseller.dashboard', [], false),
+            'client' => route('client.dashboard', [], false),
+            default => route('dashboard', [], false),
         };
 
-        return redirect($route)->with('success', "Now viewing as {$user->name}");
+        return redirect($this->urlForRole($user->role, $path))
+            ->with('success', "Now viewing as {$user->name}");
     }
 
     /**
@@ -98,8 +97,34 @@ class ImpersonationController extends Controller
         // Login back as the admin
         Auth::login($admin);
 
-        return redirect()->route('admin.users.show', $impersonatedUser)
+        $path = route('admin.users.show', $impersonatedUser, false);
+
+        return redirect($this->urlForRole('admin', $path))
             ->with('success', 'Returned to your admin account.');
+    }
+
+    /**
+     * Build an absolute URL on the host that serves the given role's portal.
+     * Falls back to the relative path when the three domains aren't all
+     * configured (single-domain mode in local dev).
+     */
+    private function urlForRole(string $role, string $path): string
+    {
+        $admin = config('app.admin_domain');
+        $reseller = config('app.reseller_domain');
+        $client = config('app.client_domain');
+
+        if (!$admin || !$reseller || !$client) {
+            return $path;
+        }
+
+        $host = match ($role) {
+            'reseller' => $reseller,
+            'client' => $client,
+            default => $admin,
+        };
+
+        return "https://{$host}{$path}";
     }
 
     /**

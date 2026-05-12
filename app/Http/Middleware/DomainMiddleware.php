@@ -9,28 +9,46 @@ use Symfony\Component\HttpFoundation\Response;
 class DomainMiddleware
 {
     /**
-     * Restrict access based on domain.
+     * Strict role-vs-host enforcement:
      *
-     * domain:admin  — only served from admin domain (keeps admin URLs off the
-     *                 customer-facing host)
-     * domain:client — served from BOTH domains; admin domain is treated as a
-     *                 superset so impersonation can stay on a single host
+     *   admin / super_admin / recharge_admin → only on admin.webvoice.net
+     *   reseller                              → only on reseller.webvoice.net
+     *   client                                → only on client.webvoice.net
      *
-     * If domains are not configured, middleware is bypassed (single-domain mode).
+     * The `$type` argument names the EXPECTED audience for the route group:
+     *   domain:admin    — admin-only routes
+     *   domain:reseller — reseller-only routes
+     *   domain:client   — client-only routes
+     *
+     * If the request comes in on the wrong host, we redirect to the host the
+     * user's role is allowed on (silent UX recovery — no 403 page).
+     *
+     * Bypassed in single-domain mode (any of the three domain configs missing).
      */
     public function handle(Request $request, Closure $next, string $type): Response
     {
-        $adminDomain = config('app.admin_domain');
-        $clientDomain = config('app.client_domain');
+        $domains = [
+            'admin' => config('app.admin_domain'),
+            'reseller' => config('app.reseller_domain'),
+            'client' => config('app.client_domain'),
+        ];
 
-        if (!$adminDomain || !$clientDomain) {
+        // Single-domain mode (local dev / tests): skip enforcement entirely.
+        if (in_array(null, $domains, true) || in_array('', $domains, true)) {
             return $next($request);
         }
 
-        if ($type === 'admin' && $request->getHost() === $clientDomain) {
-            abort(403, 'Admin panel is not accessible from this domain.');
+        $expectedHost = $domains[$type] ?? null;
+        if ($expectedHost === null) {
+            return $next($request);
         }
 
-        return $next($request);
+        $currentHost = $request->getHost();
+        if ($currentHost === $expectedHost) {
+            return $next($request);
+        }
+
+        // Wrong host for this route. Redirect to the same path on the right host.
+        return redirect()->away("https://{$expectedHost}{$request->getRequestUri()}");
     }
 }

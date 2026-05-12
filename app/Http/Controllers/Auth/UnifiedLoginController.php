@@ -65,6 +65,17 @@ class UnifiedLoginController extends Controller
             ], 422);
         }
 
+        // Strict role-vs-host: reject if this user can't log in on this domain.
+        $expectedHost = $this->loginHostFor($user);
+        if ($expectedHost !== null && $request->getHost() !== $expectedHost) {
+            RateLimiter::hit($key, 60);
+            return response()->json([
+                'success' => false,
+                'message' => "Please log in at https://{$expectedHost}",
+                'login_url' => "https://{$expectedHost}/login",
+            ], 422);
+        }
+
         // No real email → cannot deliver OTP. Log the user in directly with the
         // password they already verified above. Lower security, but the alternative
         // is a hard lockout for ~13k imported customers without an email on file.
@@ -120,16 +131,40 @@ class UnifiedLoginController extends Controller
     }
 
     /**
-     * Resolve the dashboard route for a given user role.
+     * Resolve the dashboard route for a given user role, on the role's host.
      */
     private function dashboardFor(User $user): string
     {
+        $path = match ($user->role) {
+            'super_admin', 'admin' => route('admin.dashboard', [], false),
+            'recharge_admin' => route('recharge-admin.dashboard', [], false),
+            'reseller' => route('reseller.dashboard', [], false),
+            'client' => route('client.dashboard', [], false),
+            default => route('dashboard', [], false),
+        };
+
+        $host = $this->loginHostFor($user);
+        return $host !== null ? "https://{$host}{$path}" : $path;
+    }
+
+    /**
+     * The host this user is allowed to log in on. Returns null in single-domain
+     * mode (any of the three domain configs missing).
+     */
+    private function loginHostFor(User $user): ?string
+    {
+        $admin = config('app.admin_domain');
+        $reseller = config('app.reseller_domain');
+        $client = config('app.client_domain');
+        if (!$admin || !$reseller || !$client) {
+            return null;
+        }
+
         return match ($user->role) {
-            'super_admin', 'admin' => route('admin.dashboard'),
-            'recharge_admin' => route('recharge-admin.dashboard'),
-            'reseller' => route('reseller.dashboard'),
-            'client' => route('client.dashboard'),
-            default => route('dashboard'),
+            'super_admin', 'admin', 'recharge_admin' => $admin,
+            'reseller' => $reseller,
+            'client' => $client,
+            default => $admin,
         };
     }
 
