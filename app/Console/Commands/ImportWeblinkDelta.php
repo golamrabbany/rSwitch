@@ -47,6 +47,7 @@ class ImportWeblinkDelta extends Command
         'users_skipped' => 0,
         'rate_groups_updated' => 0,
         'rate_groups_inserted' => 0,
+        'users_tariff_assigned' => 0,
         'rates_updated' => 0,
         'rates_inserted' => 0,
         'rates_skipped' => 0,
@@ -93,6 +94,7 @@ class ImportWeblinkDelta extends Command
             $this->phaseB_buildMatchMap();
             $this->phaseC_upsertUsers($dryRun);
             $this->phaseD_upsertRateGroups($dryRun);
+            $this->phaseC1_assignTariffsToUsers($dryRun);
             $this->phaseE_upsertRates($dryRun);
             $this->phaseF_upsertSipAccounts($dryRun);
 
@@ -486,6 +488,45 @@ class ImportWeblinkDelta extends Command
         }
 
         $this->info("  Rate groups updated: {$this->stats['rate_groups_updated']}, inserted: {$this->stats['rate_groups_inserted']}");
+    }
+
+    // ── Phase C.5 (after D so rateGroupMap is built) ────────────────────────
+
+    /**
+     * Assign each matched user their rate group (tariff) from accounts.id_tariff
+     * via the rateGroupMap built in Phase D. Without this, every imported user
+     * lands with rate_group_id NULL, which breaks call rating downstream.
+     */
+    private function phaseC1_assignTariffsToUsers(bool $dryRun): void
+    {
+        $this->info('Phase C.5: Assigning rate groups (tariffs) from accounts.id_tariff...');
+
+        $rows = DB::select(
+            "SELECT id, id_tariff
+             FROM `{$this->tempDb}`.`accounts`
+             WHERE status != -1
+               AND account_type IN (1,2,3,4,5)
+               AND id_tariff > 0
+             GROUP BY id"
+        );
+
+        foreach ($rows as $row) {
+            $accountId = (int) $row->id;
+            $tariffId = (int) $row->id_tariff;
+
+            $userId = $this->accountToUserId[$accountId] ?? null;
+            if ($userId === null || $userId <= 0) continue;
+
+            $rateGroupId = $this->rateGroupMap[$tariffId] ?? null;
+            if ($rateGroupId === null || $rateGroupId <= 0) continue;
+
+            if (!$dryRun) {
+                DB::table('users')->where('id', $userId)->update(['rate_group_id' => $rateGroupId]);
+            }
+            $this->stats['users_tariff_assigned']++;
+        }
+
+        $this->info("  Tariffs assigned: {$this->stats['users_tariff_assigned']}");
     }
 
     // ── Phase E ─────────────────────────────────────────────────────────────
