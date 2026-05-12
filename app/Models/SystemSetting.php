@@ -36,6 +36,22 @@ class SystemSetting extends Model
     }
 
     /**
+     * Resolved multi-domain hostnames (DB-backed with config() fallback).
+     * Empty/blank values are normalized to null so callers can rely on
+     * `?? config(...)` chains.
+     */
+    public static function domains(): array
+    {
+        $resolve = fn (string $key) => static::get($key, config("app.{$key}")) ?: null;
+
+        return [
+            'admin' => $resolve('admin_domain'),
+            'reseller' => $resolve('reseller_domain'),
+            'client' => $resolve('client_domain'),
+        ];
+    }
+
+    /**
      * Set a setting value.
      */
     public static function set(string $key, mixed $value): void
@@ -102,6 +118,13 @@ class SystemSetting extends Model
             ['key' => 'bkash_app_secret', 'value' => '', 'type' => 'string', 'group' => 'payment_gateways', 'sort_order' => 23, 'label' => 'bKash App Secret', 'description' => 'bKash Tokenized Checkout App Secret.'],
             ['key' => 'bkash_username', 'value' => '', 'type' => 'string', 'group' => 'payment_gateways', 'sort_order' => 24, 'label' => 'bKash Username', 'description' => 'bKash merchant username.'],
             ['key' => 'bkash_password', 'value' => '', 'type' => 'string', 'group' => 'payment_gateways', 'sort_order' => 25, 'label' => 'bKash Password', 'description' => 'bKash merchant password.'],
+
+            // Multi-domain — strict role-vs-host enforcement. Editing here only
+            // changes Laravel'\''s routing; nginx server_name and DNS must be
+            // updated separately (manual SSH on the server).
+            ['key' => 'admin_domain',    'value' => env('ADMIN_DOMAIN', ''),    'type' => 'string', 'group' => 'multi_domain', 'sort_order' => 1, 'label' => 'Admin Domain',    'description' => 'Subdomain that serves the admin / super_admin / recharge_admin portal (e.g. admin.example.com). Hostname only — no protocol, no path.'],
+            ['key' => 'reseller_domain', 'value' => env('RESELLER_DOMAIN', ''), 'type' => 'string', 'group' => 'multi_domain', 'sort_order' => 2, 'label' => 'Reseller Domain', 'description' => 'Subdomain that serves the reseller portal.'],
+            ['key' => 'client_domain',   'value' => env('CLIENT_DOMAIN', ''),   'type' => 'string', 'group' => 'multi_domain', 'sort_order' => 3, 'label' => 'Client Domain',   'description' => 'Subdomain that serves the client portal.'],
 
             ['key' => 'cdr_retention_days', 'value' => '365', 'type' => 'integer', 'group' => 'system', 'sort_order' => 1, 'label' => 'CDR Retention (Days)', 'description' => 'Auto-purge call records older than this.'],
             ['key' => 'audit_retention_days', 'value' => '180', 'type' => 'integer', 'group' => 'system', 'sort_order' => 2, 'label' => 'Audit Log Retention (Days)', 'description' => 'Auto-purge audit logs older than this.'],

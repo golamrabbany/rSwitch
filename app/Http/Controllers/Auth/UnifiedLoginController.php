@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Auth\Md5CompatibleUserProvider;
 use App\Http\Controllers\Controller;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Notifications\OtpNotification;
 use Illuminate\Http\JsonResponse;
@@ -153,18 +154,16 @@ class UnifiedLoginController extends Controller
      */
     private function loginHostFor(User $user): ?string
     {
-        $admin = config('app.admin_domain');
-        $reseller = config('app.reseller_domain');
-        $client = config('app.client_domain');
-        if (!$admin || !$reseller || !$client) {
+        $domains = SystemSetting::domains();
+        if (in_array(null, $domains, true)) {
             return null;
         }
 
         return match ($user->role) {
-            'super_admin', 'admin', 'recharge_admin' => $admin,
-            'reseller' => $reseller,
-            'client' => $client,
-            default => $admin,
+            'super_admin', 'admin', 'recharge_admin' => $domains['admin'],
+            'reseller' => $domains['reseller'],
+            'client' => $domains['client'],
+            default => $domains['admin'],
         };
     }
 

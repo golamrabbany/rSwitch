@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SystemSetting;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,11 +28,7 @@ class DomainMiddleware
      */
     public function handle(Request $request, Closure $next, string $type): Response
     {
-        $domains = [
-            'admin' => config('app.admin_domain'),
-            'reseller' => config('app.reseller_domain'),
-            'client' => config('app.client_domain'),
-        ];
+        $domains = SystemSetting::domains();
 
         // Single-domain mode (local dev / tests): skip enforcement entirely.
         if (in_array(null, $domains, true) || in_array('', $domains, true)) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
@@ -110,18 +111,15 @@ class ImpersonationController extends Controller
      */
     private function urlForRole(string $role, string $path): string
     {
-        $admin = config('app.admin_domain');
-        $reseller = config('app.reseller_domain');
-        $client = config('app.client_domain');
-
-        if (!$admin || !$reseller || !$client) {
+        $domains = SystemSetting::domains();
+        if (in_array(null, $domains, true)) {
             return $path;
         }
 
         $host = match ($role) {
-            'reseller' => $reseller,
-            'client' => $client,
-            default => $admin,
+            'reseller' => $domains['reseller'],
+            'client' => $domains['client'],
+            default => $domains['admin'],
         };
 
         return "https://{$host}{$path}";
