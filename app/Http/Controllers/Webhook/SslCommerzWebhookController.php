@@ -102,6 +102,10 @@ class SslCommerzWebhookController extends Controller
 
         if ($payment->status === 'pending') {
             $payment->update(['status' => 'failed', 'notes' => "SSLCommerz {$type}"]);
+            app(PaymentCreditService::class)->logFailedAttempt(
+                $payment,
+                "Payment {$type} via SSLCommerz (#{$payment->id})"
+            );
         }
 
         return view('payments.gateway-result', [

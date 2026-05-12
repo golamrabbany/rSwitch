@@ -84,4 +84,38 @@ class PaymentCreditService
 
         return true;
     }
+
+    /**
+     * Record a non-monetary transaction for a payment that ended in failed/cancelled
+     * status, so the user's transaction history reflects the attempt. Idempotent —
+     * skips if a transaction already exists for this payment reference.
+     */
+    public function logFailedAttempt(Payment $payment, string $description): void
+    {
+        $exists = DB::table('transactions')
+            ->where('reference_type', 'payment')
+            ->where('reference_id', $payment->id)
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        $user = User::find($payment->user_id);
+        if (!$user) {
+            return;
+        }
+
+        DB::table('transactions')->insert([
+            'user_id' => $user->id,
+            'type' => 'adjustment',
+            'amount' => 0,
+            'balance_after' => $user->balance,
+            'reference_type' => 'payment',
+            'reference_id' => $payment->id,
+            'description' => $description,
+            'created_by' => null,
+            'created_at' => now(),
+        ]);
+    }
 }

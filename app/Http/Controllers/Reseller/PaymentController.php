@@ -157,6 +157,7 @@ class PaymentController extends Controller
 
         if ($status !== 'success') {
             $payment->update(['status' => 'failed', 'notes' => "bKash status: {$status}"]);
+            $creditService->logFailedAttempt($payment, "Payment {$status} via bKash (#{$payment->id})");
             return redirect()->route('reseller.payments.create')->with('error', 'Payment was cancelled or failed.');
         }
 
@@ -169,9 +170,11 @@ class PaymentController extends Controller
             }
 
             $payment->update(['status' => 'failed', 'gateway_response' => $result, 'notes' => 'bKash execute failed']);
+            $creditService->logFailedAttempt($payment, "Payment failed via bKash (#{$payment->id})");
         } catch (\Throwable $e) {
             Log::error('bKash execute error', ['error' => $e->getMessage()]);
             $payment->update(['status' => 'failed', 'notes' => 'bKash execute error']);
+            $creditService->logFailedAttempt($payment, "Payment failed via bKash (#{$payment->id})");
         }
 
         return redirect()->route('reseller.payments.create')->with('error', 'Payment verification failed.');
