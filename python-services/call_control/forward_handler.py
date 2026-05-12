@@ -61,12 +61,18 @@ class ForwardCallHandler:
         # External forward via trunk — check balance and create CDR
         await agi.verbose(f"rSwitch: Forward {forward_from} -> Mobile {forward_dest} (billed)")
 
-        # Check balance
+        # Check user status + balance
         if user_id:
             user = session.execute(
-                text("SELECT balance, credit_limit, billing_type FROM users WHERE id = :uid LIMIT 1"),
+                text("SELECT status, balance, credit_limit, billing_type FROM users WHERE id = :uid LIMIT 1"),
                 {"uid": int(user_id)},
             ).first()
+
+            if user and user.status != 'active':
+                await agi.verbose(f"rSwitch: Forward blocked — user {user_id} is {user.status}")
+                await agi.set_variable("FORWARD_CDR_UUID", "")
+                await agi.set_variable("FORWARD_DIAL_STRING", "")
+                return
 
             if user and user.billing_type == 'prepaid':
                 from decimal import Decimal

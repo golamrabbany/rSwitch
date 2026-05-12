@@ -190,7 +190,9 @@ class InboundCallHandler:
                     FROM dids d
                     LEFT JOIN sip_accounts s ON d.destination_id = s.id AND d.destination_type = 'sip_account'
                     LEFT JOIN users u ON d.assigned_to_user_id = u.id
-                    WHERE d.number = :number AND d.status = 'active'
+                    WHERE d.number = :number
+                      AND d.status = 'active'
+                      AND (u.id IS NULL OR u.status = 'active')
                     LIMIT 1
                 """),
                 {"number": number},
@@ -227,7 +229,9 @@ class InboundCallHandler:
                            u.parent_id as reseller_id
                     FROM sip_accounts s
                     JOIN users u ON s.user_id = u.id
-                    WHERE s.id = :sid AND s.status = 'active'
+                    WHERE s.id = :sid
+                      AND s.status = 'active'
+                      AND u.status = 'active'
                     LIMIT 1
                 """),
                 {"sid": did.sip_account_id},
@@ -252,7 +256,10 @@ class InboundCallHandler:
                     SELECT s.username
                     FROM ring_group_members rgm
                     JOIN sip_accounts s ON rgm.sip_account_id = s.id
-                    WHERE rgm.ring_group_id = :rg_id AND s.status = 'active'
+                    JOIN users u ON s.user_id = u.id
+                    WHERE rgm.ring_group_id = :rg_id
+                      AND s.status = 'active'
+                      AND u.status = 'active'
                     ORDER BY rgm.sort_order
                 """),
                 {"rg_id": did.ring_group_id},
@@ -386,7 +393,11 @@ class InboundCallHandler:
         # Check if destination is a registered SIP account (skip for route mode)
         if not force_trunk:
             sip_dest = session.execute(
-                text("SELECT username FROM sip_accounts WHERE username = :dest AND status = 'active' LIMIT 1"),
+                text(
+                    "SELECT s.username FROM sip_accounts s "
+                    "JOIN users u ON s.user_id = u.id "
+                    "WHERE s.username = :dest AND s.status = 'active' AND u.status = 'active' LIMIT 1"
+                ),
                 {"dest": destination},
             ).first()
 
