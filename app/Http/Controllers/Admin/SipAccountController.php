@@ -66,11 +66,11 @@ class SipAccountController extends Controller
         if (!$authUser->isSuperAdmin()) {
             $resellerQuery->whereIn('id', $authUser->managedResellerIds());
         }
-        $resellers = $resellerQuery->get(['id', 'name', 'email']);
+        $resellers = $resellerQuery->get(['id', 'name', 'username', 'email']);
 
         // Resolve selected client name for display
         $selectedClient = $request->filled('client_id')
-            ? User::where('id', $request->client_id)->first(['id', 'name', 'email'])
+            ? User::where('id', $request->client_id)->first(['id', 'name', 'username', 'email'])
             : null;
 
         return view('admin.sip-accounts.index', compact('sipAccounts', 'resellers', 'selectedClient'));
@@ -96,12 +96,13 @@ class SipAccountController extends Controller
             $search = $request->q;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "{$search}%")
+                  ->orWhere('username', 'like', "{$search}%")
                   ->orWhere('email', 'like', "{$search}%");
             });
         }
 
         return response()->json(
-            $query->limit(20)->get(['id', 'name', 'email', 'parent_id', 'balance', 'kyc_status'])
+            $query->limit(20)->get(['id', 'name', 'username', 'email', 'parent_id', 'balance', 'kyc_status'])
         );
     }
 

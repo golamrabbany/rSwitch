@@ -45,9 +45,11 @@
 
         get filteredResellers() {
             if (!this.resellerSearch) return this.resellers;
+            const q = this.resellerSearch.toLowerCase();
             return this.resellers.filter(r =>
-                r.name.toLowerCase().includes(this.resellerSearch.toLowerCase()) ||
-                r.email.toLowerCase().includes(this.resellerSearch.toLowerCase())
+                (r.name || '').toLowerCase().includes(q) ||
+                (r.username || '').toLowerCase().includes(q) ||
+                (r.email || '').toLowerCase().includes(q)
             );
         },
 
@@ -128,20 +130,23 @@
                             </svg>
                         </button>
                     </div>
-                    <div x-show="resellerOpen && filteredResellers.length > 0"
+                    <div x-show="resellerOpen"
                          x-cloak
                          @click.away="resellerOpen = false"
                          x-transition
-                         class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                         class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+                        <template x-if="filteredResellers.length === 0">
+                            <div class="px-4 py-3 text-sm text-gray-500 text-center">No resellers match.</div>
+                        </template>
                         <template x-for="reseller in filteredResellers" :key="reseller.id">
                             <button type="button"
                                     @click="selectReseller(reseller)"
-                                    class="w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-medium flex-shrink-0"
-                                     x-text="reseller.name.charAt(0).toUpperCase()"></div>
-                                <div class="min-w-0">
-                                    <div class="text-sm font-medium text-gray-900 truncate" x-text="reseller.name"></div>
-                                    <div class="text-xs text-gray-500 truncate" x-text="reseller.email"></div>
+                                    class="w-full px-4 py-2.5 text-left hover:bg-indigo-50 flex items-center gap-3 border-b border-gray-50 last:border-b-0">
+                                <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                                     x-text="(reseller.name || '?').charAt(0).toUpperCase()"></div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-medium text-gray-900 truncate" x-text="reseller.name || 'Unnamed'"></div>
+                                    <div class="text-xs text-gray-500 truncate" x-text="reseller.username || reseller.email || '—'"></div>
                                 </div>
                             </button>
                         </template>
@@ -175,28 +180,36 @@
                      x-cloak
                      @click.away="clientOpen = false"
                      x-transition
-                     class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                     class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
                     <template x-for="client in clientResults" :key="client.id">
                         <button type="button"
                                 @click="selectClient(client)"
-                                class="w-full px-4 py-2 text-left hover:bg-indigo-50 flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center text-sm font-medium flex-shrink-0"
-                                 x-text="client.name.charAt(0).toUpperCase()"></div>
-                            <div class="min-w-0">
-                                <div class="text-sm font-medium text-gray-900 truncate" x-text="client.name"></div>
-                                <div class="text-xs text-gray-500 truncate" x-text="client.email"></div>
+                                class="w-full px-4 py-2.5 text-left hover:bg-indigo-50 flex items-center gap-3 border-b border-gray-50 last:border-b-0">
+                            <div class="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                                 x-text="(client.name || '?').charAt(0).toUpperCase()"></div>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm font-medium text-gray-900 truncate" x-text="client.name || 'Unnamed'"></div>
+                                <div class="text-xs text-gray-500 truncate" x-text="client.username || client.email || '—'"></div>
                             </div>
                         </button>
                     </template>
                 </div>
                 <div x-show="clientOpen && clientLoading" x-cloak
-                     class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
-                    Searching...
+                     class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                    <span class="inline-flex items-center gap-2">
+                        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" class="opacity-75"/></svg>
+                        Searching…
+                    </span>
                 </div>
                 <div x-show="clientOpen && !clientLoading && clientSearch.length >= 2 && clientResults.length === 0" x-cloak
                      @click.away="clientOpen = false"
-                     class="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
-                    No clients found
+                     class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                    No clients match.
+                </div>
+                <div x-show="clientOpen && clientSearch.length > 0 && clientSearch.length < 2 && !clientLoading" x-cloak
+                     @click.away="clientOpen = false"
+                     class="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-400">
+                    Type at least 2 characters…
                 </div>
             </div>
 
