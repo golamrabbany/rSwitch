@@ -36,6 +36,9 @@ class ImportWeblinkDelta extends Command
     /** sip_account ids that need PJSIP provisioning */
     private array $sipsToProvision = [];
 
+    /** dump accounts.id → cleartext password chosen for the user (= first SIP secret) */
+    private array $clientPasswords = [];
+
     private array $stats = [
         'users_matched_by_sip' => 0,
         'users_matched_by_email' => 0,
@@ -217,6 +220,22 @@ class ImportWeblinkDelta extends Command
         }
         $this->line('  Matched via email fallback: ' . $this->stats['users_matched_by_email']);
         $this->line('  Total matched:            ' . count($this->accountToUserId));
+
+        // Build clientId → cleartext password (= first SIP secret encountered).
+        // Used by Phase C to set the user's password and by Phase F to make
+        // ALL of that client's SIP accounts share the same password.
+        $secretRows = DB::select(
+            "SELECT id_client, secret FROM `{$this->tempDb}`.`sipusers`
+             WHERE type='friend' AND status != -1
+               AND secret IS NOT NULL AND secret <> ''
+             ORDER BY id"
+        );
+        foreach ($secretRows as $row) {
+            $clientId = (int) $row->id_client;
+            if ($clientId <= 0 || isset($this->clientPasswords[$clientId])) continue;
+            $this->clientPasswords[$clientId] = $row->secret;
+        }
+        $this->line('  Accounts with SIP-derived password: ' . count($this->clientPasswords));
     }
 
     private function sanitizeEmailForMatch(?string $raw): ?string
@@ -245,7 +264,10 @@ class ImportWeblinkDelta extends Command
              GROUP BY id ORDER BY id"
         );
 
-        $defaultPassword = Hash::make('ChangeMe123!');
+        // Default for users without a SIP-derived password (most resellers).
+        // Stored as $md5$ wrapper so the compat provider transparently upgrades
+        // to bcrypt on first successful login (fast import, full security later).
+        $defaultPassword = '$md5$' . md5('ChangeMe123!');
         $usedEmails = [];
         $usedUsernames = [];
 
@@ -295,12 +317,20 @@ class ImportWeblinkDelta extends Command
 
                 $username = $this->resolveUniqueUsername($row, $usedUsernames, $existingUsernames);
 
+                // Per-user password: clients get their first SIP secret (so
+                // their panel login matches the password their phone already
+                // uses); resellers/no-SIP users fall back to the default.
+                $cleartext = $this->clientPasswords[$accountId] ?? null;
+                $userPassword = $cleartext !== null
+                    ? '$md5$' . md5($cleartext)
+                    : $defaultPassword;
+
                 if (!$dryRun) {
                     $newId = DB::table('users')->insertGetId([
                         'name' => $row->account_name ?: $row->username ?: 'User ' . $row->id,
                         'email' => $email,
                         'username' => $username,
-                        'password' => $defaultPassword,
+                        'password' => $userPassword,
                         'role' => $role,
                         'parent_id' => null, // resolved below
                         'status' => $row->status == 1 ? 'active' : 'suspended',
@@ -555,6 +585,12 @@ class ImportWeblinkDelta extends Command
             $maxChannels = (int) ($row->{'call-limit'} ?? 2);
             $status = $row->status == 1 ? 'active' : 'suspended';
 
+            // Unified password rule: every SIP for a given client uses the
+            // SAME password as the user themselves. The user's password is
+            // derived from the FIRST SIP secret found in Phase B; here we
+            // override the per-row secret so all of this client's SIPs match.
+            $sipPassword = $this->clientPasswords[$clientId] ?? $row->secret ?: SipProvisioningService::generatePassword();
+
             if (isset($this->localSipByUsername[$username])) {
                 $sipId = $this->localSipByUsername[$username]['id'];
                 if (!$dryRun) {
@@ -563,11 +599,9 @@ class ImportWeblinkDelta extends Command
                         'caller_id_number' => $callerIdNumber,
                         'max_channels' => $maxChannels,
                         'status' => $status,
+                        'password' => $sipPassword,
                         'updated_at' => now(),
                     ];
-                    if (!empty($row->secret)) {
-                        $update['password'] = $row->secret;
-                    }
                     DB::table('sip_accounts')->where('id', $sipId)->update($update);
                     $this->sipsToProvision[$sipId] = true;
                 }
@@ -577,7 +611,7 @@ class ImportWeblinkDelta extends Command
                     $sipId = DB::table('sip_accounts')->insertGetId([
                         'user_id' => $userId,
                         'username' => $username,
-                        'password' => $row->secret ?: SipProvisioningService::generatePassword(),
+                        'password' => $sipPassword,
                         'auth_type' => 'password',
                         'caller_id_name' => $callerIdName,
                         'caller_id_number' => $callerIdNumber,
