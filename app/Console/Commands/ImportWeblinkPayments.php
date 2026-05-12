@@ -120,7 +120,7 @@ class ImportWeblinkPayments extends Command
 
         // Pass 1: SIP pivot
         $rows = DB::select(
-            "SELECT id_client, name FROM `{$this->tempDb}`.`sipusers` WHERE type='friend' AND status = 1"
+            "SELECT id_client, name FROM `{$this->tempDb}`.`sipusers` WHERE type='friend' AND status != -1"
         );
         foreach ($rows as $row) {
             $username = trim($row->name);
@@ -137,7 +137,7 @@ class ImportWeblinkPayments extends Command
         // Pass 2: email fallback
         $accounts = DB::select(
             "SELECT id, email FROM `{$this->tempDb}`.`accounts`
-             WHERE status = 1 AND account_type IN (1,2,3,4,5)
+             WHERE status != -1 AND account_type IN (1,2,3,4,5)
              GROUP BY id"
         );
         foreach ($accounts as $a) {
@@ -166,7 +166,7 @@ class ImportWeblinkPayments extends Command
 
         $rows = DB::select(
             "SELECT id, balance, credit FROM `{$this->tempDb}`.`accounts`
-             WHERE status = 1 AND account_type IN (1,2,3,4,5)
+             WHERE status != -1 AND account_type IN (1,2,3,4,5)
              GROUP BY id"
         );
 

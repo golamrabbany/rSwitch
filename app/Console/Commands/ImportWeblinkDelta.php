@@ -185,7 +185,7 @@ class ImportWeblinkDelta extends Command
 
         // Pass 1: SIP-username pivot
         $rows = DB::select(
-            "SELECT id_client, name FROM `{$this->tempDb}`.`sipusers` WHERE type='friend' AND status = 1"
+            "SELECT id_client, name FROM `{$this->tempDb}`.`sipusers` WHERE type='friend' AND status != -1"
         );
         foreach ($rows as $row) {
             $username = trim($row->name);
@@ -202,7 +202,7 @@ class ImportWeblinkDelta extends Command
         // Pass 2: email fallback for unmatched dump-accounts
         $accounts = DB::select(
             "SELECT id, email FROM `{$this->tempDb}`.`accounts`
-             WHERE status = 1 AND account_type IN (1,2,3,4,5)
+             WHERE status != -1 AND account_type IN (1,2,3,4,5)
              GROUP BY id"
         );
         foreach ($accounts as $a) {
@@ -226,7 +226,7 @@ class ImportWeblinkDelta extends Command
         // ALL of that client's SIP accounts share the same password.
         $secretRows = DB::select(
             "SELECT id_client, secret FROM `{$this->tempDb}`.`sipusers`
-             WHERE type='friend' AND status = 1
+             WHERE type='friend' AND status != -1
                AND secret IS NOT NULL AND secret <> ''
              ORDER BY id"
         );
@@ -260,7 +260,7 @@ class ImportWeblinkDelta extends Command
 
         $rows = DB::select(
             "SELECT * FROM `{$this->tempDb}`.`accounts`
-             WHERE status = 1 AND account_type IN (1,2,3,4,5)
+             WHERE status != -1 AND account_type IN (1,2,3,4,5)
              GROUP BY id ORDER BY id"
         );
 
@@ -443,7 +443,7 @@ class ImportWeblinkDelta extends Command
     {
         $this->info('Phase D: Upserting rate groups...');
 
-        $rows = DB::select("SELECT * FROM `{$this->tempDb}`.`ratename` WHERE status = 1 ORDER BY id");
+        $rows = DB::select("SELECT * FROM `{$this->tempDb}`.`ratename` WHERE status != -1 ORDER BY id");
 
         $superAdmin = User::where('role', 'super_admin')->first();
         $createdBy = $superAdmin?->id ?? User::first()?->id ?? 1;
@@ -494,7 +494,7 @@ class ImportWeblinkDelta extends Command
     {
         $this->info('Phase E: Upserting rates...');
 
-        $rows = DB::select("SELECT * FROM `{$this->tempDb}`.`ratechart` WHERE status = 1 ORDER BY id");
+        $rows = DB::select("SELECT * FROM `{$this->tempDb}`.`ratechart` WHERE status != -1 ORDER BY id");
 
         $existing = [];
         foreach (DB::table('rates')->select('id', 'rate_group_id', 'prefix')->get() as $r) {
@@ -565,7 +565,7 @@ class ImportWeblinkDelta extends Command
     {
         $this->info('Phase F: Upserting SIP accounts...');
 
-        $rows = DB::select("SELECT * FROM `{$this->tempDb}`.`sipusers` WHERE type='friend' AND status = 1 ORDER BY id");
+        $rows = DB::select("SELECT * FROM `{$this->tempDb}`.`sipusers` WHERE type='friend' AND status != -1 ORDER BY id");
 
         foreach ($rows as $row) {
             $username = trim($row->name);
