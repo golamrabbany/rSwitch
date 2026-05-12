@@ -60,8 +60,14 @@ class SslCommerzWebhookController extends Controller
     }
 
     /**
-     * Handle SSLCommerz success/fail/cancel redirects.
-     * These are user-facing redirects (POST from SSLCommerz gateway).
+     * Browser return URL from SSLCommerz (cross-site POST).
+     *
+     * Routed with withoutMiddleware(StartSession::class) so the cross-site
+     * POST — which doesn't carry the SameSite=Lax session cookie — doesn't
+     * cause Laravel to issue a NEW empty session cookie that would overwrite
+     * the user's auth cookie. Renders an inline page instead of redirecting
+     * with a flash message; user clicks "Continue" to navigate back to the
+     * panel with their existing auth intact.
      */
     public function returnUrl(Request $request)
     {
@@ -71,27 +77,40 @@ class SslCommerzWebhookController extends Controller
         $payment = Payment::find($paymentId);
 
         if (!$payment) {
-            return redirect('/')->with('error', 'Payment not found.');
+            return view('payments.gateway-result', [
+                'status' => 'error',
+                'title' => 'Payment Not Found',
+                'message' => 'We could not locate that payment.',
+                'continueUrl' => '/',
+            ]);
         }
 
-        // Determine which panel to redirect to
         $user = $payment->user;
         $panel = $user?->isReseller() ? 'reseller' : 'client';
+        $continueUrl = $panel === 'reseller' ? '/reseller/payments/create' : '/client/payments/create';
 
         if ($type === 'success') {
-            // Don't credit here — IPN handles that. Just show success page.
-            if ($panel === 'reseller') {
-                return view('reseller.payments.success', compact('payment'));
-            }
-            return view('client.payments.success', compact('payment'));
+            return view('payments.gateway-result', [
+                'status' => 'success',
+                'title' => 'Payment Received',
+                'message' => 'Thank you. Your balance will be credited within a moment.',
+                'continueUrl' => $continueUrl,
+                'amount' => $payment->amount,
+                'currency' => $payment->currency,
+            ]);
         }
 
-        // Fail or cancel
         if ($payment->status === 'pending') {
             $payment->update(['status' => 'failed', 'notes' => "SSLCommerz {$type}"]);
         }
 
-        $route = $panel === 'reseller' ? 'reseller.payments.create' : 'client.payments.create';
-        return redirect()->route($route)->with('error', $type === 'cancel' ? 'Payment cancelled.' : 'Payment failed. Please try again.');
+        return view('payments.gateway-result', [
+            'status' => $type === 'cancel' ? 'cancelled' : 'failed',
+            'title' => $type === 'cancel' ? 'Payment Cancelled' : 'Payment Failed',
+            'message' => $type === 'cancel'
+                ? 'You cancelled the payment. No charge has been made.'
+                : 'The payment did not complete. Please try again.',
+            'continueUrl' => $continueUrl,
+        ]);
     }
 }

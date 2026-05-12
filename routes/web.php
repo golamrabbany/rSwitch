@@ -456,6 +456,13 @@ Route::middleware(['auth', 'role:reseller,client'])->group(function () {
 // Payment webhooks (no CSRF, signature/validation verified in controllers)
 Route::post('webhook/stripe', [Webhook\StripeWebhookController::class, 'handle'])->name('webhook.stripe');
 Route::post('webhook/sslcommerz', [Webhook\SslCommerzWebhookController::class, 'handle'])->name('webhook.sslcommerz');
-Route::post('webhook/sslcommerz/return/{payment}/{type}', [Webhook\SslCommerzWebhookController::class, 'returnUrl'])->name('webhook.sslcommerz.return');
+// SSLCommerz POSTs back cross-site; skip StartSession so the cookie isn't
+// overwritten with a fresh empty session, which would log the user out.
+Route::post('webhook/sslcommerz/return/{payment}/{type}', [Webhook\SslCommerzWebhookController::class, 'returnUrl'])
+    ->withoutMiddleware([
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    ])
+    ->name('webhook.sslcommerz.return');
 
 require __DIR__.'/auth.php';
