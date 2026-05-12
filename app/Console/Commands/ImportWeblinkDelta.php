@@ -42,6 +42,7 @@ class ImportWeblinkDelta extends Command
     private array $stats = [
         'users_matched_by_sip' => 0,
         'users_matched_by_email' => 0,
+        'users_matched_by_username' => 0,
         'users_updated' => 0,
         'users_inserted' => 0,
         'users_skipped' => 0,
@@ -221,6 +222,34 @@ class ImportWeblinkDelta extends Command
             }
         }
         $this->line('  Matched via email fallback: ' . $this->stats['users_matched_by_email']);
+
+        // Pass 3: Username collision — handles source-data dups where two
+        // accounts.id share the same (trimmed) username. Without this pass,
+        // the second source-account-with-same-username falls through to INSERT
+        // and re-creates a ghost user that we just merged.
+        $accounts = DB::select(
+            "SELECT id, username FROM `{$this->tempDb}`.`accounts`
+             WHERE status != -1 AND account_type IN (1,2,3,4,5)
+             GROUP BY id"
+        );
+        foreach ($accounts as $a) {
+            $accountId = (int) $a->id;
+            if (isset($this->accountToUserId[$accountId])) continue;
+
+            $username = trim((string) ($a->username ?? ''));
+            if ($username === '') continue;
+
+            $userId = DB::table('users')
+                ->where('username', $username)
+                ->whereIn('role', ['reseller', 'client'])
+                ->value('id');
+
+            if ($userId) {
+                $this->accountToUserId[$accountId] = $userId;
+                $this->stats['users_matched_by_username']++;
+            }
+        }
+        $this->line('  Matched via username collision: ' . $this->stats['users_matched_by_username']);
         $this->line('  Total matched:            ' . count($this->accountToUserId));
 
         // Build clientId → cleartext password (= first SIP secret encountered).
