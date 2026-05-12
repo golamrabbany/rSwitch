@@ -6,6 +6,7 @@ use App\Models\Did;
 use App\Models\SipAccount;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Observers\UserObserver;
 use App\Policies\DidPolicy;
 use App\Policies\SipAccountPolicy;
 use App\Policies\TransactionPolicy;
@@ -65,5 +66,8 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
+
+        // Sync PJSIP realtime when a user is suspended/disabled/re-enabled
+        User::observe(UserObserver::class);
     }
 }

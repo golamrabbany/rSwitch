@@ -100,8 +100,10 @@ class SipProvisioningService
 
     /**
      * Remove a SIP account from Asterisk realtime tables.
+     * Pass $skipReload=true when batching multiple deprovisions; do a single
+     * reloadPjsip() at the end to avoid AMI thrashing.
      */
-    public function deprovision(SipAccount $sip): void
+    public function deprovision(SipAccount $sip, bool $skipReload = false): void
     {
         $id = $sip->username;
 
@@ -113,8 +115,9 @@ class SipProvisioningService
             DB::table('ps_endpoints')->where('id', $id)->delete();
         });
 
-        // Invalidate Sorcery memory cache
-        $this->reloadPjsip();
+        if (!$skipReload) {
+            $this->reloadPjsip();
+        }
     }
 
     /**

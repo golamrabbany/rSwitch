@@ -100,7 +100,9 @@ class InboundCallHandler:
                            u.parent_id as reseller_id
                     FROM sip_accounts s
                     JOIN users u ON s.user_id = u.id
-                    WHERE s.username = :ext AND s.status = 'active'
+                    WHERE s.username = :ext
+                      AND s.status = 'active'
+                      AND u.status = 'active'
                     LIMIT 1
                 """),
                 {"ext": number},
