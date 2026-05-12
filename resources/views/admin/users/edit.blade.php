@@ -58,10 +58,10 @@
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Username / Email</label>
-                                <input type="email" name="email" value="{{ old('email', $user->email) }}" required class="form-input" placeholder="Enter email address">
-                                <p class="form-hint">Used as login username</p>
-                                <x-input-error :messages="$errors->get('email')" class="mt-2" />
+                                <label class="form-label">Username</label>
+                                <input type="text" name="username" value="{{ old('username', $user->username) }}" required class="form-input" placeholder="e.g. 09647123456">
+                                <p class="form-hint">Login identifier</p>
+                                <x-input-error :messages="$errors->get('username')" class="mt-2" />
                             </div>
                             <div class="form-group" x-data="{ status: '{{ old('status', $user->status) }}' }">
                                 <label class="form-label">Status</label>
@@ -72,6 +72,12 @@
                                     <button type="button" @click="status = 'disabled'" class="flex-1 py-2 rounded-lg border-2 text-xs font-medium transition-all" :class="status === 'disabled' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">Disabled</button>
                                 </div>
                             </div>
+                        </div>
+                        <div class="form-group mt-4">
+                            <label class="form-label">Email <span class="text-gray-400 font-normal">(optional)</span></label>
+                            <input type="email" name="email" value="{{ old('email', $user->email) }}" class="form-input" placeholder="user@example.com">
+                            <p class="form-hint">For OTP, password reset, and email notifications. Leave blank if not available.</p>
+                            <x-input-error :messages="$errors->get('email')" class="mt-2" />
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="form-group">

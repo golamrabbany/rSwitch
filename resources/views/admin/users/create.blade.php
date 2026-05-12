@@ -110,9 +110,15 @@
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Username / Email</label>
-                                <input type="email" name="email" value="{{ old('email') }}" required class="form-input" placeholder="Enter email address">
-                                <p class="form-hint">Used as login username and for notifications</p>
+                                <label class="form-label">Username</label>
+                                <input type="text" name="username" value="{{ old('username') }}" required class="form-input" placeholder="e.g. 09647123456 or office">
+                                <p class="form-hint">Login identifier — letters, digits, dots, dashes</p>
+                                <x-input-error :messages="$errors->get('username')" class="mt-2" />
+                            </div>
+                            <div class="form-group md:col-span-2">
+                                <label class="form-label">Email <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <input type="email" name="email" value="{{ old('email') }}" class="form-input" placeholder="user@example.com">
+                                <p class="form-hint">For OTP, password reset, and email notifications. Leave blank if not available.</p>
                                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
                             </div>
                             <div class="form-group">

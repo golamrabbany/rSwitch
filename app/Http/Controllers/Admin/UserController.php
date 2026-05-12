@@ -155,7 +155,8 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:users,email'],
+            'username' => ['required', 'string', 'min:3', 'max:100', 'unique:users,username'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', Rule::in(['reseller', 'client'])],
             'parent_id' => ['nullable', 'exists:users,id'],
@@ -203,7 +204,8 @@ class UserController extends Controller
 
         $user = User::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
+            'username' => $validated['username'],
+            'email' => $validated['email'] ?? null,
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
             'parent_id' => $validated['parent_id'] ?? null,
@@ -410,7 +412,8 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
+            'username' => ['required', 'string', 'min:3', 'max:100', Rule::unique('users')->ignore($user->id)],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'status' => ['required', Rule::in(['active', 'suspended', 'disabled'])],
             'billing_type' => ['required', Rule::in(['prepaid', 'postpaid'])],
@@ -436,7 +439,8 @@ class UserController extends Controller
 
         $user->fill([
             'name' => $validated['name'],
-            'email' => $validated['email'],
+            'username' => $validated['username'],
+            'email' => $validated['email'] ?? null,
             'status' => $validated['status'],
             'billing_type' => $validated['billing_type'],
             'rate_group_id' => $validated['rate_group_id'],

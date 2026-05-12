@@ -21,7 +21,7 @@ class User extends Authenticatable
     use HasRoleHelpers, HasHierarchy, HasAuthorization;
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'parent_id', 'hierarchy_path', 'status',
+        'name', 'username', 'email', 'password', 'role', 'parent_id', 'hierarchy_path', 'status',
         'kyc_status', 'kyc_verified_at', 'kyc_rejected_reason',
         'billing_type', 'credit_limit', 'balance', 'currency', 'rate_group_id',
         'min_balance_for_calls', 'low_balance_threshold',
