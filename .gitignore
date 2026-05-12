@@ -22,3 +22,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Customer-data SQL dumps — never commit (contains emails, balances, hashed passwords)
+*.sql
