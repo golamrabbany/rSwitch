@@ -67,7 +67,7 @@ class UserController extends Controller
             $query->where('kyc_status', $request->kyc_status);
         }
 
-        $users = $query->orderBy('created_at', 'desc')->paginate(20);
+        $users = $query->orderBy('name', 'asc')->paginate(20);
 
         // KYC stats for client list
         $kycStats = [];
