@@ -108,7 +108,7 @@ class PaymentCreditService
 
         DB::table('transactions')->insert([
             'user_id' => $user->id,
-            'type' => 'adjustment',
+            'type' => 'payment_failed',
             'amount' => 0,
             'balance_after' => $user->balance,
             'reference_type' => 'payment',
