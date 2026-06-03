@@ -54,7 +54,7 @@ confirm_uninstall() {
     esac
 
     read -p "Are you sure? This cannot be undone. (yes/NO): " confirm
-    [[ "$confirm" != "yes" ]] && exit 0
+    if [[ "$confirm" != "yes" ]]; then echo "Cancelled."; exit 0; fi
 }
 
 remove_application() {

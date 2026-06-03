@@ -16,7 +16,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Version
-INSTALLER_VERSION="1.4.0"
+INSTALLER_VERSION="1.4.1"
 ASTERISK_VERSION="20.11.1"
 PHP_VERSION="8.3"
 NODE_VERSION="20"
@@ -570,6 +570,26 @@ install_nginx() {
 
 install_asterisk() {
     log_step "Installing Asterisk $ASTERISK_VERSION"
+
+    # Prefer the distribution's Asterisk package. The pinned source tarball at
+    # downloads.asterisk.org is frequently pruned (404s); the distro package ships
+    # a compatible Asterisk 20.x with chan_pjsip + res_odbc, which is what rSwitch
+    # needs. Fall back to the source build only if no package is available.
+    if command -v asterisk &>/dev/null || apt-cache show asterisk &>/dev/null 2>&1 || { command -v dnf &>/dev/null && dnf list asterisk &>/dev/null 2>&1; }; then
+        log_info "Installing Asterisk from distribution packages..."
+        if [[ "$OS" == "centos" || "$OS" == "almalinux" ]]; then
+            dnf install -y -q asterisk asterisk-odbc 2>/dev/null || true
+        else
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unixodbc odbc-mariadb asterisk asterisk-modules asterisk-config 2>/dev/null || true
+        fi
+        useradd -r -d /var/lib/asterisk -s /bin/false asterisk 2>/dev/null || true
+        usermod -aG audio,dialout asterisk 2>/dev/null || true
+        echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/asterisk' > /etc/sudoers.d/asterisk-www-data
+        chmod 440 /etc/sudoers.d/asterisk-www-data
+        systemctl enable asterisk 2>/dev/null || true
+        log_success "Asterisk installed from distribution packages"
+        return 0
+    fi
 
     # Install build dependencies
     log_info "Installing Asterisk build dependencies..."
@@ -1231,7 +1251,7 @@ install_application() {
     # Copy application files (assuming we're running from the installer directory)
     if [[ -d "$SCRIPT_DIR/../app" ]]; then
         log_info "Copying application files..."
-        cp -r $SCRIPT_DIR/../* $INSTALL_DIR/
+        cp -a $SCRIPT_DIR/../. $INSTALL_DIR/
         rm -rf $INSTALL_DIR/installer
     else
         log_error "Application files not found. Please run installer from the rSwitch directory."
@@ -1279,6 +1299,10 @@ install_application() {
     # Add AGI and AMI configuration
     # Read AMI secret from manager.conf (generated during configure_asterisk)
     AMI_SECRET_FOR_ENV=$(grep '^secret' /etc/asterisk/manager.conf 2>/dev/null | head -1 | awk -F'= ' '{print $2}' | tr -d ' ')
+
+    # Drop any keys the block below defines, so they aren't duplicated. phpdotenv
+    # uses the FIRST occurrence, so a stale empty key (from .env.example) would win.
+    sed -i -E '/^(AGI_HOST|AGI_PORT|AMI_HOST|AMI_PORT|AMI_USER|AMI_SECRET|BROADCAST_VOICE_PATH|PYTHON_API_URL)=/d' .env
 
     cat >> .env << EOF
 
@@ -1385,7 +1409,7 @@ install_python_services() {
         GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.invoices TO 'python_svc'@'localhost';
         GRANT SELECT, UPDATE ON ${DB_NAME}.users TO 'python_svc'@'localhost';
         FLUSH PRIVILEGES;
-    " 2>/dev/null || log_warn "Python DB user may already exist"
+    " 2>/dev/null || log_warning "Python DB user may already exist"
 
     # Read AMI secret from Asterisk manager.conf
     AMI_SECRET_VALUE=$(grep '^secret' /etc/asterisk/manager.conf 2>/dev/null | head -1 | awk -F'= ' '{print $2}' | tr -d ' ')
@@ -1978,15 +2002,21 @@ create_admin_user() {
     # Create admin user via MySQL (avoids tinker permission issues)
     HASHED_PASS=$(php -r "echo password_hash('${ADMIN_PASSWORD}', PASSWORD_BCRYPT);")
 
-    MYSQL_ROOT_PASS="${DB_PASS}_root"
-    mysql -u root -p"${MYSQL_ROOT_PASS}" ${DB_NAME} -e "
+    # root's password isn't reliably "${DB_PASS}_root" when MySQL pre-existed
+    # (installer used debian.cnf). Prefer debian.cnf (root-equivalent) when present.
+    if [[ -f /etc/mysql/debian.cnf ]] && mysql --defaults-file=/etc/mysql/debian.cnf -e "SELECT 1" &>/dev/null; then
+        MYSQL_ADMIN="mysql --defaults-file=/etc/mysql/debian.cnf"
+    else
+        MYSQL_ADMIN="mysql -u root -p${DB_PASS}_root"
+    fi
+    ${MYSQL_ADMIN} ${DB_NAME} -e "
         INSERT INTO users (name, email, password, role, status, email_verified_at, billing_type, balance, created_at, updated_at)
         VALUES ('Super Admin', '${ADMIN_EMAIL}', '${HASHED_PASS}', 'super_admin', 'active', NOW(), 'postpaid', 0, NOW(), NOW())
         ON DUPLICATE KEY UPDATE name=name;
     " 2>/dev/null
 
     # Set hierarchy path for the admin user
-    mysql -u root -p"${MYSQL_ROOT_PASS}" ${DB_NAME} -e "
+    ${MYSQL_ADMIN} ${DB_NAME} -e "
         UPDATE users SET hierarchy_path = CONCAT('/', id, '/') WHERE hierarchy_path IS NULL OR hierarchy_path = '';
     " 2>/dev/null
 
