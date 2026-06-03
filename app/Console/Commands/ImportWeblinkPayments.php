@@ -10,6 +10,7 @@ class ImportWeblinkPayments extends Command
     protected $signature = 'import:weblink-payments
         {path : Path to rbilling SQL dump}
         {--dry-run : Preview without writing}
+        {--balance-only : Update balances only, skip payment-log insert}
         {--force : Skip confirmation prompt}';
 
     protected $description = 'Update reseller/client balance + insert payment logs from a rbilling SQL dump (idempotent on gateway_transaction_id).';
@@ -38,10 +39,11 @@ class ImportWeblinkPayments extends Command
         }
 
         $dryRun = (bool) $this->option('dry-run');
+        $balanceOnly = (bool) $this->option('balance-only');
 
         $this->info('=== WebLink Payments Import ===');
         $this->line("Source: {$path}");
-        $this->line('Mode:   ' . ($dryRun ? 'DRY RUN' : 'LIVE'));
+        $this->line('Mode:   ' . ($dryRun ? 'DRY RUN' : 'LIVE') . ($balanceOnly ? ' (balance-only)' : ''));
         $this->newLine();
 
         if (!$dryRun && !$this->option('force')) {
@@ -54,7 +56,12 @@ class ImportWeblinkPayments extends Command
             $this->phaseA_loadSql($path);
             $this->phaseB_buildMatchMap();
             $this->phaseC_updateBalances($dryRun);
-            $this->phaseD_insertPayments($dryRun);
+
+            if (!$balanceOnly) {
+                $this->phaseD_insertPayments($dryRun);
+            } else {
+                $this->line('Phase D: Skipped (--balance-only).');
+            }
 
             $this->dropTempDb();
             $this->printSummary();

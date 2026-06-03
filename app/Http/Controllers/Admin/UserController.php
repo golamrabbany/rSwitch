@@ -416,6 +416,7 @@ class UserController extends Controller
             'email' => ['nullable', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'status' => ['required', Rule::in(['active', 'suspended', 'disabled'])],
+            'parent_id' => ['nullable', 'exists:users,id'],
             'billing_type' => ['required', Rule::in(['prepaid', 'postpaid'])],
             'rate_group_id' => ['nullable', 'exists:rate_groups,id'],
             'balance' => ['nullable', 'numeric'],
@@ -425,16 +426,41 @@ class UserController extends Controller
             'daily_call_limit' => ['nullable', 'integer', 'min:0'],
             'phone' => ['nullable', 'string', 'max:20'],
             'alt_phone' => ['nullable', 'string', 'max:20'],
+            'contact_email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
             'country' => ['nullable', 'string', 'max:100'],
             'zip_code' => ['nullable', 'string', 'max:20'],
             'company_name' => ['nullable', 'string', 'max:200'],
+            'company_email' => ['nullable', 'email', 'max:255'],
             'company_website' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $authUser = auth()->user();
+        $newParentId = null;
+        if ($user->role === 'client') {
+            $submitted = $validated['parent_id'] ?? null;
+            if ($submitted) {
+                $target = User::find($submitted);
+                if (!$target || !in_array($target->role, ['reseller', 'super_admin'], true)) {
+                    return back()->withErrors(['parent_id' => 'Parent must be a reseller or super admin.'])->withInput();
+                }
+                if (!$authUser->isSuperAdmin() && $target->role === 'reseller' && !in_array($target->id, $authUser->managedResellerIds(), true)) {
+                    return back()->withErrors(['parent_id' => 'You cannot assign a reseller outside your scope.'])->withInput();
+                }
+                $newParentId = $target->id;
+            } else {
+                // "Direct" (no reseller) — only super admin may set this; parent becomes super_admin themselves
+                if (!$authUser->isSuperAdmin()) {
+                    return back()->withErrors(['parent_id' => 'A parent reseller is required.'])->withInput();
+                }
+                $newParentId = $authUser->id;
+            }
+        }
+
+        $originalParentId = $user->parent_id;
         $original = $user->getAttributes();
 
         $user->fill([
@@ -463,6 +489,10 @@ class UserController extends Controller
             'notes' => $validated['notes'],
         ]);
 
+        if ($user->role === 'client' && $newParentId !== null) {
+            $user->parent_id = $newParentId;
+        }
+
         if (! empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);
         }
@@ -472,6 +502,14 @@ class UserController extends Controller
         }
 
         $user->save();
+
+        // Flush descendant caches for both old and new parent so the move shows up immediately.
+        if ($originalParentId !== $user->parent_id) {
+            \Illuminate\Support\Facades\Cache::forget("user_descendants_{$originalParentId}");
+            \Illuminate\Support\Facades\Cache::forget("user_clients_{$originalParentId}");
+            \Illuminate\Support\Facades\Cache::forget("user_descendants_{$user->parent_id}");
+            \Illuminate\Support\Facades\Cache::forget("user_clients_{$user->parent_id}");
+        }
 
         AuditService::logUpdated($user, $original, 'user.updated');
 

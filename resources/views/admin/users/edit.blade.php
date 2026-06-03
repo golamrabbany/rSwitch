@@ -50,6 +50,44 @@
                         <p class="form-card-subtitle">Credentials and account status</p>
                     </div>
                     <div class="form-card-body">
+                        @if($user->role === 'client')
+                        <div class="form-group" x-data="resellerSearch()" @click.away="open = false">
+                            <label class="form-label">Parent Reseller</label>
+                            <div class="relative">
+                                <input type="hidden" name="parent_id" :value="selectedId">
+                                <div class="relative">
+                                    <input type="text" x-model="query" @focus="open = true" @click="open = true" @input="open = true; selectedId = ''" placeholder="Search reseller..." class="form-input pr-8" autocomplete="off">
+                                    <button type="button" x-show="query" x-cloak @click="selectedId = ''; query = ''" class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-400 hover:text-gray-600">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    </button>
+                                </div>
+                                <div x-show="open" x-cloak class="absolute z-20 mt-1 w-full bg-white rounded-lg border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
+                                    @if(auth()->user()->isSuperAdmin())
+                                        <button type="button" @click="selectedId = ''; query = 'Direct (No Reseller)'; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 flex items-center gap-2 border-b border-gray-100">
+                                            <span class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                                                <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                            </span>
+                                            <span class="font-medium text-indigo-600">Direct (No Reseller)</span>
+                                        </button>
+                                    @endif
+                                    <template x-for="r in filtered" :key="r.id">
+                                        <button type="button" @click="selectedId = String(r.id); query = r.name; open = false" class="w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 flex items-center justify-between">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-6 h-6 rounded-full bg-sky-100 flex items-center justify-center flex-shrink-0">
+                                                    <span class="text-xs font-medium text-sky-600" x-text="r.name.substring(0, 1).toUpperCase()"></span>
+                                                </div>
+                                                <span class="font-medium text-gray-900" x-text="r.name"></span>
+                                            </div>
+                                            <span class="text-xs text-gray-400" x-text="r.email"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                            <p class="form-hint">Select a reseller or choose "Direct" for Super Admin managed client</p>
+                            <x-input-error :messages="$errors->get('parent_id')" class="mt-2" />
+                        </div>
+                        @endif
+
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div class="form-group">
                                 <label class="form-label">Account Name</label>
@@ -415,4 +453,44 @@
             </div>
         </div>
     </form>
+
+    @if($user->role === 'client')
+    @push('scripts')
+    <script>
+    var _resellers = @json($resellers->map(function ($r) { return ['id' => $r->id, 'name' => $r->name, 'email' => $r->email ?? '']; }));
+
+    function resellerSearch() {
+        var currentParentId = '{{ $user->parent_id ?? '' }}';
+        var currentParentIsReseller = @json(optional($user->parent)->role === 'reseller');
+        var oldVal = '{{ old('parent_id') }}';
+
+        // Pre-fill: if old() exists use it; else use current parent_id when parent is reseller; otherwise treat as Direct.
+        var initialId = oldVal !== '' ? oldVal : (currentParentIsReseller ? currentParentId : '');
+        var initialName = '';
+        if (initialId) {
+            var found = _resellers.find(function (r) { return String(r.id) === String(initialId); });
+            if (found) initialName = found.name;
+        } else if (!currentParentIsReseller) {
+            initialName = 'Direct (No Reseller)';
+        }
+
+        return {
+            open: false,
+            query: initialName,
+            selectedId: initialId,
+            filtered: _resellers,
+            init() {
+                this.$watch('query', function (val) {
+                    if (!val) { this.filtered = _resellers; return; }
+                    var q = val.toLowerCase();
+                    this.filtered = _resellers.filter(function (r) {
+                        return r.name.toLowerCase().indexOf(q) > -1 || (r.email || '').toLowerCase().indexOf(q) > -1;
+                    });
+                }.bind(this));
+            }
+        };
+    }
+    </script>
+    @endpush
+    @endif
 </x-admin-layout>
