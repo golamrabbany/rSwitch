@@ -1417,8 +1417,15 @@ install_python_services() {
     # Generate a separate Python DB user password
     PYTHON_DB_PASS=$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | head -c 16)
 
-    # Create Python DB user
-    mysql -e "
+    # Create Python DB user. Use debian.cnf (root-equivalent) when available — bare
+    # `mysql` only works if root has passwordless socket auth, which a standard
+    # MySQL 8 install does not (install_mysql uses debian.cnf for the same reason).
+    if [[ -f /etc/mysql/debian.cnf ]] && mysql --defaults-file=/etc/mysql/debian.cnf -e "SELECT 1" &>/dev/null; then
+        PY_MYSQL="mysql --defaults-file=/etc/mysql/debian.cnf"
+    else
+        PY_MYSQL="mysql"
+    fi
+    $PY_MYSQL -e "
         CREATE USER IF NOT EXISTS 'python_svc'@'localhost' IDENTIFIED BY '${PYTHON_DB_PASS}';
         GRANT SELECT ON ${DB_NAME}.* TO 'python_svc'@'localhost';
         GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.call_records TO 'python_svc'@'localhost';

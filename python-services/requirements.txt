@@ -6,6 +6,7 @@ uvicorn[standard]==0.34.0
 sqlalchemy==2.0.36
 aiomysql==0.2.0
 pymysql==1.1.1
+cryptography==44.0.0  # required by pymysql for MySQL 8 caching_sha2_password (sync DB path / AGI handlers)
 
 # Task queue
 celery[redis]==5.4.0
