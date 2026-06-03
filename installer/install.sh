@@ -568,6 +568,25 @@ install_nginx() {
     log_success "Nginx installed"
 }
 
+setup_asterisk_cli_access() {
+    # Fixed read-only wrapper so the web UI can query Asterisk status WITHOUT
+    # granting www-data sudo on the asterisk binary (a wildcard grant would allow
+    # `asterisk -C <file>` / module-loading -> root code execution).
+    cat > /usr/local/sbin/rswitch-asterisk-status << 'WRAP'
+#!/bin/bash
+set -euo pipefail
+case "${1:-}" in
+    contacts)  exec /usr/sbin/asterisk -rx "pjsip show contacts" ;;
+    endpoints) exec /usr/sbin/asterisk -rx "pjsip show endpoints" ;;
+    *) echo "usage: ${0##*/} {contacts|endpoints}" >&2; exit 2 ;;
+esac
+WRAP
+    chmod 0755 /usr/local/sbin/rswitch-asterisk-status
+    chown root:root /usr/local/sbin/rswitch-asterisk-status
+    echo 'www-data ALL=(root) NOPASSWD: /usr/local/sbin/rswitch-asterisk-status contacts, /usr/local/sbin/rswitch-asterisk-status endpoints' > /etc/sudoers.d/asterisk-www-data
+    chmod 440 /etc/sudoers.d/asterisk-www-data
+}
+
 install_asterisk() {
     log_step "Installing Asterisk $ASTERISK_VERSION"
 
@@ -584,8 +603,7 @@ install_asterisk() {
         fi
         useradd -r -d /var/lib/asterisk -s /bin/false asterisk 2>/dev/null || true
         usermod -aG audio,dialout asterisk 2>/dev/null || true
-        echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/asterisk' > /etc/sudoers.d/asterisk-www-data
-        chmod 440 /etc/sudoers.d/asterisk-www-data
+        setup_asterisk_cli_access
         systemctl enable asterisk 2>/dev/null || true
         log_success "Asterisk installed from distribution packages"
         return 0
@@ -722,8 +740,7 @@ install_asterisk() {
     sed -i 's/^;rungroup = .*/rungroup = asterisk/' /etc/asterisk/asterisk.conf
 
     # Allow www-data (PHP) to query Asterisk CLI for registration status
-    echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/asterisk' > /etc/sudoers.d/asterisk-www-data
-    chmod 440 /etc/sudoers.d/asterisk-www-data
+    setup_asterisk_cli_access
     log_info "Configured sudoers for www-data to access Asterisk CLI"
 
     # Ensure no dangerous rasterisk killer cron jobs exist

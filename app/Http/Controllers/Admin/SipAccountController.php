@@ -130,7 +130,7 @@ class SipAccountController extends Controller
         } catch (\Throwable $e) {
             // Fallback to direct Asterisk CLI if Python API is unavailable
             try {
-                $output = shell_exec('sudo asterisk -rx "pjsip show contacts" 2>/dev/null');
+                $output = shell_exec('sudo /usr/local/sbin/rswitch-asterisk-status contacts 2>/dev/null');
                 if ($output) {
                     $lookup = array_flip($usernames);
                     foreach (explode("\n", $output) as $line) {

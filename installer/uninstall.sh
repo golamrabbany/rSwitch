@@ -82,6 +82,10 @@ remove_application() {
     # Remove credentials file
     rm -f /root/rswitch-credentials.txt
 
+    # Remove sudoers grants (incl. any stale unrestricted leftover)
+    rm -f /etc/sudoers.d/asterisk-www-data /etc/sudoers.d/rswitch-asterisk
+    rm -f /usr/local/sbin/rswitch-asterisk-status
+
     log_success "Application removed"
 }
 
