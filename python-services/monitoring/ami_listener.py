@@ -451,7 +451,7 @@ class AMIListener:
         trunk_match = re.match(r"^(trunk-(?:in|out|both)-\d+)-aor$", aor)
         if trunk_match:
             endpoint = trunk_match.group(1)
-            normalized = "Avail" if status in ("Created", "Updated", "Reachable") else "Unreachable"
+            normalized = "Unreachable" if status == "Unreachable" else "Avail"
             prev = self._trunk_status.get(endpoint)
             self._trunk_status[endpoint] = normalized
             if prev != normalized:
@@ -726,7 +726,7 @@ class AMIListener:
             )
             for endpoint, status in pattern.findall(text_out):
                 # Status field is one of: Avail, NonQual, Unknown, Unreachable, NotInUse
-                self._trunk_status[endpoint] = "Avail" if status == "Avail" else "Unreachable"
+                self._trunk_status[endpoint] = "Unreachable" if status == "Unreachable" else "Avail"
             logger.info(f"Loaded trunk status: {self._trunk_status}")
         except Exception as e:
             logger.debug(f"Could not load trunk status: {e}")
@@ -740,10 +740,12 @@ class AMIListener:
             return True
         if status == "Unreachable":
             return False
-        # Unknown: be permissive briefly, then start failing closed.
-        if time.time() - self._trunk_status_started_at < 90:
-            return True
-        return False
+        # Unknown reachability (qualify disabled, or status not loadable — e.g. the
+        # engine runs as www-data and can't reach the Asterisk CLI socket): fail OPEN
+        # so we don't blackhole calls to a trunk we simply can't probe. Only an
+        # explicit Unreachable qualify result blocks; Asterisk's Dial is the real
+        # authority on whether the INVITE succeeds.
+        return True
 
     def get_trunk_status_map(self) -> dict[str, str]:
         return dict(self._trunk_status)
