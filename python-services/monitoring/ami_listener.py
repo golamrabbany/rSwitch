@@ -166,6 +166,9 @@ class AMIListener:
                 # Skip empty/metadata entries
                 if not uid or not channel or uid == '0' or channel == '0':
                     continue
+                # Skip live-listen ChanSpy/AudioSocket monitoring legs.
+                if self._is_listen_spy_channel(channel, getattr(event, 'CallerIDNum', '') or ''):
+                    continue
                 if uid not in self._active_calls:
                     linked_id = getattr(event, 'Linkedid', '') or uid
                     call = ActiveCall(uid, channel, linked_id)
@@ -243,6 +246,13 @@ class AMIListener:
         except Exception:
             return ""
 
+    @staticmethod
+    def _is_listen_spy_channel(channel: str, caller_id: str = "") -> bool:
+        """True for live-listen spy legs (ChanSpy over AudioSocket). These are
+        originated as AudioSocket/* with CallerID 'livelisten' and must never
+        appear in Active Calls or call stats."""
+        return channel.startswith("AudioSocket/") or caller_id == "livelisten"
+
     async def _on_new_channel(self, manager, event):
         """New channel created — a call is starting."""
         uid = event.get("Uniqueid", "")
@@ -250,6 +260,11 @@ class AMIListener:
         linked_id = event.get("Linkedid", "") or uid
 
         if not uid or not channel:
+            return
+
+        # Live-listen ChanSpy/AudioSocket legs are monitoring artifacts, not
+        # real calls — keep them out of Active Calls.
+        if self._is_listen_spy_channel(channel, event.get("CallerIDNum", "")):
             return
 
         call = ActiveCall(uid, channel, linked_id)
