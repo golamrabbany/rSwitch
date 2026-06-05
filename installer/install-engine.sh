@@ -478,14 +478,12 @@ noload = chan_oss.so
 noload = chan_sip.so
 noload = chan_iax2.so
 noload = chan_dahdi.so
-noload = chan_audiosocket.so
 noload = chan_motif.so
 noload = chan_rtp.so
 
 ; Unused apps
 noload = app_agent_pool.so
 noload = app_alarmreceiver.so
-noload = app_audiosocket.so
 noload = app_dictate.so
 noload = app_disa.so
 noload = app_dtmfstore.so
@@ -562,7 +560,6 @@ noload = res_smdi.so
 noload = res_snmp.so
 noload = res_xmpp.so
 noload = res_phoneprov.so
-noload = res_audiosocket.so
 noload = res_ael_share.so
 noload = res_prometheus.so
 noload = res_statsd.so
