@@ -688,6 +688,24 @@ class AMIListener:
     def active_count(self) -> int:
         return len(self._dedupe_legs())
 
+    async def originate_chanspy(self, target_channel: str, audiosocket_uuid: str,
+                                host: str, port: int):
+        """Originate an AudioSocket channel that ChanSpy's a live channel.
+
+        ChanSpy flags: q = quiet (no prompts on the spy leg), o = one-direction
+        (only audio FROM target = that party's voice), S = stop when the target
+        channel is gone. Listen-only: no audio is sent to the call parties.
+        """
+        await self.manager.send_action({
+            "Action": "Originate",
+            "Channel": f"AudioSocket/{host}:{port}/{audiosocket_uuid}",
+            "Application": "ChanSpy",
+            "Data": f"{target_channel},qoS",
+            "CallerID": "livelisten",
+            "Async": "true",
+            "Timeout": "30000",
+        })
+
     async def mark_call_rejected(self, unique_id: str, reason: str = "rejected") -> None:
         """Called by the AGI handler when it rejects a call (e.g.
         trunk_unreachable, no_balance). The dialplan still does Answer()
