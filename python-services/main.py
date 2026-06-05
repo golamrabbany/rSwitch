@@ -37,6 +37,21 @@ from billing.rating import RatingService
 from billing.balance import BalanceService
 from billing.tasks import rate_and_charge, rate_batch
 from monitoring.ami_listener import get_ami_listener
+import time
+import uuid as uuid_mod
+from monitoring.listen_manager import ListenSessionManager, AudioSocketServer
+from monitoring.listen_audit import write_listen_stop
+from shared.listen_auth import verify_listen_token
+
+LISTEN_AUDIOSOCKET_HOST = "127.0.0.1"
+LISTEN_AUDIOSOCKET_PORT = 4574
+
+_listen_manager = ListenSessionManager(max_sessions=3, audit_writer=write_listen_stop)
+
+
+def get_listen_manager() -> ListenSessionManager:
+    return _listen_manager
+
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +83,18 @@ async def lifespan(app: FastAPI):
     # Start FastAGI server for call control
     from call_control.agi_server import start_agi_server
     asyncio.create_task(start_agi_server("0.0.0.0", 4573))
+
+    # Start the AudioSocket server for live-listen
+    def _on_socket_close(as_uuid: str):
+        session_id = _listen_manager.session_id_for_uuid(as_uuid)
+        if session_id:
+            asyncio.create_task(_listen_manager.teardown(session_id))
+
+    audiosocket_server = AudioSocketServer(
+        LISTEN_AUDIOSOCKET_HOST, LISTEN_AUDIOSOCKET_PORT,
+        _listen_manager, _on_socket_close,
+    )
+    await audiosocket_server.start()
 
     logger.info("Python billing + call control service started")
     yield
@@ -330,6 +357,66 @@ async def websocket_live_calls(websocket: WebSocket):
         logger.debug(f"WebSocket error: {e}")
     finally:
         ami.unregister_client(websocket)
+
+
+@app.websocket("/ws/listen")
+async def websocket_listen(websocket: WebSocket):
+    await websocket.accept()
+    settings = get_settings()
+
+    token = websocket.query_params.get("token", "")
+    claims = verify_listen_token(token, settings.listen_token_secret, int(time.time()))
+    if not claims:
+        await websocket.close(code=4401)
+        return
+
+    linked_id = str(claims["lid"])
+    uid = int(claims["uid"])
+
+    ami = get_ami_listener()
+    legs = ami.get_call_legs(linked_id)
+    if not legs or legs[0] is None:
+        await websocket.send_json({"type": "error", "reason": "call_ended"})
+        await websocket.close()
+        return
+    caller_leg, callee_leg = legs
+
+    mgr = get_listen_manager()
+    if not mgr.can_start():
+        await websocket.send_json({"type": "error", "reason": "capacity"})
+        await websocket.close()
+        return
+
+    session_id = str(uuid_mod.uuid4())
+    left_uuid = str(uuid_mod.uuid4())
+    right_uuid = str(uuid_mod.uuid4()) if callee_leg else None
+    mgr.create(session_id, websocket, left_uuid, right_uuid, uid=uid, linked_id=linked_id)
+
+    try:
+        await ami.originate_chanspy(
+            caller_leg.channel, left_uuid,
+            LISTEN_AUDIOSOCKET_HOST, LISTEN_AUDIOSOCKET_PORT,
+        )
+        if callee_leg:
+            await ami.originate_chanspy(
+                callee_leg.channel, right_uuid,
+                LISTEN_AUDIOSOCKET_HOST, LISTEN_AUDIOSOCKET_PORT,
+            )
+        await websocket.send_json({"type": "listening", "stereo": callee_leg is not None})
+
+        while True:
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=35.0)
+                if data == "ping":
+                    await websocket.send_json({"type": "pong"})
+            except asyncio.TimeoutError:
+                continue
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.debug(f"listen WS error: {e}")
+    finally:
+        await mgr.teardown(session_id)
 
 
 # ─────────────────────────────────────────────────────
