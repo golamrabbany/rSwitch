@@ -611,7 +611,7 @@ deny = 0.0.0.0/0.0.0.0
 permit = 127.0.0.1/255.255.255.255
 permit = ${APP_SERVER_IP}/255.255.255.255
 read = command,system,call,cdr
-write = command,system,call
+write = command,system,call,originate
 EOF
 
     # Logger (with full log for debugging)

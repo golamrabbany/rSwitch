@@ -1110,7 +1110,7 @@ secret = ${AMI_SECRET}
 deny = 0.0.0.0/0.0.0.0
 permit = 127.0.0.1/255.255.255.255
 read = command,system,call,cdr
-write = command,system,call
+write = command,system,call,originate
 EOF
 
     # Logger configuration (with security log for Fail2Ban)

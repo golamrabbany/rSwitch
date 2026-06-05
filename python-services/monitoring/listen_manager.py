@@ -146,6 +146,9 @@ class AudioSocketServer:
     async def _handle(self, reader, writer):
         decoder = AudioSocketFrameDecoder()
         as_uuid = None
+        peer = writer.get_extra_info("peername")
+        logger.info(f"AudioSocket: inbound connection from {peer}")
+        audio_frames = 0
         try:
             while True:
                 data = await reader.read(4096)
@@ -154,8 +157,13 @@ class AudioSocketServer:
                 for ftype, payload in decoder.feed(data):
                     if ftype == TYPE_UUID:
                         as_uuid = uuid_bytes_to_str(payload)
+                        matched = self._manager.session_id_for_uuid(as_uuid) is not None
+                        logger.info(f"AudioSocket: handshake uuid={as_uuid} session_matched={matched}")
                         self._manager.on_connect(as_uuid, writer)
                     elif ftype == TYPE_AUDIO and as_uuid:
+                        audio_frames += 1
+                        if audio_frames == 1:
+                            logger.info(f"AudioSocket: first audio frame uuid={as_uuid} len={len(payload)}")
                         await self._manager.on_audio(as_uuid, payload)
                     elif ftype == TYPE_TERMINATE:
                         break

@@ -696,15 +696,22 @@ class AMIListener:
         (only audio FROM target = that party's voice), S = stop when the target
         channel is gone. Listen-only: no audio is sent to the call parties.
         """
-        await self.manager.send_action({
-            "Action": "Originate",
-            "Channel": f"AudioSocket/{host}:{port}/{audiosocket_uuid}",
-            "Application": "ChanSpy",
-            "Data": f"{target_channel},qoS",
-            "CallerID": "livelisten",
-            "Async": "true",
-            "Timeout": "30000",
-        })
+        try:
+            resp = await self.manager.send_action({
+                "Action": "Originate",
+                "Channel": f"AudioSocket/{host}:{port}/{audiosocket_uuid}",
+                "Application": "ChanSpy",
+                "Data": f"{target_channel},qoS",
+                "CallerID": "livelisten",
+                "Async": "true",
+                "Timeout": "30000",
+            })
+            logger.info(
+                f"ChanSpy originate target={target_channel} "
+                f"sock={host}:{port}/{audiosocket_uuid} resp={resp}"
+            )
+        except Exception as e:
+            logger.error(f"ChanSpy originate FAILED target={target_channel}: {e}")
 
     async def mark_call_rejected(self, unique_id: str, reason: str = "rejected") -> None:
         """Called by the AGI handler when it rejects a call (e.g.
