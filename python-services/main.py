@@ -88,7 +88,10 @@ async def lifespan(app: FastAPI):
     def _on_socket_close(as_uuid: str):
         session_id = _listen_manager.session_id_for_uuid(as_uuid)
         if session_id:
-            asyncio.create_task(_listen_manager.teardown(session_id))
+            try:
+                asyncio.create_task(_listen_manager.teardown(session_id))
+            except RuntimeError:
+                pass  # event loop already closing (process shutdown)
 
     audiosocket_server = AudioSocketServer(
         LISTEN_AUDIOSOCKET_HOST, LISTEN_AUDIOSOCKET_PORT,

@@ -32,4 +32,11 @@ class ListenTokenServiceTest extends TestCase
         $token = $svc->mint(linkedId: 'a', uid: 1, ttlSeconds: 30);
         $this->assertCount(2, explode('.', $token));
     }
+
+    public function test_mint_throws_when_secret_is_empty(): void
+    {
+        $svc = new ListenTokenService('');
+        $this->expectException(\RuntimeException::class);
+        $svc->mint(linkedId: 'a', uid: 1, ttlSeconds: 30);
+    }
 }

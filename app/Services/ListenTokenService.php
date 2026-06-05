@@ -16,6 +16,12 @@ class ListenTokenService
     /** Mint a compact HMAC token: base64url(json).base64url(hmac_sha256). */
     public function mint(string $linkedId, int $uid, int $ttlSeconds = 30): string
     {
+        // Fail loudly on a misconfigured deployment rather than issuing a token
+        // the engine will silently reject with WS close 4401.
+        if ($this->secret === '') {
+            throw new \RuntimeException('LISTEN_TOKEN_SECRET is not configured; cannot mint live-listen token.');
+        }
+
         $payload = [
             'lid' => $linkedId,
             'uid' => $uid,
