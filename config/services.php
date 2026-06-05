@@ -52,6 +52,10 @@ return [
         'url' => env('PYTHON_API_URL', 'http://127.0.0.1:8001'),
     ],
 
+    'listen' => [
+        'token_secret' => env('LISTEN_TOKEN_SECRET', ''),
+    ],
+
     'asterisk' => [
         'voice_path' => env('BROADCAST_VOICE_PATH', '/var/spool/asterisk/voicebroadcast'),
     ],
