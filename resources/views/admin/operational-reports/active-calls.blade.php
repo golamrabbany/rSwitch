@@ -120,6 +120,9 @@
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Dir</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    @if(auth()->user()->isSuperAdmin())
+                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Listen</th>
+                    @endif
                 </tr>
             </thead>
             <tbody id="live-calls-tbody">
@@ -187,6 +190,9 @@
                                 <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse"></span>Processing</span>
                             @endif
                         </td>
+                        @if(auth()->user()->isSuperAdmin())
+                            <td class="px-3 py-2 text-gray-300 text-xs">—</td>
+                        @endif
                     </tr>
                 @endforeach
             </tbody>
@@ -221,10 +227,74 @@
         </div>
     </div>
 
+    <script>
+        window.IS_SUPER_ADMIN = @json(auth()->user()->isSuperAdmin());
+        window.LISTEN_TOKEN_URL = "{{ route('admin.active-calls.listen-token') }}";
+        window.LISTEN_WORKLET_URL = "{{ asset('js/listen-worklet.js') }}";
+        window.CSRF_TOKEN = "{{ csrf_token() }}";
+    </script>
+
+    @if(auth()->user()->isSuperAdmin())
+    <div x-data="listenModal()" x-cloak
+         @open-listen.window="open($event.detail)">
+        <div x-show="isOpen" x-cloak class="relative z-50" role="dialog" aria-modal="true"
+             @keydown.escape.window="close()">
+            <div x-show="isOpen" x-transition.opacity class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm"></div>
+            <div class="fixed inset-0 overflow-y-auto">
+                <div class="flex min-h-full items-start justify-center p-4 pt-16" @click="close()">
+                    <div x-show="isOpen" x-transition
+                         @click.stop class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col">
+                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M12 6.343a8 8 0 010 11.314M5 9v6h4l5 5V4L9 9H5z"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-base font-semibold text-gray-900">Listen to live call</h3>
+                                    <p class="text-xs text-gray-500" x-text="caller + '  →  ' + callee"></p>
+                                </div>
+                            </div>
+                            <button @click="close()" class="rounded-lg p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="px-6 py-6">
+                            <p class="text-sm text-gray-600 mb-4" x-text="statusText"></p>
+                            <div class="grid grid-cols-2 gap-6">
+                                <div>
+                                    <p class="text-xs font-medium text-gray-500 mb-2">Caller (Left)</p>
+                                    <div class="flex items-end gap-1 h-16">
+                                        <template x-for="i in 12" :key="'l'+i">
+                                            <div class="flex-1 rounded-t bg-indigo-500 transition-all duration-75"
+                                                 :style="`height:${barHeight(levelL, i)}%`"></div>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-gray-500 mb-2">Callee (Right)</p>
+                                    <div class="flex items-end gap-1 h-16">
+                                        <template x-for="i in 12" :key="'r'+i">
+                                            <div class="flex-1 rounded-t bg-emerald-500 transition-all duration-75"
+                                                 :style="`height:${barHeight(levelR, i)}%`"></div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+                            <button @click="close()" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Stop &amp; Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
 @push('scripts')
 <script>
 (function() {
-    const WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws/live-calls';
+    const WS_URL =(window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws/live-calls';
     let ws = null;
     let reconnectAttempts = 0;
     const maxReconnect = 10;
@@ -381,6 +451,7 @@
             <td class="px-3 py-2 text-xs text-gray-600">${escapeHtml(call.trunk || '—')}</td>
             <td class="px-3 py-2">${dirBadge}</td>
             <td class="px-3 py-2 status-cell">${statusBadge}</td>
+            ${window.IS_SUPER_ADMIN ? `<td class="px-3 py-2"><button type="button" class="listen-btn inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors" data-linked="${escapeHtml(call.linked_id || '')}" data-unique="${escapeHtml(call.unique_id || '')}" data-caller="${escapeHtml(call.caller || '')}" data-callee="${escapeHtml(call.callee || '')}"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M12 6.343a8 8 0 010 11.314M5 9v6h4l5 5V4L9 9H5z"/></svg>Listen</button></td>` : ''}
         `;
 
         callsTableBody.prepend(tr);
@@ -493,9 +564,106 @@
         }
     }, 25000);
 
+    // Delegated Listen-button handler (works for snapshot + event rows).
+    if (window.IS_SUPER_ADMIN && callsTableBody) {
+        callsTableBody.addEventListener('click', function (e) {
+            const btn = e.target.closest('.listen-btn');
+            if (!btn) return;
+            window.dispatchEvent(new CustomEvent('open-listen', { detail: {
+                linkedId: btn.dataset.linked,
+                uniqueId: btn.dataset.unique,
+                caller: btn.dataset.caller,
+                callee: btn.dataset.callee,
+            }}));
+        });
+    }
+
     // Start connection
     connect();
 })();
+</script>
+<script>
+function listenModal() {
+    return {
+        isOpen: false,
+        caller: '', callee: '',
+        statusText: '',
+        levelL: 0, levelR: 0,
+        ws: null, ctx: null, node: null, _ping: null,
+
+        barHeight(level, i) {
+            const threshold = i / 12;
+            const lit = Math.min(1, level * 6);
+            return lit >= threshold ? Math.max(8, lit * 100) : 6;
+        },
+
+        async open(detail) {
+            this.caller = detail.caller || '';
+            this.callee = detail.callee || '';
+            this.isOpen = true;
+            this.statusText = 'Connecting…';
+            this.levelL = this.levelR = 0;
+
+            let token;
+            try {
+                const resp = await fetch(window.LISTEN_TOKEN_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.CSRF_TOKEN },
+                    body: JSON.stringify({
+                        linked_id: detail.linkedId, unique_id: detail.uniqueId,
+                        caller: detail.caller, callee: detail.callee,
+                    }),
+                });
+                if (!resp.ok) { this.statusText = 'Not authorized.'; return; }
+                token = (await resp.json()).token;
+            } catch (e) { this.statusText = 'Failed to get token.'; return; }
+
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            await this.ctx.audioWorklet.addModule(window.LISTEN_WORKLET_URL);
+            this.node = new AudioWorkletNode(this.ctx, 'listen-processor', { outputChannelCount: [2] });
+            this.node.connect(this.ctx.destination);
+            this.node.port.onmessage = (e) => {
+                if (e.data.rmsL !== undefined) { this.levelL = e.data.rmsL; this.levelR = e.data.rmsR; }
+            };
+
+            const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://')
+                + location.host + '/ws/listen?token=' + encodeURIComponent(token);
+            this.ws = new WebSocket(wsUrl);
+            this.ws.binaryType = 'arraybuffer';
+            this.ws.onmessage = (ev) => {
+                if (typeof ev.data === 'string') {
+                    const msg = JSON.parse(ev.data);
+                    if (msg.type === 'listening') this.statusText = msg.stereo ? 'Live — stereo' : 'Live — caller only (not bridged yet)';
+                    else if (msg.type === 'error') this.statusText = msg.reason === 'call_ended' ? 'Call already ended.' : (msg.reason === 'capacity' ? 'Too many active listeners.' : 'Error.');
+                    else if (msg.type === 'call_ended') { this.statusText = 'Call ended.'; this._stop(); }
+                    return;
+                }
+                const view = new DataView(ev.data);
+                const side = view.getUint8(0);
+                const n = (ev.data.byteLength - 1) / 2;
+                const samples = new Float32Array(n);
+                for (let i = 0; i < n; i++) samples[i] = view.getInt16(1 + i * 2, true) / 32768;
+                if (this.node) this.node.port.postMessage({ side, samples });
+            };
+            this.ws.onclose = () => { if (this.isOpen) this.statusText = 'Disconnected.'; };
+
+            this._ping = setInterval(() => { if (this.ws && this.ws.readyState === 1) this.ws.send('ping'); }, 25000);
+        },
+
+        _stop() {
+            clearInterval(this._ping);
+            if (this.ws) { try { this.ws.close(); } catch (e) {} this.ws = null; }
+            if (this.node) { try { this.node.disconnect(); } catch (e) {} this.node = null; }
+            if (this.ctx) { try { this.ctx.close(); } catch (e) {} this.ctx = null; }
+            this.levelL = this.levelR = 0;
+        },
+
+        close() {
+            this._stop();
+            this.isOpen = false;
+        },
+    };
+}
 </script>
 @endpush
 </x-admin-layout>
