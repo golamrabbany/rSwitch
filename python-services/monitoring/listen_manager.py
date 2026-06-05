@@ -91,6 +91,21 @@ class ListenSessionManager:
         idx = self._uuid_index.get(as_uuid)
         return idx[0] if idx else None
 
+    async def end_from_call(self, session_id):
+        """The Asterisk call ended (AudioSocket closed): notify the browser so
+        it can auto-close, close its WebSocket, then tear down."""
+        s = self._sessions.get(session_id)
+        if s is not None:
+            try:
+                await s.ws.send_json({"type": "call_ended"})
+            except Exception:
+                pass
+            try:
+                await s.ws.close()
+            except Exception:
+                pass
+        await self.teardown(session_id)
+
     async def teardown(self, session_id):
         s = self._sessions.pop(session_id, None)
         if not s:

@@ -259,30 +259,58 @@
                             </button>
                         </div>
                         <div class="px-6 py-6">
-                            <p class="text-sm text-gray-600 mb-4" x-text="statusText"></p>
-                            <div class="grid grid-cols-2 gap-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="inline-flex items-center gap-2 text-sm font-medium"
+                                      :class="playing ? 'text-emerald-600' : 'text-gray-500'">
+                                    <span class="relative flex h-2.5 w-2.5" x-show="playing">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                    </span>
+                                    <span x-text="statusText"></span>
+                                </span>
+                                <span class="text-xs tabular-nums"
+                                      :class="bytesRecv > 0 ? 'text-gray-400' : 'text-amber-500'"
+                                      x-text="bytesRecv > 0 ? (Math.round(bytesRecv/1024) + ' KB received') : 'waiting for audio…'"></span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-5">
                                 <div>
-                                    <p class="text-xs font-medium text-gray-500 mb-2">Caller (Left)</p>
-                                    <div class="flex items-end gap-1 h-16">
-                                        <template x-for="i in 12" :key="'l'+i">
-                                            <div class="flex-1 rounded-t bg-indigo-500 transition-all duration-75"
-                                                 :style="`height:${barHeight(levelL, i)}%`"></div>
+                                    <p class="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>Caller (Left)
+                                    </p>
+                                    <div class="flex items-end justify-center gap-[3px] h-24 rounded-xl bg-gray-50 px-2 py-2">
+                                        <template x-for="i in 16" :key="'l'+i">
+                                            <div class="flex-1 rounded-full bg-indigo-500 transition-all duration-100 ease-out"
+                                                 style="min-width:3px" :style="`height:${barHeight(levelL, i)}%`"></div>
                                         </template>
                                     </div>
                                 </div>
                                 <div>
-                                    <p class="text-xs font-medium text-gray-500 mb-2">Callee (Right)</p>
-                                    <div class="flex items-end gap-1 h-16">
-                                        <template x-for="i in 12" :key="'r'+i">
-                                            <div class="flex-1 rounded-t bg-emerald-500 transition-all duration-75"
-                                                 :style="`height:${barHeight(levelR, i)}%`"></div>
+                                    <p class="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>Callee (Right)
+                                    </p>
+                                    <div class="flex items-end justify-center gap-[3px] h-24 rounded-xl bg-gray-50 px-2 py-2">
+                                        <template x-for="i in 16" :key="'r'+i">
+                                            <div class="flex-1 rounded-full bg-emerald-500 transition-all duration-100 ease-out"
+                                                 style="min-width:3px" :style="`height:${barHeight(levelR, i)}%`"></div>
                                         </template>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
-                            <button @click="close()" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Stop &amp; Close</button>
+                        <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+                            <div>
+                                <button x-show="!playing" @click="play()"
+                                        class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition-colors">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.84A1 1 0 004.8 3.7v12.6a1 1 0 001.5.86l10.1-6.3a1 1 0 000-1.72L6.3 2.84z"/></svg>
+                                    Play
+                                </button>
+                                <button x-show="playing" @click="stop()"
+                                        class="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 transition-colors">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="1.5"/></svg>
+                                    Stop
+                                </button>
+                            </div>
+                            <button @click="close()" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Close</button>
                         </div>
                     </div>
                 </div>
@@ -586,21 +614,28 @@
 function listenModal() {
     return {
         isOpen: false,
+        playing: false,
         caller: '', callee: '',
         statusText: '',
+        bytesRecv: 0,
         levelL: 0, levelR: 0,
-        ws: null, ctx: null, node: null, _ping: null,
+        ws: null, ctx: null, node: null, _ping: null, _closing: false,
 
         barHeight(level, i) {
-            const threshold = i / 12;
-            const lit = Math.min(1, level * 6);
-            return lit >= threshold ? Math.max(8, lit * 100) : 6;
+            // 16-bar centre-weighted VU meter; flat baseline when silent.
+            const center = 8.5;
+            const profile = 1 - Math.abs(i - center) / 9;   // 0..1, peak at centre
+            const amp = Math.min(1, level * 8);              // voice RMS ≈ 0.05–0.2
+            return Math.max(6, Math.min(100, 6 + amp * 94 * profile));
         },
 
         async open(detail) {
             this.caller = detail.caller || '';
             this.callee = detail.callee || '';
             this.isOpen = true;
+            this.playing = false;
+            this._closing = false;
+            this.bytesRecv = 0;
             this.statusText = 'Connecting…';
             this.levelL = this.levelR = 0;
 
@@ -618,13 +653,15 @@ function listenModal() {
                 token = (await resp.json()).token;
             } catch (e) { this.statusText = 'Failed to get token.'; return; }
 
-            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-            await this.ctx.audioWorklet.addModule(window.LISTEN_WORKLET_URL);
-            this.node = new AudioWorkletNode(this.ctx, 'listen-processor', { outputChannelCount: [2] });
-            this.node.connect(this.ctx.destination);
-            this.node.port.onmessage = (e) => {
-                if (e.data.rmsL !== undefined) { this.levelL = e.data.rmsL; this.levelR = e.data.rmsR; }
-            };
+            try {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                await this.ctx.audioWorklet.addModule(window.LISTEN_WORKLET_URL);
+                this.node = new AudioWorkletNode(this.ctx, 'listen-processor', { outputChannelCount: [2] });
+                this.node.connect(this.ctx.destination);
+                this.node.port.onmessage = (e) => {
+                    if (e.data.rmsL !== undefined) { this.levelL = e.data.rmsL; this.levelR = e.data.rmsR; }
+                };
+            } catch (e) { this.statusText = 'Audio init failed.'; return; }
 
             const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://')
                 + location.host + '/ws/listen?token=' + encodeURIComponent(token);
@@ -633,11 +670,20 @@ function listenModal() {
             this.ws.onmessage = (ev) => {
                 if (typeof ev.data === 'string') {
                     const msg = JSON.parse(ev.data);
-                    if (msg.type === 'listening') this.statusText = msg.stereo ? 'Live — stereo' : 'Live — caller only (not bridged yet)';
-                    else if (msg.type === 'error') this.statusText = msg.reason === 'call_ended' ? 'Call already ended.' : (msg.reason === 'capacity' ? 'Too many active listeners.' : 'Error.');
-                    else if (msg.type === 'call_ended') { this.statusText = 'Call ended.'; this._stop(); }
+                    if (msg.type === 'listening') {
+                        this.statusText = msg.stereo ? 'Live — stereo' : 'Live — caller only (not bridged)';
+                    } else if (msg.type === 'error') {
+                        this.statusText = msg.reason === 'call_ended' ? 'Call already ended.'
+                            : (msg.reason === 'capacity' ? 'Too many active listeners.' : 'Error.');
+                    } else if (msg.type === 'call_ended') {
+                        this.statusText = 'Call ended.';
+                        this.playing = false;
+                        this._autoClose();
+                    }
                     return;
                 }
+                // Binary: [1-byte side][SLIN16 PCM]
+                this.bytesRecv += ev.data.byteLength;
                 const view = new DataView(ev.data);
                 const side = view.getUint8(0);
                 const n = (ev.data.byteLength - 1) / 2;
@@ -645,17 +691,46 @@ function listenModal() {
                 for (let i = 0; i < n; i++) samples[i] = view.getInt16(1 + i * 2, true) / 32768;
                 if (this.node) this.node.port.postMessage({ side, samples });
             };
-            this.ws.onclose = () => { if (this.isOpen) this.statusText = 'Disconnected.'; };
+            this.ws.onclose = () => {
+                // Engine closes our socket when the call ends → auto-close.
+                if (this.isOpen && !this._closing) { this.statusText = 'Call ended.'; this.playing = false; this._autoClose(); }
+            };
 
             this._ping = setInterval(() => { if (this.ws && this.ws.readyState === 1) this.ws.send('ping'); }, 25000);
+
+            // Try to start audio right away; if the browser blocks autoplay
+            // (the token fetch consumed the click gesture), the Play button —
+            // a fresh direct gesture — will always resume the context.
+            await this.play();
+        },
+
+        async play() {
+            if (!this.ctx) return;
+            try { await this.ctx.resume(); } catch (e) {}
+            this.playing = (this.ctx && this.ctx.state === 'running');
+            if (this.playing && this.statusText === 'Connecting…') this.statusText = 'Live';
+        },
+
+        async stop() {
+            if (!this.ctx) return;
+            try { await this.ctx.suspend(); } catch (e) {}
+            this.playing = false;
+        },
+
+        _autoClose() {
+            // Brief pause so the operator sees "Call ended", then close.
+            if (this._closing) return;
+            setTimeout(() => { this.close(); }, 1500);
         },
 
         _stop() {
+            this._closing = true;
             clearInterval(this._ping);
             if (this.ws) { try { this.ws.close(); } catch (e) {} this.ws = null; }
             if (this.node) { try { this.node.disconnect(); } catch (e) {} this.node = null; }
             if (this.ctx) { try { this.ctx.close(); } catch (e) {} this.ctx = null; }
             this.levelL = this.levelR = 0;
+            this.playing = false;
         },
 
         close() {

@@ -89,7 +89,7 @@ async def lifespan(app: FastAPI):
         session_id = _listen_manager.session_id_for_uuid(as_uuid)
         if session_id:
             try:
-                asyncio.create_task(_listen_manager.teardown(session_id))
+                asyncio.create_task(_listen_manager.end_from_call(session_id))
             except RuntimeError:
                 pass  # event loop already closing (process shutdown)
 
