@@ -180,6 +180,12 @@ update_application() {
         fi
         asterisk -rx "dialplan reload" 2>/dev/null || true
         asterisk -rx "module reload" 2>/dev/null || true
+        # Live call listening needs the AudioSocket modules. A running Asterisk
+        # won't auto-load them from a reload, so load explicitly (idempotent;
+        # "already loaded" is harmless).
+        for m in res_audiosocket.so chan_audiosocket.so app_audiosocket.so; do
+            asterisk -rx "module load ${m}" 2>/dev/null || true
+        done
         log_success "Asterisk configs updated from templates"
     fi
 
@@ -200,6 +206,25 @@ update_application() {
     if ! grep -q 'PYTHON_API_URL' "$INSTALL_DIR/.env" 2>/dev/null; then
         echo -e "\n# Python Billing API (bare metal = localhost:8001)\nPYTHON_API_URL=http://127.0.0.1:8001" >> "$INSTALL_DIR/.env"
         log_success "Added PYTHON_API_URL to .env"
+    fi
+
+    # Ensure LISTEN_TOKEN_SECRET is present (added for live call listening).
+    # On an all-in-one box this same value must be in BOTH the Laravel .env and
+    # the Python engine .env. Generate once if missing and sync both.
+    if ! grep -q '^LISTEN_TOKEN_SECRET=' "$INSTALL_DIR/.env" 2>/dev/null; then
+        LISTEN_TOKEN_SECRET=$(openssl rand -hex 32)
+        echo -e "\n# Live-listen token secret (shared with Python engine)\nLISTEN_TOKEN_SECRET=${LISTEN_TOKEN_SECRET}" >> "$INSTALL_DIR/.env"
+        log_success "Added LISTEN_TOKEN_SECRET to Laravel .env"
+    else
+        LISTEN_TOKEN_SECRET=$(grep '^LISTEN_TOKEN_SECRET=' "$INSTALL_DIR/.env" | head -n1 | cut -d= -f2)
+    fi
+    # Sync into the engine .env (all-in-one box only; split deploys manage the
+    # engine .env on the other machine).
+    if [[ -f "$INSTALL_DIR/python-services/.env" ]]; then
+        if ! grep -q '^LISTEN_TOKEN_SECRET=' "$INSTALL_DIR/python-services/.env" 2>/dev/null; then
+            echo "LISTEN_TOKEN_SECRET=${LISTEN_TOKEN_SECRET}" >> "$INSTALL_DIR/python-services/.env"
+            log_success "Added LISTEN_TOKEN_SECRET to engine .env"
+        fi
     fi
 
     # Ensure ffmpeg is installed (needed for voice file conversion)

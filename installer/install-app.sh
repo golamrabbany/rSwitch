@@ -20,6 +20,7 @@ DB_PASS=""
 DB_HOST=""
 ENGINE_HOST=""
 AMI_SECRET=""
+LISTEN_TOKEN_SECRET=""
 DOMAIN=""
 SSL_TYPE="letsencrypt"
 ADMIN_EMAIL="admin@localhost"
@@ -102,6 +103,13 @@ gather_configuration() {
     read -s -p "AMI Secret (from Engine server): " AMI_SECRET
     echo
     while [[ -z "$AMI_SECRET" ]]; do log_warning "AMI secret is required"; read -s -p "AMI Secret: " AMI_SECRET; echo; done
+
+    # Live-listen token secret — must MATCH the Engine server's LISTEN_TOKEN_SECRET
+    # (printed by install-engine.sh). Optional: leave blank to disable live call
+    # listening until set later in .env.
+    read -s -p "Listen Token Secret (from Engine server, blank to skip): " LISTEN_TOKEN_SECRET
+    echo
+    [[ -z "$LISTEN_TOKEN_SECRET" ]] && log_warning "No Listen Token Secret — live call listening will be disabled until LISTEN_TOKEN_SECRET is set in .env"
 
     # Admin
     read -p "Admin email [$ADMIN_EMAIL]: " input_email
@@ -292,6 +300,9 @@ AMI_SECRET=${AMI_SECRET}
 
 # Python Billing API on Engine Server
 PYTHON_API_URL=http://${ENGINE_HOST}:8001
+
+# Live-listen token secret (must match Engine server's LISTEN_TOKEN_SECRET)
+LISTEN_TOKEN_SECRET=${LISTEN_TOKEN_SECRET}
 
 BROADCAST_VOICE_PATH=/var/spool/asterisk/voicebroadcast
 EOF
