@@ -1433,6 +1433,7 @@ install_python_services() {
         GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.transactions TO 'python_svc'@'localhost';
         GRANT SELECT, INSERT, UPDATE ON ${DB_NAME}.invoices TO 'python_svc'@'localhost';
         GRANT SELECT, UPDATE ON ${DB_NAME}.users TO 'python_svc'@'localhost';
+        GRANT INSERT ON ${DB_NAME}.audit_logs TO 'python_svc'@'localhost';
         FLUSH PRIVILEGES;
     " 2>/dev/null || log_warning "Python DB user may already exist"
 

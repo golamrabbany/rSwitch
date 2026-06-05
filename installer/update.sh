@@ -227,6 +227,21 @@ update_application() {
         fi
     fi
 
+    # Ensure the engine DB user can write live-listen stop-audit rows.
+    # Older all-in-one installs granted python_svc SELECT-only on audit_logs.
+    # (engine-only installs already grant ALL, so this is a no-op there.)
+    DB_NAME_U=$(grep '^DB_DATABASE=' "$INSTALL_DIR/.env" 2>/dev/null | head -n1 | cut -d= -f2)
+    if [[ -n "$DB_NAME_U" ]]; then
+        GRANT_SQL="GRANT INSERT ON \`${DB_NAME_U}\`.audit_logs TO 'python_svc'@'localhost'; FLUSH PRIVILEGES;"
+        if [[ -f /etc/mysql/debian.cnf ]]; then
+            mysql --defaults-file=/etc/mysql/debian.cnf -e "$GRANT_SQL" 2>/dev/null && \
+                log_success "Granted python_svc INSERT on audit_logs" || true
+        else
+            mysql -u root -e "$GRANT_SQL" 2>/dev/null && \
+                log_success "Granted python_svc INSERT on audit_logs" || true
+        fi
+    fi
+
     # Ensure ffmpeg is installed (needed for voice file conversion)
     if ! command -v ffmpeg &>/dev/null; then
         log_info "Installing ffmpeg (required for voice broadcast)..."
