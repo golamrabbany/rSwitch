@@ -103,6 +103,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:super_admin', 
     Route::post('bulk-import/users', [Admin\BulkImportController::class, 'importUsers'])->name('bulk-import.users');
     Route::post('bulk-import/sip-accounts', [Admin\BulkImportController::class, 'importSipAccounts'])->name('bulk-import.sip-accounts');
     Route::post('bulk-import/dids', [Admin\BulkImportController::class, 'importDids'])->name('bulk-import.dids');
+
+    // Live call listening — token endpoint
+    Route::post('active-calls/listen-token', [Admin\LiveListenController::class, 'token'])
+        ->name('active-calls.listen-token');
 });
 
 // Admin routes (both super_admin and admin) - scoped to assigned resellers for regular admins

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     asterisk_ami_port: int = 5038
     asterisk_ami_user: str = "admin"
     asterisk_ami_secret: str = "admin"
+    listen_token_secret: str = ""
 
     # App
     debug: bool = False

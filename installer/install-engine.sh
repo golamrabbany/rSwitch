@@ -478,14 +478,12 @@ noload = chan_oss.so
 noload = chan_sip.so
 noload = chan_iax2.so
 noload = chan_dahdi.so
-noload = chan_audiosocket.so
 noload = chan_motif.so
 noload = chan_rtp.so
 
 ; Unused apps
 noload = app_agent_pool.so
 noload = app_alarmreceiver.so
-noload = app_audiosocket.so
 noload = app_dictate.so
 noload = app_disa.so
 noload = app_dtmfstore.so
@@ -562,7 +560,6 @@ noload = res_smdi.so
 noload = res_snmp.so
 noload = res_xmpp.so
 noload = res_phoneprov.so
-noload = res_audiosocket.so
 noload = res_ael_share.so
 noload = res_prometheus.so
 noload = res_statsd.so
@@ -767,6 +764,9 @@ install_python_services() {
 
     AMI_SECRET_VALUE=$(grep '^secret' /etc/asterisk/manager.conf 2>/dev/null | head -1 | awk -F'= ' '{print $2}' | tr -d ' ')
 
+    LISTEN_TOKEN_SECRET="${LISTEN_TOKEN_SECRET:-$(openssl rand -hex 32)}"
+    echo "  LISTEN_TOKEN_SECRET (must match the App server .env): ${LISTEN_TOKEN_SECRET}"
+
     cat > .env << EOF
 DATABASE_URL=mysql+pymysql://python_svc:${PYTHON_DB_PASS}@${PYTHON_DB_HOST}:3306/${DB_NAME}
 ASYNC_DATABASE_URL=mysql+aiomysql://python_svc:${PYTHON_DB_PASS}@${PYTHON_DB_HOST}:3306/${DB_NAME}
@@ -777,6 +777,7 @@ ASTERISK_AMI_USER=rswitch
 ASTERISK_AMI_SECRET=${AMI_SECRET_VALUE}
 DEBUG=false
 LOG_LEVEL=info
+LISTEN_TOKEN_SECRET=${LISTEN_TOKEN_SECRET}
 EOF
 
     log_success "Python billing services installed"
@@ -994,10 +995,15 @@ Commands:
   View AGI logs:   tail -f /var/log/rswitch-python-api.err.log
   View Celery:     tail -f /var/log/rswitch-celery.err.log
 
+Live-Listen (shared secret):
+  LISTEN_TOKEN_SECRET: ${LISTEN_TOKEN_SECRET}
+  (Copy this value into the App server .env as LISTEN_TOKEN_SECRET)
+
 ╔══════════════════════════════════════════════════════════════════╗
-║  PROVIDE AMI SECRET TO APP SERVER INSTALLER!                     ║
+║  PROVIDE THESE VALUES TO APP SERVER INSTALLER!                   ║
 ║  AMI Secret: ${AMI_SECRET_VALUE}
 ║  DB Password: ${DB_PASS}
+║  LISTEN_TOKEN_SECRET: ${LISTEN_TOKEN_SECRET}
 ╚══════════════════════════════════════════════════════════════════╝
 EOF
     chmod 600 /root/rswitch-engine-credentials.txt

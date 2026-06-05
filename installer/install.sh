@@ -976,14 +976,12 @@ noload = chan_oss.so
 noload = chan_sip.so
 noload = chan_iax2.so
 noload = chan_dahdi.so
-noload = chan_audiosocket.so
 noload = chan_motif.so
 noload = chan_rtp.so
 
 ; Unused apps
 noload = app_agent_pool.so
 noload = app_alarmreceiver.so
-noload = app_audiosocket.so
 noload = app_dictate.so
 noload = app_disa.so
 noload = app_dtmfstore.so
@@ -1060,7 +1058,6 @@ noload = res_smdi.so
 noload = res_snmp.so
 noload = res_xmpp.so
 noload = res_phoneprov.so
-noload = res_audiosocket.so
 noload = res_ael_share.so
 noload = res_prometheus.so
 noload = res_statsd.so
@@ -1100,6 +1097,7 @@ EOF
 
     # Manager configuration (AMI)
     AMI_SECRET=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)
+    LISTEN_TOKEN_SECRET=$(openssl rand -hex 32)
     cat > /etc/asterisk/manager.conf << EOF
 [general]
 enabled = yes
@@ -1319,7 +1317,7 @@ install_application() {
 
     # Drop any keys the block below defines, so they aren't duplicated. phpdotenv
     # uses the FIRST occurrence, so a stale empty key (from .env.example) would win.
-    sed -i -E '/^(AGI_HOST|AGI_PORT|AMI_HOST|AMI_PORT|AMI_USER|AMI_SECRET|BROADCAST_VOICE_PATH|PYTHON_API_URL)=/d' .env
+    sed -i -E '/^(AGI_HOST|AGI_PORT|AMI_HOST|AMI_PORT|AMI_USER|AMI_SECRET|BROADCAST_VOICE_PATH|PYTHON_API_URL|LISTEN_TOKEN_SECRET)=/d' .env
 
     cat >> .env << EOF
 
@@ -1337,6 +1335,9 @@ BROADCAST_VOICE_PATH=/var/spool/asterisk/voicebroadcast
 
 # Python Billing API (bare metal = localhost:8001)
 PYTHON_API_URL=http://127.0.0.1:8001
+
+# Shared HMAC secret for live-listen tokens (must match Python engine .env)
+LISTEN_TOKEN_SECRET=${LISTEN_TOKEN_SECRET}
 EOF
 
     # Generate application key
@@ -1451,6 +1452,7 @@ ASTERISK_AMI_USER=rswitch
 ASTERISK_AMI_SECRET=${AMI_SECRET_VALUE}
 DEBUG=false
 LOG_LEVEL=info
+LISTEN_TOKEN_SECRET=${LISTEN_TOKEN_SECRET}
 EOF
 
     # Fix ownership
@@ -2106,6 +2108,11 @@ Asterisk
 AMI User:       rswitch
 AMI Secret:     ${DB_PASS}
 AMI Port:       5038
+
+Live-Listen
+───────────
+LISTEN_TOKEN_SECRET: ${LISTEN_TOKEN_SECRET}
+(Must match the Python engine .env — same value written to both on this box)
 
 Application Paths
 ─────────────────
