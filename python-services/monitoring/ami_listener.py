@@ -653,6 +653,20 @@ class AMIListener:
         """Return active calls as dicts, deduped by linked_id (one per call)."""
         return [c.to_dict() for c in self._dedupe_legs()]
 
+    def get_call_legs(self, linked_id: str):
+        """Return (caller_leg, callee_leg) ActiveCall objects for a call.
+
+        The caller leg is the Asterisk originator (unique_id == linked_id) and
+        maps to the LEFT audio channel; the other leg maps to RIGHT. Returns
+        None if no legs exist; callee_leg is None if the call has only one leg.
+        """
+        legs = [c for c in self._active_calls.values() if c.linked_id == linked_id]
+        if not legs:
+            return None
+        caller_leg = next((c for c in legs if c.unique_id == c.linked_id), legs[0])
+        callee_leg = next((c for c in legs if c is not caller_leg), None)
+        return caller_leg, callee_leg
+
     def get_stats(self) -> dict:
         """Return summary statistics for active calls (deduped by linked_id)."""
         calls = self._dedupe_legs()
