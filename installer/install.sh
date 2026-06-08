@@ -1135,6 +1135,10 @@ EOF
         AST_MOD_DIR="/usr/lib/asterisk/modules"
     fi
 
+    # maxload is a circuit breaker compared against the 1-minute load average.
+    # A fixed 0.9 rejected ALL calls ("call limit reached") on multi-core boxes
+    # the moment load crossed ~one busy core — scale it to the CPU count instead.
+    ASTERISK_MAXLOAD=$(awk "BEGIN{printf \"%.1f\", $(nproc)*0.9}")
     cat > /etc/asterisk/asterisk.conf << EOF
 [directories]
 astetcdir => /etc/asterisk
@@ -1155,7 +1159,7 @@ verbose = 1
 debug = 0
 highpriority = yes
 maxcalls = 3000
-maxload = 0.9
+maxload = ${ASTERISK_MAXLOAD}
 cache_record_files = yes
 transmit_silence = yes
 hideconnect = yes

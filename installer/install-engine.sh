@@ -630,6 +630,9 @@ EOF
     [[ -d "/usr/lib/x86_64-linux-gnu/asterisk/modules" ]] && AST_MOD_DIR="/usr/lib/x86_64-linux-gnu/asterisk/modules"
     [[ -d "/usr/lib64/asterisk/modules" ]] && AST_MOD_DIR="/usr/lib64/asterisk/modules"
 
+    # maxload scales with CPU count (a fixed 0.9 rejected all calls on
+    # multi-core boxes once load crossed ~one busy core).
+    ASTERISK_MAXLOAD=$(awk "BEGIN{printf \"%.1f\", $(nproc)*0.9}")
     cat > /etc/asterisk/asterisk.conf << EOF
 [directories]
 astetcdir => /etc/asterisk
@@ -650,7 +653,7 @@ verbose = 1
 debug = 0
 highpriority = yes
 maxcalls = 3000
-maxload = 0.9
+maxload = ${ASTERISK_MAXLOAD}
 transmit_silence = yes
 EOF
 
