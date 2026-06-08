@@ -40,6 +40,10 @@ Schedule::command('billing:check-low-balances')
     ->hourly()
     ->withoutOverlapping();
 
+Schedule::command('billing:auto-recharge')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
 Schedule::command('data:purge')
     ->dailyAt('03:00')
     ->withoutOverlapping();

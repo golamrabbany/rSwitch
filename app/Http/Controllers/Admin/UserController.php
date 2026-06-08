@@ -177,6 +177,7 @@ class UserController extends Controller
             'company_website' => ['nullable', 'string', 'max:255'],
             'company_email' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'auto_recharge_enabled' => ['sometimes', 'boolean'],
         ]);
 
         // For non-super admins (Regular Admin): enforce scoping rules
@@ -228,6 +229,9 @@ class UserController extends Controller
             'company_email' => $validated['company_email'] ?? null,
             'company_website' => $validated['company_website'] ?? null,
             'notes' => $validated['notes'] ?? null,
+            // Auto-recharge is a super-admin-only privilege; never trust the field
+            // from a non-super-admin even if they POST it.
+            'auto_recharge_enabled' => $authUser->isSuperAdmin() ? $request->boolean('auto_recharge_enabled') : false,
         ]);
 
         $user->assignRole($validated['role']);
@@ -436,6 +440,7 @@ class UserController extends Controller
             'company_email' => ['nullable', 'email', 'max:255'],
             'company_website' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'auto_recharge_enabled' => ['sometimes', 'boolean'],
         ]);
 
         $authUser = auth()->user();
@@ -499,6 +504,11 @@ class UserController extends Controller
 
         if (isset($validated['balance'])) {
             $user->balance = $validated['balance'];
+        }
+
+        // Auto-recharge toggle: super admin only. Non-super-admins never modify it.
+        if ($authUser->isSuperAdmin()) {
+            $user->auto_recharge_enabled = $request->boolean('auto_recharge_enabled');
         }
 
         $user->save();

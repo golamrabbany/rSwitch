@@ -232,6 +232,16 @@
                                 <p class="form-hint">Maximum concurrent calls</p>
                                 <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                             </div>
+                            @if(auth()->user()->isSuperAdmin())
+                            <div class="form-group">
+                                <label class="inline-flex items-center gap-2 cursor-pointer">
+                                    <input type="hidden" name="auto_recharge_enabled" value="0">
+                                    <input type="checkbox" name="auto_recharge_enabled" value="1" {{ old('auto_recharge_enabled') ? 'checked' : '' }} class="rounded border-gray-300 text-indigo-600">
+                                    <span class="form-label" style="margin:0">Enable Auto Balance</span>
+                                </label>
+                                <p class="form-hint">Auto top-up ৳50–200 (bKash/Nagad) when balance drops to the low-balance threshold. Super admin only.</p>
+                            </div>
+                            @endif
                         </div>
                     </div>
                 </div>
