@@ -183,8 +183,100 @@ class OutboundCallHandler:
             await agi.set_variable("ROUTE_ACTION", "REJECT")
             return
 
+        # 2b. Resolve billing identity.
+        # Default: the originating account is the billed party.
+        # Random CLI policy: the call is presented with — and billed to the owner
+        # of — a random number from the reseller's pool. Re-pick if that owner
+        # cannot afford the call; reject only if no pool member can.
+        bill_uid = row.uid
+        bill_parent_id = row.parent_id
+        bill_balance = row.balance
+        bill_credit_limit = row.credit_limit
+        bill_billing_type = row.billing_type
+        bill_rate_group_id = row.rate_group_id
+        bill_min_balance = row.min_balance_for_calls
+        bill_whitelist = row.destination_whitelist_enabled
+        bill_daily_call_limit = row.daily_call_limit
+        bill_daily_spend_limit = row.daily_spend_limit
+        bill_sip_id = row.id
+        random_cli_num = None
+
+        if row.random_caller_id:
+            candidates = session.execute(
+                text("""
+                    SELECT s.id AS sip_id, s.caller_id_number,
+                           u.id AS uid, u.parent_id, u.balance, u.credit_limit,
+                           u.billing_type, u.rate_group_id, u.min_balance_for_calls,
+                           u.destination_whitelist_enabled,
+                           u.daily_call_limit, u.daily_spend_limit
+                    FROM sip_accounts s
+                    JOIN users u ON u.id = s.user_id
+                    WHERE (u.parent_id = :rid OR u.id = :rid)
+                      AND s.status = 'active' AND u.status = 'active'
+                      AND s.caller_id_number IS NOT NULL AND s.caller_id_number <> ''
+                      AND s.id <> :self_id
+                    ORDER BY RAND()
+                    LIMIT 50
+                """),
+                {"rid": row.parent_id, "self_id": row.id},
+            ).fetchall()
+
+            chosen = None
+            for cand in candidates:
+                # Affordability: prepaid CLI owner must cover at least 1s at the rate.
+                if cand.billing_type == "prepaid":
+                    avail = Decimal(str(cand.balance or 0)) + Decimal(str(cand.credit_limit or 0))
+                    if avail <= Decimal(str(cand.min_balance_for_calls or 0)) or avail <= Decimal("0"):
+                        continue
+                    rate_chk = session.execute(
+                        text("""
+                            SELECT rate_per_minute FROM rates
+                            WHERE rate_group_id = :rg AND status = 'active'
+                              AND effective_date <= CURDATE()
+                              AND (end_date IS NULL OR end_date > CURDATE())
+                              AND :dest LIKE CONCAT(prefix, '%')
+                            ORDER BY LENGTH(prefix) DESC LIMIT 1
+                        """),
+                        {"rg": cand.rate_group_id, "dest": extension},
+                    ).first()
+                    if rate_chk and Decimal(str(rate_chk.rate_per_minute)) > 0:
+                        rps = Decimal(str(rate_chk.rate_per_minute)) / Decimal("60")
+                        if avail < rps:
+                            continue
+                chosen = cand
+                break
+
+            if not chosen:
+                await agi.verbose("rSwitch: Random CLI — no affordable number in reseller pool")
+                await agi.set_variable("ROUTE_ACTION", "REJECT")
+                await agi.set_variable("ROUTE_REJECT_REASON", "no_balance")
+                return
+
+            bill_uid = chosen.uid
+            bill_parent_id = chosen.parent_id
+            bill_balance = chosen.balance
+            bill_credit_limit = chosen.credit_limit
+            bill_billing_type = chosen.billing_type
+            bill_rate_group_id = chosen.rate_group_id
+            bill_min_balance = chosen.min_balance_for_calls
+            bill_whitelist = chosen.destination_whitelist_enabled
+            bill_daily_call_limit = chosen.daily_call_limit
+            bill_daily_spend_limit = chosen.daily_spend_limit
+            bill_sip_id = chosen.sip_id
+            random_cli_num = chosen.caller_id_number
+            await agi.verbose(f"rSwitch: Random CLI {random_cli_num} billed to user {bill_uid}")
+            # Publish the presented CLI keyed by the Asterisk channel uniqueid so
+            # the AMI live-calls feed can show the random CLI (per policy) instead
+            # of the originating device. Short TTL — only needed during the call.
+            try:
+                _ast_uid = await agi.get_variable("CHANNEL(uniqueid)")
+                if _ast_uid:
+                    _get_redis().setex(f"rswitch:cli_map:{_ast_uid}", 7200, str(random_cli_num))
+            except Exception as _e:
+                logger.warning(f"rSwitch: cli_map publish failed: {_e}")
+
         # 3. Check destination whitelist/blacklist
-        if row.destination_whitelist_enabled:
+        if bill_whitelist:
             allowed = session.execute(
                 text("""
                     SELECT 1 FROM destination_list_entries e
@@ -193,18 +285,18 @@ class OutboundCallHandler:
                     AND :dest LIKE CONCAT(e.prefix, '%')
                     LIMIT 1
                 """),
-                {"user_id": row.uid, "dest": extension},
+                {"user_id": bill_uid, "dest": extension},
             ).first()
             if not allowed:
                 await agi.verbose("rSwitch: Destination not in whitelist")
                 await agi.set_variable("ROUTE_ACTION", "REJECT")
                 return
 
-        # 4. Rate lookup and balance check
-        if row.rate_group_id and row.billing_type == "prepaid":
-            balance = Decimal(str(row.balance or 0))
-            credit_limit = Decimal(str(row.credit_limit or 0))
-            min_balance = Decimal(str(row.min_balance_for_calls or 0))
+        # 4. Rate lookup and balance check (against the billed party)
+        if bill_rate_group_id and bill_billing_type == "prepaid":
+            balance = Decimal(str(bill_balance or 0))
+            credit_limit = Decimal(str(bill_credit_limit or 0))
+            min_balance = Decimal(str(bill_min_balance or 0))
             available = balance + credit_limit
 
             if available < min_balance:
@@ -214,11 +306,11 @@ class OutboundCallHandler:
                 return
 
         # 4a. Reseller blocked check (Redis flag — instant, no DB query)
-        if row.parent_id:
+        if bill_parent_id:
             try:
                 r = _get_redis()
-                if r.exists(f"rswitch:reseller_blocked:{row.parent_id}"):
-                    await agi.verbose(f"rSwitch: Reseller {row.parent_id} is blocked (insufficient balance)")
+                if r.exists(f"rswitch:reseller_blocked:{bill_parent_id}"):
+                    await agi.verbose(f"rSwitch: Reseller {bill_parent_id} is blocked (insufficient balance)")
                     await agi.set_variable("ROUTE_ACTION", "REJECT")
                     await agi.set_variable("ROUTE_REJECT_REASON", "reseller_blocked")
                     return
@@ -226,13 +318,13 @@ class OutboundCallHandler:
                 logger.warning(f"rSwitch: Redis check failed for reseller block: {e}")
 
         # 4b. Reseller rate_group + balance check (for clients under resellers)
-        if row.parent_id:
+        if bill_parent_id:
             reseller = session.execute(
                 text("""
                     SELECT id, role, balance, credit_limit, billing_type, rate_group_id
                     FROM users WHERE id = :pid LIMIT 1
                 """),
-                {"pid": row.parent_id},
+                {"pid": bill_parent_id},
             ).first()
 
             # Only check if parent is a reseller (not super_admin)
@@ -258,7 +350,7 @@ class OutboundCallHandler:
 
         # 4c. Credit control: calculate max call duration for prepaid users
         rate_per_minute = Decimal("0")
-        if row.rate_group_id and row.billing_type == "prepaid":
+        if bill_rate_group_id and bill_billing_type == "prepaid":
             rate_row = session.execute(
                 text("""
                     SELECT rate_per_minute FROM rates
@@ -270,13 +362,13 @@ class OutboundCallHandler:
                     ORDER BY LENGTH(prefix) DESC
                     LIMIT 1
                 """),
-                {"rg_id": row.rate_group_id, "dest": extension},
+                {"rg_id": bill_rate_group_id, "dest": extension},
             ).first()
 
             if rate_row:
                 rate_per_minute = Decimal(str(rate_row.rate_per_minute))
                 if rate_per_minute > 0:
-                    available_balance = Decimal(str(row.balance or 0)) + Decimal(str(row.credit_limit or 0))
+                    available_balance = Decimal(str(bill_balance or 0)) + Decimal(str(bill_credit_limit or 0))
                     rate_per_second = rate_per_minute / Decimal("60")
                     if rate_per_second > 0:
                         max_seconds = int(available_balance / rate_per_second)
@@ -285,8 +377,8 @@ class OutboundCallHandler:
                         await agi.set_variable("RSWITCH_MAX_DURATION", str(max_seconds))
                         await agi.verbose(f"rSwitch: Credit control max_duration={max_seconds}s")
 
-        # 5. Check daily limits
-        if row.daily_call_limit or row.daily_spend_limit:
+        # 5. Check daily limits (against the billed party)
+        if bill_daily_call_limit or bill_daily_spend_limit:
             today_start = datetime.now().replace(hour=0, minute=0, second=0)
             stats = session.execute(
                 text("""
@@ -294,15 +386,15 @@ class OutboundCallHandler:
                     FROM call_records
                     WHERE user_id = :user_id AND call_start >= :today
                 """),
-                {"user_id": row.uid, "today": today_start},
+                {"user_id": bill_uid, "today": today_start},
             ).first()
 
-            if row.daily_call_limit and stats.call_count >= row.daily_call_limit:
+            if bill_daily_call_limit and stats.call_count >= bill_daily_call_limit:
                 await agi.verbose("rSwitch: Daily call limit reached")
                 await agi.set_variable("ROUTE_ACTION", "REJECT")
                 return
 
-            if row.daily_spend_limit and Decimal(str(stats.total_spend)) >= Decimal(str(row.daily_spend_limit)):
+            if bill_daily_spend_limit and Decimal(str(stats.total_spend)) >= Decimal(str(bill_daily_spend_limit)):
                 await agi.verbose("rSwitch: Daily spend limit reached")
                 await agi.set_variable("ROUTE_ACTION", "REJECT")
                 return
@@ -569,6 +661,11 @@ class OutboundCallHandler:
         # 10. Determine CLI
         cli_name = row.caller_id_name or username
         cli_num = row.caller_id_number or caller_id
+        # Random Caller ID: present the pool number chosen during billing-identity
+        # resolution (the owner of which is the billed party). Applied before trunk
+        # cli_mode so route override/hide still wins (matches PHP policy).
+        if random_cli_num:
+            cli_num = random_cli_num
 
         if primary.cli_mode == "override" and primary.cli_override_number:
             cli_num = primary.cli_override_number
@@ -580,22 +677,29 @@ class OutboundCallHandler:
         session.execute(
             text("""
                 INSERT INTO call_records
-                (uuid, sip_account_id, user_id, reseller_id, call_flow,
-                 caller, callee, destination, outgoing_trunk_id,
+                (uuid, sip_account_id, origin_sip_account_id, user_id, reseller_id, call_flow,
+                 caller, origin_caller, callee, destination, outgoing_trunk_id,
                  src_ip, user_agent,
                  call_start, disposition, status, created_at)
                 VALUES
-                (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
-                 :caller, :callee, :destination, :trunk_id,
+                (:uuid, :sip_id, :origin_sip_id, :user_id, :reseller_id, 'sip_to_trunk',
+                 :caller, :origin_caller, :callee, :destination, :trunk_id,
                  :src_ip, :user_agent,
                  NOW(), 'ANSWERED', 'in_progress', NOW())
             """),
             {
                 "uuid": cdr_uuid,
-                "sip_id": row.id,
-                "user_id": row.uid,
-                "reseller_id": row.parent_id,
-                "caller": caller_id,
+                "sip_id": bill_sip_id,
+                # Actual originating SIP account + its caller — preserved for
+                # investigation even though billing/display use the CLI owner B.
+                "origin_sip_id": row.id,
+                "user_id": bill_uid,
+                "reseller_id": bill_parent_id,
+                # Record the presented CLI as the caller. For Random CLI this is
+                # the random pool number actually sent to the destination (so the
+                # CDR shows the random number, not the originating device).
+                "caller": cli_num if random_cli_num else caller_id,
+                "origin_caller": caller_id,
                 "callee": extension,
                 "destination": dial_number,
                 "trunk_id": primary.tid,

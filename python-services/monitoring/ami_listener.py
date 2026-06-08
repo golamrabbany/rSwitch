@@ -12,10 +12,25 @@ from datetime import datetime
 from typing import Optional
 
 from panoramisk import Manager
+import redis as redis_lib
 
 from shared.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+_cli_redis_pool = None
+
+
+def _get_cli_redis():
+    """Redis client for the per-call random-CLI map published by route_outbound,
+    so the AMI live feed can show the CLI owner (per policy) rather than the
+    originating device."""
+    global _cli_redis_pool
+    if _cli_redis_pool is None:
+        _cli_redis_pool = redis_lib.ConnectionPool.from_url(
+            get_settings().redis_url, max_connections=5
+        )
+    return redis_lib.Redis(connection_pool=_cli_redis_pool)
 
 
 class ActiveCall:
@@ -24,6 +39,7 @@ class ActiveCall:
     __slots__ = [
         "unique_id", "linked_id", "channel", "caller", "callee", "call_flow",
         "state", "started_at", "answered_at", "trunk", "sip_account", "client",
+        "cli_resolved",
     ]
 
     def __init__(self, unique_id: str, channel: str, linked_id: str = ""):
@@ -39,6 +55,7 @@ class ActiveCall:
         self.trunk = ""
         self.sip_account = ""
         self.client = ""  # User name owning the SIP account
+        self.cli_resolved = False  # random-CLI override applied (per policy)
 
     def to_dict(self) -> dict:
         # Duration only counts billable time (post-answer). Ringing time = 0.
@@ -246,6 +263,27 @@ class AMIListener:
         except Exception:
             return ""
 
+    def _enrich_cli(self, call) -> None:
+        """Random CLI policy: show the presented CLI owner (B), not the
+        originating device. route_outbound publishes the random CLI keyed by the
+        Asterisk uniqueid; if present, override SIP/Client/Caller with B. The
+        actual originating device stays preserved in call_records.origin_*."""
+        if call.call_flow != "outbound" or call.cli_resolved:
+            return
+        try:
+            r = _get_cli_redis()
+            b = r.get(f"rswitch:cli_map:{call.unique_id}") or r.get(
+                f"rswitch:cli_map:{call.linked_id}"
+            )
+            if b:
+                b_num = b.decode() if isinstance(b, (bytes, bytearray)) else str(b)
+                call.sip_account = b_num
+                call.caller = b_num
+                call.client = self._lookup_client(b_num)
+                call.cli_resolved = True
+        except Exception:
+            pass
+
     @staticmethod
     def _is_listen_spy_channel(channel: str, caller_id: str = "") -> bool:
         """True for live-listen spy legs (ChanSpy over AudioSocket). These are
@@ -289,6 +327,7 @@ class AMIListener:
 
         if not is_secondary_leg:
             self._displayed_uid[linked_id] = uid
+            self._enrich_cli(call)
             await self._broadcast({
                 "type": "call_start",
                 "call": call.to_dict(),
@@ -344,6 +383,7 @@ class AMIListener:
                     call.callee = connected
 
                 broadcast_leg = self._mirror_to_displayed(call)
+                self._enrich_cli(broadcast_leg)
                 await self._broadcast({
                     "type": "call_answered",
                     "call": broadcast_leg.to_dict(),
@@ -363,6 +403,7 @@ class AMIListener:
                 call.answered_at = time.time()
 
                 broadcast_leg = self._mirror_to_displayed(call)
+                self._enrich_cli(broadcast_leg)
                 await self._broadcast({
                     "type": "call_answered",
                     "call": broadcast_leg.to_dict(),
@@ -666,7 +707,11 @@ class AMIListener:
 
     def get_active_calls_list(self) -> list[dict]:
         """Return active calls as dicts, deduped by linked_id (one per call)."""
-        return [c.to_dict() for c in self._dedupe_legs()]
+        out = []
+        for c in self._dedupe_legs():
+            self._enrich_cli(c)
+            out.append(c.to_dict())
+        return out
 
     def get_call_legs(self, linked_id: str):
         """Return (caller_leg, callee_leg) ActiveCall objects for a call.
