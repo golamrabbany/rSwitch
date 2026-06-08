@@ -25,3 +25,6 @@ Thumbs.db
 
 # Customer-data SQL dumps — never commit (contains emails, balances, hashed passwords)
 *.sql
+
+# bulk-provision password exports (contain SIP/login secrets)
+cybernest_clients_*.csv
