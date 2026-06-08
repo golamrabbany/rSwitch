@@ -178,6 +178,7 @@ class UserController extends Controller
             'company_email' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'auto_recharge_enabled' => ['sometimes', 'boolean'],
+            'low_balance_threshold' => ['sometimes', 'numeric', 'min:0'],
         ]);
 
         // For non-super admins (Regular Admin): enforce scoping rules
@@ -230,8 +231,10 @@ class UserController extends Controller
             'company_website' => $validated['company_website'] ?? null,
             'notes' => $validated['notes'] ?? null,
             // Auto-recharge is a super-admin-only privilege; never trust the field
-            // from a non-super-admin even if they POST it.
+            // from a non-super-admin even if they POST it. low_balance_threshold is
+            // the auto-recharge trigger ("recharge when balance <= this").
             'auto_recharge_enabled' => $authUser->isSuperAdmin() ? $request->boolean('auto_recharge_enabled') : false,
+            'low_balance_threshold' => $authUser->isSuperAdmin() ? ($validated['low_balance_threshold'] ?? 5) : 5,
         ]);
 
         $user->assignRole($validated['role']);
@@ -441,6 +444,7 @@ class UserController extends Controller
             'company_website' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'auto_recharge_enabled' => ['sometimes', 'boolean'],
+            'low_balance_threshold' => ['sometimes', 'numeric', 'min:0'],
         ]);
 
         $authUser = auth()->user();
@@ -506,9 +510,12 @@ class UserController extends Controller
             $user->balance = $validated['balance'];
         }
 
-        // Auto-recharge toggle: super admin only. Non-super-admins never modify it.
+        // Auto-recharge toggle + trigger threshold: super admin only.
         if ($authUser->isSuperAdmin()) {
             $user->auto_recharge_enabled = $request->boolean('auto_recharge_enabled');
+            if ($request->filled('low_balance_threshold')) {
+                $user->low_balance_threshold = $request->input('low_balance_threshold');
+            }
         }
 
         $user->save();

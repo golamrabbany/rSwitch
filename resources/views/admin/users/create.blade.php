@@ -239,7 +239,14 @@
                                     <input type="checkbox" name="auto_recharge_enabled" value="1" {{ old('auto_recharge_enabled') ? 'checked' : '' }} class="rounded border-gray-300 text-indigo-600">
                                     <span class="form-label" style="margin:0">Enable Auto Balance</span>
                                 </label>
-                                <p class="form-hint">Auto top-up ৳50–200 (bKash/Nagad) when balance drops to the low-balance threshold. Super admin only.</p>
+                                <p class="form-hint">Super admin only. Auto top-up ৳50–200 (bKash/Nagad) when balance falls to the trigger below.</p>
+                                <label class="form-label mt-3">Auto-recharge when balance ≤</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
+                                    <input type="number" name="low_balance_threshold" value="{{ old('low_balance_threshold', '10') }}" step="0.01" min="0" class="form-input pl-8">
+                                </div>
+                                <p class="form-hint">Trigger balance — the top-up fires once the client's balance reaches this amount or lower.</p>
+                                <x-input-error :messages="$errors->get('low_balance_threshold')" class="mt-2" />
                             </div>
                             @endif
                         </div>
