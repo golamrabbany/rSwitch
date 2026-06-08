@@ -235,23 +235,24 @@
                                 <x-input-error :messages="$errors->get('max_channels')" class="mt-2" />
                             </div>
                             @if(auth()->user()->isSuperAdmin())
-                            <div class="form-group" x-data="{ autoBal: {{ old('auto_recharge_enabled', $user->auto_recharge_enabled) ? 'true' : 'false' }} }">
-                                <label class="form-label">Auto Balance</label>
-                                <label class="inline-flex items-center gap-2 cursor-pointer" style="min-height:42px">
-                                    <input type="hidden" name="auto_recharge_enabled" value="0">
-                                    <input type="checkbox" name="auto_recharge_enabled" value="1" x-model="autoBal" class="rounded border-gray-300 text-indigo-600">
-                                    <span class="text-sm text-gray-700">Enable auto top-up</span>
-                                </label>
-                                <p class="form-hint">Super admin only — auto top-up ৳50–200 (bKash/Nagad) at the trigger.</p>
-                                <div x-show="autoBal" x-transition class="mt-2" style="{{ old('auto_recharge_enabled', $user->auto_recharge_enabled) ? '' : 'display:none' }}">
-                                    <label class="form-label">Auto-recharge when balance ≤</label>
-                                    <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
-                                        <input type="number" name="low_balance_threshold" value="{{ old('low_balance_threshold', $user->low_balance_threshold) }}" step="0.01" min="0" class="form-input pl-8">
+                            <div class="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-4" x-data="{ autoBal: {{ old('auto_recharge_enabled', $user->auto_recharge_enabled) ? 'true' : 'false' }} }">
+                                <div class="flex flex-wrap items-end justify-between gap-4">
+                                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                                        <input type="hidden" name="auto_recharge_enabled" value="0">
+                                        <input type="checkbox" name="auto_recharge_enabled" value="1" x-model="autoBal" class="rounded border-gray-300 text-indigo-600">
+                                        <span class="font-semibold text-gray-800">Enable Auto Balance</span>
+                                        <span class="text-xs text-gray-500 font-medium">Super admin only</span>
+                                    </label>
+                                    <div x-show="autoBal" x-transition style="{{ old('auto_recharge_enabled', $user->auto_recharge_enabled) ? '' : 'display:none' }}">
+                                        <label class="form-label">Auto-recharge when balance ≤</label>
+                                        <div class="relative" style="width:10rem">
+                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
+                                            <input type="number" name="low_balance_threshold" value="{{ old('low_balance_threshold', $user->low_balance_threshold) }}" step="0.01" min="0" class="form-input pl-8">
+                                        </div>
+                                        <x-input-error :messages="$errors->get('low_balance_threshold')" class="mt-2" />
                                     </div>
-                                    <p class="form-hint">Top-up fires once balance reaches this amount or lower.</p>
-                                    <x-input-error :messages="$errors->get('low_balance_threshold')" class="mt-2" />
                                 </div>
+                                <p class="form-hint mt-2">Automatically top up ৳50–200 (bKash/Nagad) once the client's balance reaches the trigger. Default off.</p>
                             </div>
                             @endif
                             <div class="form-group">
