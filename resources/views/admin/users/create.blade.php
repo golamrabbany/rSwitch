@@ -234,13 +234,14 @@
                             </div>
                             @if(auth()->user()->isSuperAdmin())
                             <div class="form-group" x-data="{ autoBal: {{ old('auto_recharge_enabled') ? 'true' : 'false' }} }">
-                                <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <label class="form-label">Auto Balance</label>
+                                <label class="inline-flex items-center gap-2 cursor-pointer" style="min-height:42px">
                                     <input type="hidden" name="auto_recharge_enabled" value="0">
                                     <input type="checkbox" name="auto_recharge_enabled" value="1" x-model="autoBal" class="rounded border-gray-300 text-indigo-600">
-                                    <span class="form-label" style="margin:0">Enable Auto Balance</span>
+                                    <span class="text-sm text-gray-700">Enable auto top-up</span>
                                 </label>
-                                <p class="form-hint">Super admin only. Auto top-up ৳50–200 (bKash/Nagad) when balance hits the trigger.</p>
-                                <div x-show="autoBal" x-transition class="mt-3" style="{{ old('auto_recharge_enabled') ? '' : 'display:none' }}">
+                                <p class="form-hint">Super admin only — auto top-up ৳50–200 (bKash/Nagad) at the trigger.</p>
+                                <div x-show="autoBal" x-transition class="mt-2" style="{{ old('auto_recharge_enabled') ? '' : 'display:none' }}">
                                     <label class="form-label">Auto-recharge when balance ≤</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ currency_symbol() }}</span>
