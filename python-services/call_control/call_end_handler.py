@@ -69,10 +69,16 @@ class CallEndHandler:
         hangup_cause = await agi.get_variable("HANGUPCAUSE") or ""
 
         billsec = int(answered_str) if answered_str.isdigit() else 0
-        ring_time = int(dialed_str) if dialed_str.isdigit() else 0
-        duration = billsec + ring_time
+        # DIALEDTIME is the FULL Dial() duration (ring + talk) — it already
+        # includes ANSWEREDTIME, so the call duration IS DIALEDTIME; ring-only
+        # would be DIALEDTIME - ANSWEREDTIME. (Old bug: `billsec + DIALEDTIME`
+        # double-counted the talk time, so duration exceeded the call's own
+        # wall-clock window. Billing is unaffected — rating uses billsec.)
+        duration = int(dialed_str) if dialed_str.isdigit() else 0
         if duration == 0 and duration_str.isdigit():
             duration = int(duration_str)
+        if duration < billsec:  # a call can't be shorter than its talk time
+            duration = billsec
 
         # 3. Map to disposition
         disposition = DIALSTATUS_MAP.get(dial_status.upper(), "FAILED")
