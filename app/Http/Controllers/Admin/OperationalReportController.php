@@ -710,23 +710,31 @@ class OperationalReportController extends Controller
         $baseQuery = CallRecord::where('call_start', '>=', $dateFrom)
             ->where('call_start', '<=', $dateTo . ' 23:59:59');
 
-        // Overall Stats
+        // Overall Stats — answered = completed answered calls only (exclude
+        // duration=0 in-progress placeholders); ACD from exact billsec so it
+        // doesn't drift from the rounded minutes value.
         $totalCalls = (clone $baseQuery)->count();
-        // Answered = completed answered calls only (exclude duration=0 in-progress placeholders)
         $answeredCalls = (clone $baseQuery)->where('disposition', 'ANSWERED')->where('duration', '>', 0)->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
-        $totalMinutes = round((clone $baseQuery)->where('disposition', 'ANSWERED')->where('duration', '>', 0)->sum('duration') / 60, 1);
+        $totalBillsec = (int) (clone $baseQuery)->where('disposition', 'ANSWERED')->where('duration', '>', 0)->sum('duration');
+        $totalMinutes = round($totalBillsec / 60, 1);
+        $acd = $answeredCalls > 0 ? (int) round($totalBillsec / $answeredCalls) : 0;
+
         // Inbound Stats
         $inboundTotal = (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->count();
         $inboundAnswered = (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->where('duration', '>', 0)->count();
         $inboundAsr = $inboundTotal > 0 ? round(($inboundAnswered / $inboundTotal) * 100, 1) : 0;
-        $inboundMinutes = round((clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->where('duration', '>', 0)->sum('duration') / 60, 1);
+        $inboundBillsec = (int) (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->where('duration', '>', 0)->sum('duration');
+        $inboundMinutes = round($inboundBillsec / 60, 1);
+        $inboundAcd = $inboundAnswered > 0 ? (int) round($inboundBillsec / $inboundAnswered) : 0;
 
         // Outbound Stats
         $outboundTotal = (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->count();
         $outboundAnswered = (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->where('duration', '>', 0)->count();
         $outboundAsr = $outboundTotal > 0 ? round(($outboundAnswered / $outboundTotal) * 100, 1) : 0;
-        $outboundMinutes = round((clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
+        $outboundBillsec = (int) (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->where('duration', '>', 0)->sum('duration');
+        $outboundMinutes = round($outboundBillsec / 60, 1);
+        $outboundAcd = $outboundAnswered > 0 ? (int) round($outboundBillsec / $outboundAnswered) : 0;
         // Disposition breakdown
         $dispositions = (clone $baseQuery)
             ->selectRaw('disposition, COUNT(*) as count')
@@ -787,14 +795,17 @@ class OperationalReportController extends Controller
             'answeredCalls',
             'asr',
             'totalMinutes',
+            'acd',
             'inboundTotal',
             'inboundAnswered',
             'inboundAsr',
             'inboundMinutes',
+            'inboundAcd',
             'outboundTotal',
             'outboundAnswered',
             'outboundAsr',
             'outboundMinutes',
+            'outboundAcd',
             'dispositions',
             'hourlyStats',
             'topDestinations',

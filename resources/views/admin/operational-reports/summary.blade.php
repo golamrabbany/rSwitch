@@ -42,8 +42,9 @@
     {{-- Overall Stats --}}
     @php
         $failedCalls = $totalCalls - $answeredCalls;
-        $totalDuration = $totalMinutes * 60;
-        $acdSeconds = ($answeredCalls > 0) ? round($totalDuration / $answeredCalls) : 0;
+        // Precise ACD from the controller (exact billsec / answered), not derived
+        // from the rounded minutes value.
+        $acdSeconds = $acd ?? 0;
         $acdMin = intdiv($acdSeconds, 60);
         $acdSec = $acdSeconds % 60;
     @endphp
@@ -143,7 +144,8 @@
                         <p class="text-xs text-gray-500 mt-1">Minutes</p>
                     </div>
                 </div>
-                <div class="mt-4 pt-4 border-t border-gray-100 text-center">
+                <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                    <span class="text-sm text-gray-500">ACD <span class="font-semibold text-gray-900 tabular-nums ml-1">{{ $inboundAcd > 0 ? sprintf('%d:%02d', intdiv($inboundAcd, 60), $inboundAcd % 60) : '—' }}</span></span>
                     <a href="{{ route('admin.operational-reports.inbound', ['date_from' => $dateFrom, 'date_to' => $dateTo]) }}" class="text-sm text-blue-600 hover:text-blue-500 font-medium">
                         View Inbound Details
                         <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,7 +190,8 @@
                         <p class="text-xs text-gray-500 mt-1">Minutes</p>
                     </div>
                 </div>
-                <div class="mt-4 pt-4 border-t border-gray-100 text-center">
+                <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                    <span class="text-sm text-gray-500">ACD <span class="font-semibold text-gray-900 tabular-nums ml-1">{{ $outboundAcd > 0 ? sprintf('%d:%02d', intdiv($outboundAcd, 60), $outboundAcd % 60) : '—' }}</span></span>
                     <a href="{{ route('admin.operational-reports.outbound', ['date_from' => $dateFrom, 'date_to' => $dateTo]) }}" class="text-sm text-purple-600 hover:text-purple-500 font-medium">
                         View Outbound Details
                         <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
