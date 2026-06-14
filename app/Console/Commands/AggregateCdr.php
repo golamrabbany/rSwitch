@@ -36,7 +36,7 @@ class AggregateCdr extends Command
                 reseller_id,
                 ? AS `date`,
                 COUNT(*) AS total_calls,
-                SUM(CASE WHEN disposition = 'ANSWERED' THEN 1 ELSE 0 END) AS answered_calls,
+                SUM(CASE WHEN disposition = 'ANSWERED' AND duration > 0 THEN 1 ELSE 0 END) AS answered_calls,
                 COALESCE(SUM(CASE WHEN disposition = 'ANSWERED' THEN duration ELSE 0 END), 0) AS total_duration,
                 COALESCE(SUM(billable_duration), 0) AS total_billable,
                 COALESCE(SUM(total_cost), 0) AS total_cost,
@@ -96,7 +96,7 @@ class AggregateCdr extends Command
                 reseller_id,
                 DATE_FORMAT(call_start, '%Y-%m-%d %H:00:00') AS hour_start,
                 COUNT(*) AS total_calls,
-                SUM(CASE WHEN disposition = 'ANSWERED' THEN 1 ELSE 0 END) AS answered_calls,
+                SUM(CASE WHEN disposition = 'ANSWERED' AND duration > 0 THEN 1 ELSE 0 END) AS answered_calls,
                 SUM(CASE WHEN disposition != 'ANSWERED' THEN 1 ELSE 0 END) AS failed_calls,
                 COALESCE(SUM(CASE WHEN disposition = 'ANSWERED' THEN duration ELSE 0 END), 0) AS total_duration,
                 COALESCE(SUM(billable_duration), 0) AS total_billable,
@@ -159,7 +159,7 @@ class AggregateCdr extends Command
                 COALESCE(destination, callee) AS destination,
                 outgoing_trunk_id,
                 COUNT(*) AS total_calls,
-                SUM(CASE WHEN disposition = 'ANSWERED' THEN 1 ELSE 0 END) AS answered_calls,
+                SUM(CASE WHEN disposition = 'ANSWERED' AND duration > 0 THEN 1 ELSE 0 END) AS answered_calls,
                 COALESCE(SUM(CASE WHEN disposition = 'ANSWERED' THEN duration ELSE 0 END), 0) AS total_duration,
                 COALESCE(SUM(total_cost), 0) AS total_cost
             FROM call_records
