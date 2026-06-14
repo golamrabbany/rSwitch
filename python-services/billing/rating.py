@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from billing.trie import PrefixTrie
 from billing.exceptions import RateNotFoundException
+from billing.number_format import normalize_bd_msisdn
 from shared.models.rate import Rate
 from shared.models.rate_group import RateGroup
 from shared.models.call_record import CallRecord
@@ -430,7 +431,11 @@ class RatingService:
 
             # Use callee (original dialed number) for rate matching.
             # destination may contain MNP-transformed number which won't match rate prefixes.
-            destination = cdr.callee or cdr.destination or ""
+            # Normalize BD national format (01XXXXXXXXX) to international
+            # (8801XXXXXXXXX) so it matches 880-prefixed rate rows. Without this,
+            # national-dialed numbers match no rate → unbillable (billsec real but
+            # billable_duration=0), the client/route duration mismatch.
+            destination = normalize_bd_msisdn(cdr.callee or cdr.destination or "")
 
             # ── Transit calls (trunk_to_trunk): no user, use trunk rates ──
             if cdr.call_flow == "trunk_to_trunk":
