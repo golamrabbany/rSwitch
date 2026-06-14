@@ -249,7 +249,7 @@ class OperationalReportController extends Controller
         }
 
         $totalCalls = (clone $statsQuery)->count();
-        $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
+        $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->where('duration', '>', 0)->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
         $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
 
@@ -598,7 +598,7 @@ class OperationalReportController extends Controller
         }
 
         $totalCalls = (clone $statsQuery)->count();
-        $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
+        $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->where('duration', '>', 0)->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
         $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
 
@@ -678,7 +678,7 @@ class OperationalReportController extends Controller
 
         $statsRow = $statsQuery->selectRaw('
             COUNT(*) as total_calls,
-            SUM(disposition = "ANSWERED") as answered_calls,
+            SUM(disposition = "ANSWERED" AND duration > 0) as answered_calls,
             COALESCE(SUM(duration), 0) as total_duration,
             COALESCE(SUM(billsec), 0) as total_billsec
         ')->first();
@@ -712,18 +712,19 @@ class OperationalReportController extends Controller
 
         // Overall Stats
         $totalCalls = (clone $baseQuery)->count();
-        $answeredCalls = (clone $baseQuery)->where('disposition', 'ANSWERED')->count();
+        // Answered = completed answered calls only (exclude duration=0 in-progress placeholders)
+        $answeredCalls = (clone $baseQuery)->where('disposition', 'ANSWERED')->where('duration', '>', 0)->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
-        $totalMinutes = round((clone $baseQuery)->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
+        $totalMinutes = round((clone $baseQuery)->where('disposition', 'ANSWERED')->where('duration', '>', 0)->sum('duration') / 60, 1);
         // Inbound Stats
         $inboundTotal = (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->count();
-        $inboundAnswered = (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->count();
+        $inboundAnswered = (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->where('duration', '>', 0)->count();
         $inboundAsr = $inboundTotal > 0 ? round(($inboundAnswered / $inboundTotal) * 100, 1) : 0;
-        $inboundMinutes = round((clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
+        $inboundMinutes = round((clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->where('duration', '>', 0)->sum('duration') / 60, 1);
 
         // Outbound Stats
         $outboundTotal = (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->count();
-        $outboundAnswered = (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->count();
+        $outboundAnswered = (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->where('duration', '>', 0)->count();
         $outboundAsr = $outboundTotal > 0 ? round(($outboundAnswered / $outboundTotal) * 100, 1) : 0;
         $outboundMinutes = round((clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
         // Disposition breakdown
@@ -867,7 +868,7 @@ class OperationalReportController extends Controller
                 ->selectRaw('
                     DATE(call_start) as date,
                     COUNT(*) as total_calls,
-                    SUM(disposition = "ANSWERED") as answered_calls,
+                    SUM(disposition = "ANSWERED" AND duration > 0) as answered_calls,
                     SUM(disposition != "ANSWERED") as failed_calls,
                     COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
                 ')
@@ -972,7 +973,7 @@ class OperationalReportController extends Controller
                     YEAR(call_start) as year,
                     MONTH(call_start) as month,
                     COUNT(*) as total_calls,
-                    SUM(disposition = "ANSWERED") as answered_calls,
+                    SUM(disposition = "ANSWERED" AND duration > 0) as answered_calls,
                     SUM(disposition != "ANSWERED") as failed_calls,
                     COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
                 ')
@@ -1091,7 +1092,7 @@ class OperationalReportController extends Controller
                 ->selectRaw('
                     HOUR(call_start) as hour,
                     COUNT(*) as total_calls,
-                    SUM(disposition = "ANSWERED") as answered_calls,
+                    SUM(disposition = "ANSWERED" AND duration > 0) as answered_calls,
                     SUM(disposition != "ANSWERED") as failed_calls,
                     COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
                 ')
@@ -1181,7 +1182,7 @@ class OperationalReportController extends Controller
             ->selectRaw('
                 DATE(call_start) as date,
                 COUNT(*) as total_calls,
-                SUM(disposition = "ANSWERED") as answered_calls,
+                SUM(disposition = "ANSWERED" AND duration > 0) as answered_calls,
                 SUM(disposition != "ANSWERED") as failed_calls,
                 COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
             ')
@@ -1273,7 +1274,7 @@ class OperationalReportController extends Controller
                 YEAR(call_start) as year,
                 MONTH(call_start) as month,
                 COUNT(*) as total_calls,
-                SUM(disposition = "ANSWERED") as answered_calls,
+                SUM(disposition = "ANSWERED" AND duration > 0) as answered_calls,
                 SUM(disposition != "ANSWERED") as failed_calls,
                 COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
             ')
@@ -1368,7 +1369,7 @@ class OperationalReportController extends Controller
             ->selectRaw('
                 HOUR(call_start) as hour,
                 COUNT(*) as total_calls,
-                SUM(disposition = "ANSWERED") as answered_calls,
+                SUM(disposition = "ANSWERED" AND duration > 0) as answered_calls,
                 SUM(disposition != "ANSWERED") as failed_calls,
                 COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
             ')
