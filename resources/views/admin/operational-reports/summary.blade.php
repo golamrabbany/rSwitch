@@ -301,44 +301,4 @@
         </div>
     </div>
 
-    {{-- Top Destinations --}}
-    @if($topDestinations->count() > 0)
-        <div class="mt-6 bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div class="px-4 py-3 border-b border-gray-100">
-                <h3 class="font-semibold text-gray-900 text-sm">Top Destination Prefixes (Outbound)</h3>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-100">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Prefix</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Calls</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Minutes</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Avg Duration</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        @foreach($topDestinations as $index => $dest)
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3">
-                                    <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-600 text-xs font-bold flex items-center justify-center">{{ $index + 1 }}</span>
-                                </td>
-                                <td class="px-4 py-3 font-mono font-medium text-gray-900">{{ $dest->prefix }}xxx</td>
-                                <td class="px-4 py-3 text-gray-600">{{ number_format($dest->count) }}</td>
-                                <td class="px-4 py-3 text-gray-600">{{ number_format($dest->duration / 60, 0) }}</td>
-                                <td class="px-4 py-3 text-gray-600">
-                                    @if($dest->count > 0)
-                                        {{ gmdate('i:s', $dest->duration / $dest->count) }}
-                                    @else
-                                        -
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    @endif
 </x-admin-layout>

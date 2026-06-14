@@ -751,15 +751,6 @@ class OperationalReportController extends Controller
             ->orderBy('hour')
             ->get();
 
-        // Top destinations (outbound)
-        $topDestinations = (clone $baseQuery)
-            ->where('call_flow', 'sip_to_trunk')
-            ->selectRaw('LEFT(callee, 3) as prefix, COUNT(*) as count, SUM(billsec) as duration')
-            ->groupBy('prefix')
-            ->orderByDesc('count')
-            ->limit(10)
-            ->get();
-
         // Top SIP accounts
         $topSipAccounts = (clone $baseQuery)
             ->whereNotNull('sip_account_id')
@@ -808,7 +799,6 @@ class OperationalReportController extends Controller
             'outboundAcd',
             'dispositions',
             'hourlyStats',
-            'topDestinations',
             'topSipAccounts',
             'topTrunks'
         ));
