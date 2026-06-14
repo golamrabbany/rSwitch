@@ -35,6 +35,14 @@ from shared.database import get_session
 from shared.models.user import User
 from billing.rating import RatingService
 from billing.balance import BalanceService
+
+# Instantiate the configured Celery app (broker=redis) so that the
+# `@shared_task`s below bind to it. Without this import the current Celery app
+# is the library default (broker amqp://localhost:5672, RabbitMQ — not running),
+# so every rate_and_charge.delay() fails with [Errno 111] Connection refused and
+# silently falls back to synchronous in-process rating. Mirrors `-A celery_app`.
+import celery_app  # noqa: F401,E402
+
 from billing.tasks import rate_and_charge, rate_batch
 from monitoring.ami_listener import get_ami_listener
 import time
