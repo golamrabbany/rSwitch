@@ -204,7 +204,7 @@
     </div>
 
     {{-- Disposition Breakdown & Top Lists --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {{-- Disposition Breakdown --}}
         <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div class="px-4 py-3 border-b border-gray-100">
@@ -257,15 +257,13 @@
                 <div class="divide-y divide-gray-50">
                     @foreach($topSipAccounts as $index => $item)
                         @if($item->sipAccount)
-                            <div class="px-4 py-3 flex items-center gap-3 hover:bg-gray-50">
-                                <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center">{{ $index + 1 }}</span>
-                                <div class="flex-1 min-w-0">
-                                    <a href="{{ route('admin.sip-accounts.show', $item->sipAccount) }}" class="text-sm text-gray-900 hover:text-indigo-600 truncate block">
-                                        {{ $item->sipAccount->username }}
-                                    </a>
-                                    <span class="text-xs text-gray-400">{{ number_format($item->duration / 60, 0) }} min</span>
-                                </div>
-                                <span class="text-sm font-semibold text-gray-500">{{ $item->call_count }}</span>
+                            <div class="px-4 py-2 flex items-center gap-2.5 hover:bg-gray-50">
+                                <span class="w-5 h-5 rounded-full bg-indigo-50 text-indigo-600 text-[11px] font-semibold flex items-center justify-center shrink-0 tabular-nums">{{ $index + 1 }}</span>
+                                <a href="{{ route('admin.sip-accounts.show', $item->sipAccount) }}" class="text-sm text-gray-700 hover:text-indigo-600 truncate flex-1">{{ $item->sipAccount->username }}</a>
+                                @if($item->duration > 0)
+                                    <span class="text-xs text-gray-400 tabular-nums">{{ number_format($item->duration / 60, 0) }}m</span>
+                                @endif
+                                <span class="text-sm font-semibold text-gray-700 tabular-nums w-7 text-right">{{ number_format($item->call_count) }}</span>
                             </div>
                         @endif
                     @endforeach
@@ -286,17 +284,11 @@
                 <div class="divide-y divide-gray-50">
                     @foreach($topTrunks as $index => $item)
                         @if($item->trunk)
-                            <div class="px-4 py-3 flex items-center gap-3 hover:bg-gray-50">
-                                <span class="w-5 h-5 rounded-full {{ $item->call_flow === 'trunk_to_sip' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600' }} text-xs font-bold flex items-center justify-center">{{ $index + 1 }}</span>
-                                <div class="flex-1 min-w-0">
-                                    <a href="{{ route('admin.trunks.show', $item->trunk) }}" class="text-sm text-gray-900 hover:text-indigo-600 truncate block">
-                                        {{ $item->trunk->name }}
-                                    </a>
-                                    <span class="text-xs {{ $item->call_flow === 'trunk_to_sip' ? 'text-blue-500' : 'text-purple-500' }}">
-                                        {{ $item->call_flow === 'trunk_to_sip' ? 'Inbound' : 'Outbound' }}
-                                    </span>
-                                </div>
-                                <span class="text-sm font-semibold text-gray-500">{{ $item->call_count }}</span>
+                            <div class="px-4 py-2 flex items-center gap-2.5 hover:bg-gray-50">
+                                <span class="w-5 h-5 rounded-full {{ $item->call_flow === 'trunk_to_sip' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600' }} text-[11px] font-semibold flex items-center justify-center shrink-0 tabular-nums">{{ $index + 1 }}</span>
+                                <a href="{{ route('admin.trunks.show', $item->trunk) }}" class="text-sm text-gray-700 hover:text-indigo-600 truncate flex-1">{{ $item->trunk->name }}</a>
+                                <span class="text-[10px] font-medium tracking-wide {{ $item->call_flow === 'trunk_to_sip' ? 'text-blue-500' : 'text-purple-500' }}">{{ $item->call_flow === 'trunk_to_sip' ? 'IN' : 'OUT' }}</span>
+                                <span class="text-sm font-semibold text-gray-700 tabular-nums w-7 text-right">{{ number_format($item->call_count) }}</span>
                             </div>
                         @endif
                     @endforeach
