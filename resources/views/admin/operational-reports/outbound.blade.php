@@ -301,6 +301,9 @@
 
                                 {{-- Status --}}
                                 <td class="px-3 py-2">
+                                    @if(is_null($call->call_end))
+                                        <span class="inline-flex items-center gap-1 text-xs font-medium text-indigo-700" title="Call still in progress"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>In Progress</span>
+                                    @else
                                     @switch($call->disposition)
                                         @case('ANSWERED')
                                             <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Answered</span>
@@ -327,6 +330,7 @@
                                         @default
                                             <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>{{ $call->disposition ?? 'Unknown' }}</span>
                                     @endswitch
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

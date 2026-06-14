@@ -426,9 +426,12 @@ class OperationalReportController extends Controller
         }
 
         $totalCalls = (clone $statsQuery)->count();
-        $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
+        // "Answered" = completed answered calls only. In-progress calls are inserted
+        // with a placeholder disposition='ANSWERED' + duration=0; excluding duration=0
+        // keeps live calls out of the answered count and ACD until they hang up.
+        $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->where('duration', '>', 0)->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
-        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
+        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->where('duration', '>', 0)->sum('duration') / 60, 1);
         $trunks = Trunk::whereIn('direction', ['outgoing', 'both'])->orderBy('name')->get();
         $resellers = \App\Models\User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email']);
         $clients = \App\Models\User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email']);
