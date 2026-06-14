@@ -30,6 +30,9 @@ DOMAIN=""
 SSL_TYPE="letsencrypt"  # letsencrypt, namecheap, or skip
 ADMIN_EMAIL="admin@localhost"
 ADMIN_PASSWORD=""
+# System timezone. MySQL follows the OS (system_time_zone) and the Python engine
+# writes CDR timestamps in server-local time, so the app defaults to this zone.
+TIMEZONE="${TIMEZONE:-Asia/Dhaka}"
 
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -280,6 +283,14 @@ install_system_dependencies() {
             python3-venv \
             python3-pip \
             ffmpeg
+    fi
+
+    # Set the system timezone BEFORE MySQL is installed, so MySQL picks up the
+    # right system_time_zone (the engine stores CDR timestamps in local time and
+    # the app defaults to this zone — keep OS, MySQL and app aligned).
+    if command -v timedatectl >/dev/null 2>&1; then
+        log_info "Setting system timezone to ${TIMEZONE}..."
+        timedatectl set-timezone "${TIMEZONE}" 2>/dev/null || log_warning "Could not set timezone to ${TIMEZONE}"
     fi
 
     log_success "System dependencies installed"
