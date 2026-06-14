@@ -84,16 +84,18 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Dhaka'),
 
     /*
     |--------------------------------------------------------------------------
     | Display Timezone
     |--------------------------------------------------------------------------
     |
-    | Storage stays in UTC (matches what the Python engine writes to MySQL).
-    | This timezone is applied at read time so users see local clock values
-    | (e.g. CDR call times rendered in BST, not UTC).
+    | The Python engine writes CDR timestamps in SERVER-LOCAL time (MySQL
+    | NOW()), and the server runs in GMT+6 — so both `timezone` and this value
+    | are Asia/Dhaka, and the CallRecord display accessor becomes a no-op.
+    | Both are overridden at runtime by the `timezone` system setting
+    | (see AppServiceProvider::boot).
     |
     */
 

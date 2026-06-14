@@ -214,6 +214,32 @@
                                                 <option value="prepaid" {{ $setting->value === 'prepaid' ? 'selected' : '' }}>Prepaid</option>
                                                 <option value="postpaid" {{ $setting->value === 'postpaid' ? 'selected' : '' }}>Postpaid</option>
                                             </select>
+                                        @elseif ($setting->key === 'timezone')
+                                            @php
+                                                $tzList = [
+                                                    'Asia/Dhaka' => 'Asia/Dhaka (GMT+6) — Bangladesh',
+                                                    'UTC' => 'UTC (GMT+0)',
+                                                    'Asia/Kolkata' => 'Asia/Kolkata (GMT+5:30) — India',
+                                                    'Asia/Karachi' => 'Asia/Karachi (GMT+5) — Pakistan',
+                                                    'Asia/Kathmandu' => 'Asia/Kathmandu (GMT+5:45) — Nepal',
+                                                    'Asia/Yangon' => 'Asia/Yangon (GMT+6:30) — Myanmar',
+                                                    'Asia/Bangkok' => 'Asia/Bangkok (GMT+7) — Thailand',
+                                                    'Asia/Dubai' => 'Asia/Dubai (GMT+4) — UAE',
+                                                    'Asia/Riyadh' => 'Asia/Riyadh (GMT+3) — Saudi Arabia',
+                                                    'Europe/London' => 'Europe/London (GMT+0/+1)',
+                                                    'America/New_York' => 'America/New_York (GMT-5/-4)',
+                                                ];
+                                            @endphp
+                                            <select id="setting_{{ $setting->key }}"
+                                                    name="settings[{{ $setting->key }}]"
+                                                    class="form-input">
+                                                @foreach ($tzList as $tzVal => $tzLabel)
+                                                    <option value="{{ $tzVal }}" {{ $setting->value === $tzVal ? 'selected' : '' }}>{{ $tzLabel }}</option>
+                                                @endforeach
+                                                @if ($setting->value && !array_key_exists($setting->value, $tzList))
+                                                    <option value="{{ $setting->value }}" selected>{{ $setting->value }} (custom)</option>
+                                                @endif
+                                            </select>
                                         @elseif ($setting->type === 'boolean')
                                             <div class="flex items-center gap-3 mt-2">
                                                 <label class="relative inline-flex items-center cursor-pointer">

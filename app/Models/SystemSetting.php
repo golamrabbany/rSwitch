@@ -93,6 +93,7 @@ class SystemSetting extends Model
             ['key' => 'company_address', 'value' => '', 'type' => 'string', 'group' => 'general', 'sort_order' => 2, 'label' => 'Company Address', 'description' => 'Full company address for invoices.'],
             ['key' => 'company_email', 'value' => '', 'type' => 'string', 'group' => 'general', 'sort_order' => 3, 'label' => 'Support Email', 'description' => 'Email displayed in notifications.'],
             ['key' => 'default_currency', 'value' => 'USD', 'type' => 'string', 'group' => 'general', 'sort_order' => 4, 'label' => 'Default Currency', 'description' => 'Currency code for new users.'],
+            ['key' => 'timezone', 'value' => 'Asia/Dhaka', 'type' => 'string', 'group' => 'general', 'sort_order' => 5, 'label' => 'Timezone', 'description' => 'Application timezone — all dates/times (CDRs, reports, dashboards) are displayed in this zone. Default Asia/Dhaka (GMT+6).'],
 
             ['key' => 'default_billing_type', 'value' => 'prepaid', 'type' => 'string', 'group' => 'billing', 'sort_order' => 1, 'label' => 'Default Billing Type', 'description' => 'Default billing type for new users (prepaid or postpaid).'],
             ['key' => 'default_credit_limit', 'value' => '0', 'type' => 'float', 'group' => 'billing', 'sort_order' => 2, 'label' => 'Default Credit Limit', 'description' => 'Default credit limit for postpaid users.'],

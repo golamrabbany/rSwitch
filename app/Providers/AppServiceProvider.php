@@ -44,6 +44,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Application timezone (admin-configurable via the `timezone` system
+        // setting, default Asia/Dhaka = GMT+6). The Python engine stores CDR
+        // timestamps in SERVER-LOCAL time (MySQL NOW()), and the server runs in
+        // GMT+6 — so the app timezone MUST match, otherwise Eloquent misreads the
+        // stored values (UTC default would shift every timestamp by 6 hours and
+        // the CallRecord display accessor would double-shift to +12). Setting it
+        // here overrides config at runtime so it works even with a cached config.
+        try {
+            $tz = \App\Models\SystemSetting::get('timezone', config('app.timezone'));
+            if ($tz) {
+                config(['app.timezone' => $tz, 'app.display_timezone' => $tz]);
+                date_default_timezone_set($tz);
+            }
+        } catch (\Throwable $e) {
+            // settings table not migrated yet (e.g. during install) — keep config default
+        }
+
         // Force HTTPS when behind Cloudflare proxy (Flexible SSL)
         if (request()->header('X-Forwarded-Proto') === 'https' || config('app.env') === 'production') {
             URL::forceScheme('https');
