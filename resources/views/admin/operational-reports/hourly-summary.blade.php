@@ -155,8 +155,9 @@
 
     {{-- Stats Cards --}}
     @php
-        $totalDuration = $totals['total_duration'] ?? ($totals['minutes'] * 60);
-        $acdSeconds = ($totals['answered_calls'] > 0) ? round($totalDuration / $totals['answered_calls']) : 0;
+        // Precise ACD passed from the controller (exact billsec / answered),
+        // not derived from the rounded "minutes" value.
+        $acdSeconds = $totals['acd'] ?? 0;
         $acdMin = intdiv($acdSeconds, 60);
         $acdSec = $acdSeconds % 60;
     @endphp
@@ -219,14 +220,18 @@
 
     {{-- Data Table --}}
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-3">
             <span class="text-sm text-gray-600">
-                24-hour breakdown for
+                Hourly breakdown for
                 @if($dateFrom->isSameDay($dateTo))
                     <span class="font-semibold">{{ $dateFrom->format('M d, Y') }}</span>
                 @else
                     <span class="font-semibold">{{ $dateFrom->format('M d, Y') }}</span> &mdash; <span class="font-semibold">{{ $dateTo->format('M d, Y') }}</span>
                 @endif
+            </span>
+            <span class="inline-flex items-center gap-1 text-xs text-gray-400">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                Newest hour first
             </span>
         </div>
         <div class="overflow-x-auto">
@@ -258,8 +263,8 @@
                                     &mdash;
                                 @endif
                             </td>
-                            <td class="px-3 py-2 text-right text-gray-600">{{ $row->acd > 0 ? sprintf('%dm %ds', intdiv($row->acd, 60), $row->acd % 60) : '-' }}</td>
-                            <td class="px-3 py-2 text-right tabular-nums">{{ number_format($row->minutes, 0) }}</td>
+                            <td class="px-3 py-2 text-right text-gray-600 tabular-nums">{{ $row->acd > 0 ? sprintf('%d:%02d', intdiv($row->acd, 60), $row->acd % 60) : '—' }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums">{{ number_format($row->minutes, 1) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -273,9 +278,9 @@
                         <td class="px-3 py-2 text-right">
                             <span class="{{ $totals['asr'] >= 50 ? 'text-emerald-600' : 'text-amber-600' }}">{{ $totals['asr'] }}%</span>
                         </td>
-                        @php $totalAcd = $totals['answered_calls'] > 0 ? round($rows->sum('total_billsec') / $totals['answered_calls']) : 0; @endphp
-                        <td class="px-3 py-2 text-right text-gray-600">{{ $totalAcd > 0 ? sprintf('%dm %ds', intdiv($totalAcd, 60), $totalAcd % 60) : '-' }}</td>
-                        <td class="px-3 py-2 text-right tabular-nums">{{ number_format($totals['minutes'], 0) }}</td>
+                        @php $totalAcd = $totals['acd'] ?? 0; @endphp
+                        <td class="px-3 py-2 text-right text-gray-600 tabular-nums">{{ $totalAcd > 0 ? sprintf('%d:%02d', intdiv($totalAcd, 60), $totalAcd % 60) : '—' }}</td>
+                        <td class="px-3 py-2 text-right tabular-nums">{{ number_format($totals['minutes'], 1) }}</td>
                     </tr>
                 </tfoot>
             </table>

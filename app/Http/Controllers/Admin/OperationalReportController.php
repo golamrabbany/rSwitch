@@ -1124,19 +1124,26 @@ class OperationalReportController extends Controller
             $rows->push($row);
         }
 
-        // Totals
+        // Totals (keep exact total_billsec so ACD is precise, not derived from
+        // the rounded minutes value).
+        $totalBillsec = $rows->sum('total_billsec');
         $totals = [
             'total_calls' => $rows->sum('total_calls'),
             'answered_calls' => $rows->sum('answered_calls'),
             'failed_calls' => $rows->sum('failed_calls'),
-            'minutes' => round($rows->sum('total_billsec') / 60, 1),
+            'total_billsec' => $totalBillsec,
+            'minutes' => round($totalBillsec / 60, 1),
         ];
         $totals['asr'] = $totals['total_calls'] > 0 ? round(($totals['answered_calls'] / $totals['total_calls']) * 100, 1) : 0;
+        $totals['acd'] = $totals['answered_calls'] > 0 ? (int) round($totalBillsec / $totals['answered_calls']) : 0;
 
-        // Chart data
+        // Chart data — keep chronological (ASC) regardless of table order.
         $chartLabels = $rows->map(fn($r) => sprintf('%02d:00', $r->hour))->values();
         $chartAnswered = $rows->pluck('answered_calls')->values();
         $chartFailed = $rows->pluck('failed_calls')->values();
+
+        // Table shows newest hour first (DESC); the chart above stays chronological.
+        $rows = $rows->reverse()->values();
 
         // Filter options
         [$resellers, $trunks] = $this->getFilterOptions($authUser);
