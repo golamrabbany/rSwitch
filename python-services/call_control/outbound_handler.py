@@ -33,6 +33,7 @@ from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 from call_control.agi_protocol import AgiConnection
+from billing.number_format import normalize_bd_msisdn
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,54 @@ class OutboundCallHandler:
             except Exception as e:
                 logger.debug(f"mark_call_rejected failed: {e}")
 
+    async def _reject(self, agi: AgiConnection, session: Session, reason: str, *,
+                      caller: str = "", callee: str = "", src_ip: str = "",
+                      user_agent: str = "", sip_id=None, user_id=None,
+                      reseller_id=None) -> None:
+        """Reject the call AND record it as a FAILED CDR so the rejection is
+        auditable (hangup_cause = reason, e.g. NO_BALANCE, CLIENT_NO_RATE).
+
+        Without this, pre-dial rejections leave no CDR and you cannot answer
+        "why did this call fail?". Never raises — a logging failure must not
+        change the admission decision. Skips the CDR when there is no user to
+        attribute it to (e.g. unknown SIP account)."""
+        if user_id is not None:
+            try:
+                session.execute(
+                    text("""
+                        INSERT INTO call_records
+                        (uuid, sip_account_id, user_id, reseller_id, call_flow,
+                         caller, callee, destination, src_ip, user_agent,
+                         call_start, call_end, duration, billsec,
+                         disposition, hangup_cause, status, created_at)
+                        VALUES
+                        (:uuid, :sip_id, :user_id, :reseller_id, 'sip_to_trunk',
+                         :caller, :callee, :callee, :src_ip, :user_agent,
+                         NOW(), NOW(), 0, 0,
+                         'FAILED', :reason, 'unbillable', NOW())
+                    """),
+                    {
+                        "uuid": str(uuid.uuid4()),
+                        "sip_id": sip_id,
+                        "user_id": user_id,
+                        "reseller_id": reseller_id,
+                        "caller": (caller or "")[:40],
+                        "callee": (callee or "")[:40],
+                        "src_ip": (src_ip or "")[:45],
+                        "user_agent": (user_agent or "")[:255],
+                        "reason": reason,
+                    },
+                )
+                session.commit()
+            except Exception as e:
+                logger.error(f"_reject: CDR insert failed ({reason}): {e}")
+                try:
+                    session.rollback()
+                except Exception:
+                    pass
+        await agi.set_variable("ROUTE_ACTION", "REJECT")
+        await agi.set_variable("ROUTE_REJECT_REASON", reason)
+
     async def _process(self, agi: AgiConnection, session: Session) -> None:
         channel = agi.get_channel()
         extension = agi.get_extension()
@@ -180,7 +229,10 @@ class OutboundCallHandler:
 
         if row.sip_status != "active" or row.user_status != "active":
             await agi.verbose(f"rSwitch: Account/user suspended")
-            await agi.set_variable("ROUTE_ACTION", "REJECT")
+            await self._reject(agi, session, "ACCOUNT_SUSPENDED",
+                               caller=caller_id, callee=extension, src_ip=src_ip,
+                               user_agent=user_agent, sip_id=row.id,
+                               user_id=row.uid, reseller_id=row.parent_id)
             return
 
         # 2b. Resolve billing identity.
@@ -248,8 +300,10 @@ class OutboundCallHandler:
 
             if not chosen:
                 await agi.verbose("rSwitch: Random CLI — no affordable number in reseller pool")
-                await agi.set_variable("ROUTE_ACTION", "REJECT")
-                await agi.set_variable("ROUTE_REJECT_REASON", "no_balance")
+                await self._reject(agi, session, "NO_BALANCE",
+                                   caller=caller_id, callee=extension, src_ip=src_ip,
+                                   user_agent=user_agent, sip_id=row.id,
+                                   user_id=row.uid, reseller_id=row.parent_id)
                 return
 
             bill_uid = chosen.uid
@@ -289,7 +343,10 @@ class OutboundCallHandler:
             ).first()
             if not allowed:
                 await agi.verbose("rSwitch: Destination not in whitelist")
-                await agi.set_variable("ROUTE_ACTION", "REJECT")
+                await self._reject(agi, session, "DEST_NOT_WHITELISTED",
+                                   caller=caller_id, callee=extension, src_ip=src_ip,
+                                   user_agent=user_agent, sip_id=row.id,
+                                   user_id=row.uid, reseller_id=row.parent_id)
                 return
 
         # 4. Rate lookup and balance check (against the billed party)
@@ -301,8 +358,10 @@ class OutboundCallHandler:
 
             if available < min_balance:
                 await agi.verbose(f"rSwitch: Insufficient balance ({available})")
-                await agi.set_variable("ROUTE_ACTION", "REJECT")
-                await agi.set_variable("ROUTE_REJECT_REASON", "no_balance")
+                await self._reject(agi, session, "NO_BALANCE",
+                                   caller=caller_id, callee=extension, src_ip=src_ip,
+                                   user_agent=user_agent, sip_id=row.id,
+                                   user_id=row.uid, reseller_id=row.parent_id)
                 return
 
         # 4a. Reseller blocked check (Redis flag — instant, no DB query)
@@ -311,8 +370,10 @@ class OutboundCallHandler:
                 r = _get_redis()
                 if r.exists(f"rswitch:reseller_blocked:{bill_parent_id}"):
                     await agi.verbose(f"rSwitch: Reseller {bill_parent_id} is blocked (insufficient balance)")
-                    await agi.set_variable("ROUTE_ACTION", "REJECT")
-                    await agi.set_variable("ROUTE_REJECT_REASON", "reseller_blocked")
+                    await self._reject(agi, session, "RESELLER_BLOCKED",
+                                       caller=caller_id, callee=extension, src_ip=src_ip,
+                                       user_agent=user_agent, sip_id=row.id,
+                                       user_id=row.uid, reseller_id=row.parent_id)
                     return
             except Exception as e:
                 logger.warning(f"rSwitch: Redis check failed for reseller block: {e}")
@@ -329,11 +390,33 @@ class OutboundCallHandler:
 
             # Only check if parent is a reseller (not super_admin)
             if reseller and reseller.role == 'reseller':
+                _rj = dict(caller=caller_id, callee=extension, src_ip=src_ip,
+                           user_agent=user_agent, sip_id=row.id, user_id=row.uid,
+                           reseller_id=row.parent_id)
                 # CHECK 1: Reseller MUST have a rate_group — billing is incomplete without it
                 if not reseller.rate_group_id:
                     await agi.verbose(f"rSwitch: Reseller {reseller.id} has no rate_group — call blocked")
-                    await agi.set_variable("ROUTE_ACTION", "REJECT")
-                    await agi.set_variable("ROUTE_REJECT_REASON", "reseller_no_rate")
+                    await self._reject(agi, session, "RESELLER_NO_RATEGROUP", **_rj)
+                    return
+
+                # CHECK 1b: Reseller must have a MATCHING rate for the destination —
+                # else the platform can't bill the reseller (revenue leak). Reject.
+                # Only the TRUNK rate is allowed to be missing (-> trunk_cost 0).
+                # Uses the same normalized destination as rating (01... -> 880...).
+                reseller_rate = session.execute(
+                    text("""
+                        SELECT 1 FROM rates
+                        WHERE rate_group_id = :rg AND status = 'active'
+                        AND effective_date <= CURDATE()
+                        AND (end_date IS NULL OR end_date > CURDATE())
+                        AND :dest LIKE CONCAT(prefix, '%')
+                        LIMIT 1
+                    """),
+                    {"rg": reseller.rate_group_id, "dest": normalize_bd_msisdn(extension)},
+                ).first()
+                if not reseller_rate:
+                    await agi.verbose(f"rSwitch: No reseller rate for {extension} — call blocked")
+                    await self._reject(agi, session, "RESELLER_NO_RATE", **_rj)
                     return
 
                 # CHECK 2: Reseller must have sufficient balance (prepaid only)
@@ -344,14 +427,19 @@ class OutboundCallHandler:
 
                     if reseller_available <= Decimal("0"):
                         await agi.verbose(f"rSwitch: Reseller insufficient balance ({reseller_available})")
-                        await agi.set_variable("ROUTE_ACTION", "REJECT")
-                        await agi.set_variable("ROUTE_REJECT_REASON", "reseller_no_balance")
+                        await self._reject(agi, session, "RESELLER_NO_BALANCE", **_rj)
                         return
 
-        # 4c. Credit control: calculate max call duration for prepaid users
-        rate_per_minute = Decimal("0")
-        if bill_rate_group_id and bill_billing_type == "prepaid":
-            rate_row = session.execute(
+        # 4b2. Client rate validation (admission gate). The call MUST be billable
+        # to the client. Uses the SAME normalized destination as rating
+        # (callee 01XXXXXXXXX -> 8801XXXXXXXXX), so it rejects exactly the calls
+        # rating would mark unbillable — no silent free calls. A missing TRUNK
+        # rate is allowed (trunk_cost just becomes 0, client+reseller still
+        # billed from their own rates); only the client/reseller rates gate.
+        billing_dest = normalize_bd_msisdn(extension)
+        client_rate_row = None
+        if bill_rate_group_id:
+            client_rate_row = session.execute(
                 text("""
                     SELECT rate_per_minute FROM rates
                     WHERE rate_group_id = :rg_id
@@ -362,20 +450,29 @@ class OutboundCallHandler:
                     ORDER BY LENGTH(prefix) DESC
                     LIMIT 1
                 """),
-                {"rg_id": bill_rate_group_id, "dest": extension},
+                {"rg_id": bill_rate_group_id, "dest": billing_dest},
             ).first()
 
-            if rate_row:
-                rate_per_minute = Decimal(str(rate_row.rate_per_minute))
-                if rate_per_minute > 0:
-                    available_balance = Decimal(str(bill_balance or 0)) + Decimal(str(bill_credit_limit or 0))
-                    rate_per_second = rate_per_minute / Decimal("60")
-                    if rate_per_second > 0:
-                        max_seconds = int(available_balance / rate_per_second)
-                        # Cap at 4 hours max, minimum 60 seconds
-                        max_seconds = max(60, min(max_seconds, 14400))
-                        await agi.set_variable("RSWITCH_MAX_DURATION", str(max_seconds))
-                        await agi.verbose(f"rSwitch: Credit control max_duration={max_seconds}s")
+        if not client_rate_row:
+            await agi.verbose(f"rSwitch: No client rate for {billing_dest} — call blocked")
+            await self._reject(agi, session, "CLIENT_NO_RATE",
+                               caller=caller_id, callee=extension, src_ip=src_ip,
+                               user_agent=user_agent, sip_id=row.id,
+                               user_id=row.uid, reseller_id=row.parent_id)
+            return
+
+        rate_per_minute = Decimal(str(client_rate_row.rate_per_minute))
+
+        # 4c. Credit control: cap call duration for prepaid users by affordable seconds.
+        if bill_billing_type == "prepaid" and rate_per_minute > 0:
+            available_balance = Decimal(str(bill_balance or 0)) + Decimal(str(bill_credit_limit or 0))
+            rate_per_second = rate_per_minute / Decimal("60")
+            if rate_per_second > 0:
+                max_seconds = int(available_balance / rate_per_second)
+                # Cap at 4 hours max, minimum 60 seconds
+                max_seconds = max(60, min(max_seconds, 14400))
+                await agi.set_variable("RSWITCH_MAX_DURATION", str(max_seconds))
+                await agi.verbose(f"rSwitch: Credit control max_duration={max_seconds}s")
 
         # 5. Check daily limits (against the billed party)
         if bill_daily_call_limit or bill_daily_spend_limit:
@@ -389,14 +486,17 @@ class OutboundCallHandler:
                 {"user_id": bill_uid, "today": today_start},
             ).first()
 
+            _rjd = dict(caller=caller_id, callee=extension, src_ip=src_ip,
+                        user_agent=user_agent, sip_id=row.id, user_id=row.uid,
+                        reseller_id=row.parent_id)
             if bill_daily_call_limit and stats.call_count >= bill_daily_call_limit:
                 await agi.verbose("rSwitch: Daily call limit reached")
-                await agi.set_variable("ROUTE_ACTION", "REJECT")
+                await self._reject(agi, session, "DAILY_CALL_LIMIT", **_rjd)
                 return
 
             if bill_daily_spend_limit and Decimal(str(stats.total_spend)) >= Decimal(str(bill_daily_spend_limit)):
                 await agi.verbose("rSwitch: Daily spend limit reached")
-                await agi.set_variable("ROUTE_ACTION", "REJECT")
+                await self._reject(agi, session, "DAILY_SPEND_LIMIT", **_rjd)
                 return
 
         # 6. Check for internal SIP-to-SIP call
@@ -412,7 +512,10 @@ class OutboundCallHandler:
         if internal_target:
             if not row.allow_p2p:
                 await agi.verbose("rSwitch: P2P calls not allowed for this account")
-                await agi.set_variable("ROUTE_ACTION", "REJECT")
+                await self._reject(agi, session, "P2P_NOT_ALLOWED",
+                                   caller=caller_id, callee=extension, src_ip=src_ip,
+                                   user_agent=user_agent, sip_id=row.id,
+                                   user_id=row.uid, reseller_id=row.parent_id)
                 return
 
             # Check if callee is registered (has contact in ps_contacts)
