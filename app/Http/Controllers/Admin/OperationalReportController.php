@@ -43,7 +43,7 @@ class OperationalReportController extends Controller
                 SUM(call_flow = "trunk_to_sip") as inbound,
                 SUM(call_flow = "sip_to_trunk") as outbound,
                 SUM(disposition = "ANSWERED") as answered,
-                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as duration
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as duration
             ')->first();
 
         $todayInbound = (int) $todayStats->inbound;
@@ -251,7 +251,7 @@ class OperationalReportController extends Controller
         $totalCalls = (clone $statsQuery)->count();
         $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
-        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
+        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
 
         $trunks = Trunk::whereIn('direction', ['incoming', 'both'])->orderBy('name')->get();
         $resellers = User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email']);
@@ -428,7 +428,7 @@ class OperationalReportController extends Controller
         $totalCalls = (clone $statsQuery)->count();
         $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
-        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
+        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
         $trunks = Trunk::whereIn('direction', ['outgoing', 'both'])->orderBy('name')->get();
         $resellers = \App\Models\User::where('role', 'reseller')->orderBy('name')->get(['id', 'name', 'email']);
         $clients = \App\Models\User::where('role', 'client')->orderBy('name')->get(['id', 'name', 'email']);
@@ -597,7 +597,7 @@ class OperationalReportController extends Controller
         $totalCalls = (clone $statsQuery)->count();
         $answeredCalls = (clone $statsQuery)->where('disposition', 'ANSWERED')->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
-        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
+        $totalMinutes = round((clone $statsQuery)->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
 
         $incomingTrunks = Trunk::whereIn('direction', ['incoming', 'both'])->orderBy('name')->get();
         $outgoingTrunks = Trunk::whereIn('direction', ['outgoing', 'both'])->orderBy('name')->get();
@@ -711,18 +711,18 @@ class OperationalReportController extends Controller
         $totalCalls = (clone $baseQuery)->count();
         $answeredCalls = (clone $baseQuery)->where('disposition', 'ANSWERED')->count();
         $asr = $totalCalls > 0 ? round(($answeredCalls / $totalCalls) * 100, 1) : 0;
-        $totalMinutes = round((clone $baseQuery)->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
+        $totalMinutes = round((clone $baseQuery)->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
         // Inbound Stats
         $inboundTotal = (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->count();
         $inboundAnswered = (clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->count();
         $inboundAsr = $inboundTotal > 0 ? round(($inboundAnswered / $inboundTotal) * 100, 1) : 0;
-        $inboundMinutes = round((clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
+        $inboundMinutes = round((clone $baseQuery)->where('call_flow', 'trunk_to_sip')->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
 
         // Outbound Stats
         $outboundTotal = (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->count();
         $outboundAnswered = (clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->count();
         $outboundAsr = $outboundTotal > 0 ? round(($outboundAnswered / $outboundTotal) * 100, 1) : 0;
-        $outboundMinutes = round((clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->sum('billsec') / 60, 1);
+        $outboundMinutes = round((clone $baseQuery)->where('call_flow', 'sip_to_trunk')->where('disposition', 'ANSWERED')->sum('duration') / 60, 1);
         // Disposition breakdown
         $dispositions = (clone $baseQuery)
             ->selectRaw('disposition, COUNT(*) as count')
@@ -866,7 +866,7 @@ class OperationalReportController extends Controller
                     COUNT(*) as total_calls,
                     SUM(disposition = "ANSWERED") as answered_calls,
                     SUM(disposition != "ANSWERED") as failed_calls,
-                    COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+                    COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
                 ')
                 ->groupBy('date')
                 ->orderBy('date')
@@ -971,7 +971,7 @@ class OperationalReportController extends Controller
                     COUNT(*) as total_calls,
                     SUM(disposition = "ANSWERED") as answered_calls,
                     SUM(disposition != "ANSWERED") as failed_calls,
-                    COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+                    COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
                 ')
                 ->groupByRaw('YEAR(call_start), MONTH(call_start)')
                 ->orderByRaw('YEAR(call_start), MONTH(call_start)')
@@ -1090,7 +1090,7 @@ class OperationalReportController extends Controller
                     COUNT(*) as total_calls,
                     SUM(disposition = "ANSWERED") as answered_calls,
                     SUM(disposition != "ANSWERED") as failed_calls,
-                    COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+                    COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
                 ')
                 ->groupByRaw('HOUR(call_start)')
                 ->orderByRaw('HOUR(call_start)')
@@ -1180,7 +1180,7 @@ class OperationalReportController extends Controller
                 COUNT(*) as total_calls,
                 SUM(disposition = "ANSWERED") as answered_calls,
                 SUM(disposition != "ANSWERED") as failed_calls,
-                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
             ')
             ->groupBy('date')
             ->orderBy('date')
@@ -1272,7 +1272,7 @@ class OperationalReportController extends Controller
                 COUNT(*) as total_calls,
                 SUM(disposition = "ANSWERED") as answered_calls,
                 SUM(disposition != "ANSWERED") as failed_calls,
-                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
             ')
             ->groupByRaw('YEAR(call_start), MONTH(call_start)')
             ->orderByRaw('YEAR(call_start), MONTH(call_start)')
@@ -1367,7 +1367,7 @@ class OperationalReportController extends Controller
                 COUNT(*) as total_calls,
                 SUM(disposition = "ANSWERED") as answered_calls,
                 SUM(disposition != "ANSWERED") as failed_calls,
-                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN billsec ELSE 0 END), 0) as total_billsec
+                COALESCE(SUM(CASE WHEN disposition = "ANSWERED" THEN duration ELSE 0 END), 0) as total_billsec
             ')
             ->groupByRaw('HOUR(call_start)')
             ->orderByRaw('HOUR(call_start)')
