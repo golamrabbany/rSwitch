@@ -326,9 +326,10 @@ class RatingService:
             cdr.total_cost = Decimal("0.0000")
             cdr.billable_duration = cdr.billsec
 
-        # Calculate cost (outgoing trunk rate)
+        # Calculate cost (outgoing trunk rate) — carrier bills full duration
+        # (ring/PDD + talk), so use cdr.duration to match the carrier invoice.
         if outgoing_rate:
-            cost = self.calculate_cost(cdr.billsec, outgoing_rate)
+            cost = self.calculate_cost(cdr.duration, outgoing_rate)
             cdr.trunk_cost = cost.total_cost
         else:
             cdr.trunk_cost = Decimal("0.0000")
@@ -513,9 +514,12 @@ class RatingService:
                 )
             )
 
-            # Calculate trunk cost (what platform pays trunk provider)
+            # Calculate trunk cost (what platform pays the carrier/trunk provider).
+            # The carrier bills on the FULL call window (ring/PDD + talk), so use
+            # cdr.duration here to match the carrier invoice. Client (sell) and
+            # reseller (cost) charges stay on billsec (talk time) above.
             trunk_cost = (
-                self.calculate_cost(cdr.billsec, rates.trunk)
+                self.calculate_cost(cdr.duration, rates.trunk)
                 if rates.trunk
                 else CostResult(
                     billable_duration=sell.billable_duration,
