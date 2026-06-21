@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from billing.trie import PrefixTrie
 from billing.exceptions import RateNotFoundException
 from billing.number_format import normalize_bd_msisdn
+from billing.cost_basis import trunk_billable_seconds
 from shared.models.rate import Rate
 from shared.models.rate_group import RateGroup
 from shared.models.call_record import CallRecord
@@ -326,10 +327,13 @@ class RatingService:
             cdr.total_cost = Decimal("0.0000")
             cdr.billable_duration = cdr.billsec
 
-        # Calculate cost (outgoing trunk rate) — carrier bills full duration
-        # (ring/PDD + talk), so use cdr.duration to match the carrier invoice.
+        # Calculate cost (outgoing trunk rate). The carrier invoices answered
+        # talk time (billsec), not the full ring+talk window — see
+        # billing.cost_basis.trunk_billable_seconds.
         if outgoing_rate:
-            cost = self.calculate_cost(cdr.duration, outgoing_rate)
+            cost = self.calculate_cost(
+                trunk_billable_seconds(cdr.billsec, cdr.duration), outgoing_rate
+            )
             cdr.trunk_cost = cost.total_cost
         else:
             cdr.trunk_cost = Decimal("0.0000")
@@ -515,11 +519,13 @@ class RatingService:
             )
 
             # Calculate trunk cost (what platform pays the carrier/trunk provider).
-            # The carrier bills on the FULL call window (ring/PDD + talk), so use
-            # cdr.duration here to match the carrier invoice. Client (sell) and
-            # reseller (cost) charges stay on billsec (talk time) above.
+            # The carrier invoices answered talk time (billsec), not ring+talk —
+            # see billing.cost_basis.trunk_billable_seconds. Client (sell) and
+            # reseller (cost) charges also stay on billsec above.
             trunk_cost = (
-                self.calculate_cost(cdr.duration, rates.trunk)
+                self.calculate_cost(
+                    trunk_billable_seconds(cdr.billsec, cdr.duration), rates.trunk
+                )
                 if rates.trunk
                 else CostResult(
                     billable_duration=sell.billable_duration,
