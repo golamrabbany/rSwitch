@@ -8,7 +8,6 @@ Key improvements over PHP version:
 """
 
 import json
-import math
 import logging
 import re
 import time
@@ -24,7 +23,7 @@ from sqlalchemy.orm import Session
 from billing.trie import PrefixTrie
 from billing.exceptions import RateNotFoundException
 from billing.number_format import normalize_bd_msisdn
-from billing.cost_basis import trunk_billable_seconds
+from billing.cost_basis import billable_seconds, trunk_billable_seconds
 from shared.models.rate import Rate
 from shared.models.rate_group import RateGroup
 from shared.models.call_record import CallRecord
@@ -376,16 +375,12 @@ class RatingService:
 
         Formula: (billable_duration / 60) * rate_per_minute + connection_fee
         """
-        min_duration = int(rate.min_duration or 0)
-        billing_increment = max(1, int(rate.billing_increment or 1))
-
-        # Apply minimum duration
-        effective_duration = max(billsec, min_duration)
-
-        # Round up to billing increment
-        billable_duration = math.ceil(
-            effective_duration / billing_increment
-        ) * billing_increment
+        # Chargeable seconds under the rate's X/Y increment policy
+        # (min_duration / billing_increment), applied to billsec. Single source
+        # of truth in billing.cost_basis.billable_seconds.
+        billable_duration = billable_seconds(
+            billsec, rate.min_duration, rate.billing_increment
+        )
 
         # Calculate cost with Decimal precision (matches PHP bcmath 4-digit scale)
         duration_minutes = Decimal(str(billable_duration)) / Decimal("60")
