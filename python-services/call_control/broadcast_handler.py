@@ -7,8 +7,9 @@ import json
 import uuid
 import logging
 from datetime import datetime
-from decimal import Decimal
 from sqlalchemy import text
+
+from broadcast.formatting import build_broadcast_cdr_params
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ class BroadcastCallHandler:
             callee = await agi.get_variable("BROADCAST_CALLEE") or ""
             user_id = await agi.get_variable("RSWITCH_USER_ID")
             sip_account_id = await agi.get_variable("RSWITCH_SIP_ACCOUNT_ID")
+            outgoing_trunk_id = await agi.get_variable("RSWITCH_OUTGOING_TRUNK_ID")
+            reseller_id = await agi.get_variable("RSWITCH_RESELLER_ID")
             caller_id = await agi.get_variable("CALLERID(num)") or ""
 
             if not broadcast_id or not number_id:
@@ -36,8 +39,12 @@ class BroadcastCallHandler:
             number_id = int(number_id)
             user_id = int(user_id) if user_id else 0
             sip_account_id = int(sip_account_id) if sip_account_id else None
+            outgoing_trunk_id = int(outgoing_trunk_id) if outgoing_trunk_id else None
+            reseller_id = int(reseller_id) if reseller_id else None
 
-            call_start = datetime.utcnow()
+            # Engine stores LOCAL time (GMT+6); the rest of the system uses
+            # NOW(). Never datetime.utcnow() here or broadcast CDRs land 6h off.
+            call_start = datetime.now()
             survey_response = None
 
             # --- Play voice file ---
@@ -101,57 +108,49 @@ class BroadcastCallHandler:
             except Exception as e:
                 logger.debug(f"Broadcast playback interrupted (callee hangup): {e}")
 
-            call_end = datetime.utcnow()
+            call_end = datetime.now()
             duration = max(int((call_end - call_start).total_seconds()), 1)
 
-            # --- Rate lookup: broadcast → fallback regular ---
-            rate = self._lookup_rate(session, user_id, callee, "broadcast")
-            if not rate:
-                rate = self._lookup_rate(session, user_id, callee, "regular")
-
-            rate_per_minute = float(rate.rate_per_minute) if rate else 0
-            connection_fee = float(rate.connection_fee) if rate else 0
-            cost = round((duration / 60) * rate_per_minute + connection_fee, 4)
-
-            # --- Deduct balance ---
-            if cost > 0:
-                session.execute(text(
-                    "UPDATE users SET balance = balance - :cost WHERE id = :uid"
-                ), {"cost": cost, "uid": user_id})
-
-            # --- Create CDR ---
+            # --- Create the CDR as a billable, UNRATED trunk call ---
+            # No inline cost: the shared rater (rate_call) fills total_cost /
+            # reseller_cost / trunk_cost / matched_prefix, applying BD-MSISDN
+            # normalize, the increment policy, dual client+reseller billing,
+            # and trunk cost — so broadcast billing can never drift from
+            # regular outbound billing.
             cdr_uuid = str(uuid.uuid4())
+            params = build_broadcast_cdr_params(
+                uuid=cdr_uuid, user_id=user_id, sip_account_id=sip_account_id,
+                reseller_id=reseller_id, outgoing_trunk_id=outgoing_trunk_id,
+                broadcast_id=broadcast_id, caller=caller_id, callee=callee,
+                caller_id=caller_id, call_start=call_start, call_end=call_end,
+                duration=duration,
+            )
             session.execute(text("""
                 INSERT INTO call_records (
-                    uuid, user_id, sip_account_id, call_type, broadcast_id,
-                    call_flow, caller, callee, caller_id,
+                    uuid, user_id, sip_account_id, reseller_id, outgoing_trunk_id,
+                    call_type, broadcast_id, call_flow,
+                    caller, callee, caller_id,
                     call_start, call_end, duration, billsec, billable_duration,
                     rate_per_minute, connection_fee, total_cost,
-                    disposition, status, destination, matched_prefix,
-                    rate_group_id, created_at
+                    disposition, status, created_at
                 ) VALUES (
-                    :uuid, :uid, :sid, 'broadcast', :bid,
-                    'sip_to_trunk', :caller, :callee, :caller_id,
-                    :start, :end, :dur, :dur, :dur,
-                    :rpm, :cfee, :cost,
-                    'ANSWERED', 'completed', :dest, :prefix,
-                    :rgid, NOW()
+                    :uuid, :user_id, :sip_account_id, :reseller_id, :outgoing_trunk_id,
+                    :call_type, :broadcast_id, :call_flow,
+                    :caller, :callee, :caller_id,
+                    :call_start, :call_end, :duration, :billsec, :billsec,
+                    0, 0, 0,
+                    :disposition, :status, NOW()
                 )
-            """), {
-                "uuid": cdr_uuid, "uid": user_id, "sid": sip_account_id,
-                "bid": broadcast_id, "caller": caller_id, "callee": callee,
-                "caller_id": caller_id, "start": call_start, "end": call_end,
-                "dur": duration, "rpm": rate_per_minute, "cfee": connection_fee,
-                "cost": cost,
-                "dest": rate.destination if rate else "",
-                "prefix": rate.prefix if rate else "",
-                "rgid": int(rate.rate_group_id) if rate else None,
-            })
+            """), params)
 
             cdr_row = session.execute(text("SELECT LAST_INSERT_ID() as id")).first()
             cdr_id = cdr_row.id if cdr_row else None
+            session.commit()
 
-            # --- Update broadcast_numbers ---
+            # --- Rate + charge through the SAME pipeline as regular calls ---
+            cost = self._rate_and_charge(cdr_id)
+
+            # --- Update broadcast_numbers with the rated cost ---
             session.execute(text("""
                 UPDATE broadcast_numbers SET
                     status = 'completed', duration = :dur, cost = :cost,
@@ -186,22 +185,40 @@ class BroadcastCallHandler:
             except Exception:
                 pass
 
-    def _lookup_rate(self, session, user_id, destination, rate_type):
-        """Longest prefix match with rate_type."""
-        user = session.execute(text(
-            "SELECT rate_group_id FROM users WHERE id = :id"
-        ), {"id": user_id}).first()
+    def _rate_and_charge(self, cdr_id):
+        """Rate + charge the broadcast CDR via the shared billing pipeline.
 
-        if not user or not user.rate_group_id:
-            return None
+        Same path as a regular outbound call: rate_call (BD-MSISDN normalize,
+        increment policy, dual client/reseller + trunk cost) then charge_call
+        (atomic dual debit, prepaid check, reseller auto-block, idempotent).
+        Returns the rated client cost for the broadcast counters.
 
-        return session.execute(text("""
-            SELECT * FROM rates
-            WHERE rate_group_id = :rg AND :dest LIKE CONCAT(prefix, '%')
-            AND status = 'active' AND rate_type = :rt
-            ORDER BY LENGTH(prefix) DESC LIMIT 1
-        """), {
-            "rg": user.rate_group_id,
-            "dest": destination,
-            "rt": rate_type,
-        }).first()
+        On any failure the CDR is left status='in_progress', so the billing
+        safety net (billing.tasks.rate_batch, every 2 min) still bills it; we
+        return 0 for the live counter in that case.
+        """
+        if not cdr_id:
+            return 0
+        try:
+            import redis as redis_lib
+            from billing.rating import RatingService
+            from billing.balance import BalanceService
+            from shared.config import get_settings
+            from shared.database import get_session
+
+            r = redis_lib.from_url(get_settings().redis_url)
+            result = RatingService(r).rate_call(cdr_id)
+            if result.get("status") == "rated":
+                BalanceService().charge_call(cdr_id)
+
+            with get_session() as s:
+                row = s.execute(text(
+                    "SELECT total_cost FROM call_records WHERE id = :id"
+                ), {"id": cdr_id}).first()
+            return float(row.total_cost) if row and row.total_cost is not None else 0
+        except Exception as e:
+            logger.error(
+                f"Broadcast rate/charge failed [cdr={cdr_id}]: {e} "
+                f"— left for rate_batch safety net", exc_info=True
+            )
+            return 0

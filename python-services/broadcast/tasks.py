@@ -2,7 +2,6 @@
 Celery tasks for voice broadcast execution.
 Uses Asterisk .call files for zero-risk automated dialing.
 """
-import json
 import os
 import time
 import logging
@@ -10,6 +9,7 @@ import redis
 from sqlalchemy import text
 from celery_app import app as celery_app
 from shared.database import get_session
+from broadcast.formatting import build_call_file_content
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,14 @@ def process_broadcast(broadcast_id):
         session.commit()
 
         logger.info(f"Starting broadcast {broadcast_id}: {broadcast.name}")
+
+        # Resolve the client's reseller (parent) once. Captured into every CDR
+        # so the shared rater applies dual client+reseller billing. The rater
+        # itself ignores a super_admin parent, so passing parent_id is safe.
+        owner = session.execute(text(
+            "SELECT parent_id FROM users WHERE id = :id"
+        ), {"id": broadcast.user_id}).first()
+        reseller_id = owner.parent_id if owner else None
 
         while True:
             # Check pause/cancel signals
@@ -136,8 +144,8 @@ def process_broadcast(broadcast_id):
             dial_number = _apply_manipulation(number.phone_number, trunk)
             dial_string = f"PJSIP/{dial_number}@trunk-{trunk.direction}-{trunk.id}"
 
-            # Write .call file
-            _write_call_file(number, broadcast, dial_string)
+            # Write .call file (carries trunk + reseller ids for billing)
+            _write_call_file(number, broadcast, dial_string, trunk.id, reseller_id)
 
             # Mark as queued
             session.execute(text("""
@@ -174,27 +182,12 @@ def process_broadcast(broadcast_id):
         session.close()
 
 
-def _write_call_file(number, broadcast, dial_string):
+def _write_call_file(number, broadcast, dial_string, outgoing_trunk_id, reseller_id):
     """Write .call file — atomic (write to /tmp, move to spool)."""
-    survey_config = json.dumps(broadcast.survey_config) if broadcast.survey_config else "{}"
-
-    content = f"""Channel: {dial_string}
-CallerID: "{broadcast.caller_id_name or 'Broadcast'}" <{broadcast.caller_id_number or '0000'}>
-MaxRetries: {broadcast.retry_attempts or 0}
-RetryTime: {broadcast.retry_delay or 300}
-WaitTime: {broadcast.ring_timeout or 30}
-Context: from-broadcast
-Extension: s
-Priority: 1
-Set: BROADCAST_ID={broadcast.id}
-Set: BROADCAST_NUMBER_ID={number.id}
-Set: VOICE_FILE={broadcast.voice_file_path}
-Set: BROADCAST_TYPE={broadcast.type}
-Set: SURVEY_CONFIG={survey_config}
-Set: RSWITCH_USER_ID={broadcast.user_id}
-Set: RSWITCH_SIP_ACCOUNT_ID={broadcast.sip_account_id}
-Set: BROADCAST_CALLEE={number.phone_number}
-"""
+    content = build_call_file_content(
+        number, broadcast, dial_string,
+        outgoing_trunk_id=outgoing_trunk_id, reseller_id=reseller_id,
+    )
 
     temp_path = f"{CALL_FILE_TMP}/bc_{broadcast.id}_{number.id}.call"
     final_path = f"{CALL_FILE_DIR}/bc_{broadcast.id}_{number.id}.call"
