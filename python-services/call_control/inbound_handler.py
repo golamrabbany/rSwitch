@@ -433,8 +433,8 @@ class InboundCallHandler:
 
         # Apply MNP
         if route.mnp_enabled:
-            from call_control.outbound_handler import _apply_bd_mnp
-            dial_number = _apply_bd_mnp(dial_number)
+            from billing.number_format import apply_bd_mnp
+            dial_number = apply_bd_mnp(dial_number)
 
         trunk_endpoint = f"trunk-{route.trunk_direction}-{route.tid}"
         return f"PJSIP/{dial_number}@{trunk_endpoint}"

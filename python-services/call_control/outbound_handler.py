@@ -33,24 +33,16 @@ from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 
 from call_control.agi_protocol import AgiConnection
-from billing.number_format import normalize_bd_msisdn
+from billing.number_format import (
+    normalize_bd_msisdn,
+    apply_bd_mnp,
+    is_malformed_bd_mobile,
+)
 
 logger = logging.getLogger(__name__)
 
 # Module-level Redis connection pool — reused across all calls (no TCP per call)
 _redis_pool = None
-
-
-# BD MNP operator prefix → route number
-BD_MNP_MAP = {
-    '13': '71',  # Grameenphone
-    '14': '91',  # Banglalink
-    '15': '51',  # Teletalk
-    '16': '81',  # Airtel
-    '17': '71',  # Grameenphone
-    '18': '81',  # Robi
-    '19': '91',  # Banglalink
-}
 
 
 def _weighted_select(routes):
@@ -74,33 +66,6 @@ def _weighted_select(routes):
     # Weighted random selection
     weights = [max(r.weight or 1, 1) for r in candidates]
     return random.choices(candidates, weights=weights, k=1)[0]
-
-
-def _apply_bd_mnp(number: str) -> str:
-    """Auto-convert BD number to MNP format: 880 + route_code + national_number.
-    Non-BD numbers pass through unchanged."""
-    n = number.lstrip('+')
-
-    # Normalize to national (strip country code / leading zero)
-    if n.startswith('00880'):
-        national = n[5:]
-    elif n.startswith('880'):
-        national = n[3:]
-    elif n.startswith('0'):
-        national = n[1:]
-    else:
-        national = n
-
-    # Validate: 10 digits, starts with BD operator prefix
-    if len(national) != 10:
-        return number
-
-    op = national[:2]
-    mnp_code = BD_MNP_MAP.get(op)
-    if not mnp_code:
-        return number  # Not BD mobile, passthrough
-
-    return '880' + mnp_code + national
 
 
 def _get_redis() -> redis_lib.Redis:
@@ -735,7 +700,23 @@ class OutboundCallHandler:
 
         # BD MNP auto-convert (after remove/add prefix)
         if primary.mnp_enabled:
-            dial_number = _apply_bd_mnp(dial_number)
+            # Reject malformed BD mobile numbers (wrong digit count) before they
+            # reach the carrier. Without an MNP prefix the carrier answers them
+            # with '503 No Treatment Reached', so dialing out only burns ASR and
+            # leaves a confusing 503 instead of an auditable rejection reason.
+            if is_malformed_bd_mobile(dial_number):
+                await self._reject(
+                    agi, session, "INVALID_BD_NUMBER",
+                    caller=caller_id, callee=extension,
+                    src_ip=src_ip, user_agent=user_agent,
+                    sip_id=row.id, user_id=row.uid, reseller_id=row.parent_id,
+                )
+                await agi.verbose(
+                    f"rSwitch: invalid BD number {extension} "
+                    f"(dial {dial_number}) — rejected, not dialed"
+                )
+                return
+            dial_number = apply_bd_mnp(dial_number)
 
         # Tech prefix
         if primary.tech_prefix:
@@ -755,7 +736,7 @@ class OutboundCallHandler:
             if failover.add_prefix:
                 fo_number = failover.add_prefix + fo_number
             if failover.mnp_enabled:
-                fo_number = _apply_bd_mnp(fo_number)
+                fo_number = apply_bd_mnp(fo_number)
             if failover.tech_prefix:
                 fo_number = failover.tech_prefix + fo_number
             fo_endpoint = f"trunk-{failover.trunk_direction}-{failover.tid}"
