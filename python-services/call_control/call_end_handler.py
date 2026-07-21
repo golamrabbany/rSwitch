@@ -68,7 +68,11 @@ class CallEndHandler:
         billsec_str = answered_str or await agi.get_variable("CALL_BILLSEC") or "0"
         hangup_cause = await agi.get_variable("HANGUPCAUSE") or ""
 
-        billsec = int(answered_str) if answered_str.isdigit() else 0
+        # Keep whether Asterisk actually REPORTED a value distinct from the
+        # value itself: ANSWEREDTIME="0" (answered, sub-second talk) and
+        # ANSWEREDTIME="" (no data) both parse to 0 but mean different things.
+        answered_reported = answered_str.isdigit()
+        billsec = int(answered_str) if answered_reported else 0
         # DIALEDTIME is the FULL Dial() duration (ring + talk) — it already
         # includes ANSWEREDTIME, so the call duration IS DIALEDTIME; ring-only
         # would be DIALEDTIME - ANSWEREDTIME. (Old bug: `billsec + DIALEDTIME`
@@ -107,26 +111,38 @@ class CallEndHandler:
         else:
             status = "in_progress"  # Leave for billing service to process
 
-        # Last-resort fallback: if Asterisk gave us 0 but the call answered,
-        # compute wall-clock seconds from call_start. Slightly overcounts
-        # because it includes ring time, but better than billing 0.
+        # Answered, but Asterisk reported no talk time. This is the 200 OK /
+        # CANCEL glare case: the callee answers at the instant the caller gives
+        # up, so the session establishes and is torn down within a second.
+        #
+        # The old code substituted wall-clock seconds from call_start here. That
+        # is ring+talk, so it is ALWAYS wrong for a talk-time field, and it was
+        # over-billing badly. Measured against the MMCL carrier CDR for
+        # 2026-07-01..07: 364 such calls, every one SIP 200 with the egress leg
+        # answered, carrier billable median 1s (min 0, max 25) — while we billed
+        # 33-38s each. That is ~87 min/week charged to clients for ring time and
+        # ~6x overstated trunk cost on this slice.
+        #
+        # These are provably NOT lost long calls: across 1,551 occurrences in 30
+        # days the substituted wall-clock value ranged 3-47s with ZERO over 60s,
+        # i.e. it tracks ring duration, not conversation length.
+        #
+        # Bill one increment instead. The carrier ceils fractional talk to 1s,
+        # so 1s is what we are actually charged for these.
         if billsec == 0 and disposition == "ANSWERED":
-            wall = session.execute(
-                text("SELECT TIMESTAMPDIFF(SECOND, call_start, NOW()) AS s "
-                     "FROM call_records WHERE uuid = :uuid"),
-                {"uuid": cdr_uuid},
-            ).scalar() or 0
-            wall = max(0, int(wall))
-            if wall > 0:
-                logger.warning(
-                    f"CDR {cdr_uuid}: ANSWEREDTIME/DIALEDTIME both 0; "
-                    f"falling back to wall-clock {wall}s"
-                )
-                billsec = wall
-                duration = max(duration, wall)
-                # Re-evaluate billing status now that we have a non-zero billsec.
-                if cdr.call_flow != "sip_to_sip":
-                    status = "in_progress"
+            logger.warning(
+                f"CDR {cdr_uuid}: answered with no talk time "
+                f"(ANSWEREDTIME={answered_str!r} reported={answered_reported}, "
+                f"DIALEDTIME={dialed_str!r}, cause={hangup_cause}); "
+                f"billing minimum 1s (200 OK/CANCEL glare)"
+            )
+            billsec = 1
+            # Keep DIALEDTIME as the call window so ring time stays visible;
+            # only floor it if we have nothing better.
+            duration = max(duration, billsec)
+            # Re-evaluate billing status now that we have a non-zero billsec.
+            if cdr.call_flow != "sip_to_sip":
+                status = "in_progress"
 
         # 5. Update CDR
         session.execute(
