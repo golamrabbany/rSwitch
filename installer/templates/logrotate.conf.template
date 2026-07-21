@@ -15,16 +15,30 @@
     endscript
 }
 
-/var/log/asterisk/*.log {
+# Asterisk log files are named "messages", "full", "security", "queue_log" --
+# NONE of them end in .log, so a "*.log" glob here matches nothing and silently
+# rotates zero files. List them explicitly.
+#
+# "security" is the largest and fastest-growing of these (SIP brute-force traffic
+# can push it past 100 MB/day) and was previously uncovered entirely.
+#
+# copytruncate is deliberate: Asterisk holds these files open, and its own
+# sequential rotation produces .0/.1/.2 files that are NEVER pruned. Truncating
+# in place keeps one inode per log and stops those orphans being created.
+/var/log/asterisk/messages
+/var/log/asterisk/full
+/var/log/asterisk/security
+/var/log/asterisk/debug
+/var/log/asterisk/*_log
+{
     daily
+    rotate 7
+    maxsize 200M
     missingok
-    rotate 14
+    notifempty
     compress
     delaycompress
-    notifempty
-    create 0640 asterisk asterisk
+    copytruncate
     sharedscripts
-    postrotate
-        /usr/sbin/asterisk -rx 'logger reload' > /dev/null 2>&1 || true
-    endscript
+    su asterisk asterisk
 }

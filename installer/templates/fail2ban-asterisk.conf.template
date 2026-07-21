@@ -1,23 +1,50 @@
 # rSwitch Fail2Ban Asterisk Jail Configuration
 # Place in /etc/fail2ban/jail.d/asterisk.conf
+#
+# CRITICAL -- "backend = polling" on every jail:
+# Debian/Ubuntu ship /etc/fail2ban/jail.d/defaults-debian.conf containing
+# "backend = systemd", which applies to ALL jails. Under the systemd backend
+# fail2ban reads the journal and SILENTLY IGNORES logpath. Asterisk logs to
+# files, not the journal, so without this line these jails match nothing and
+# ban nobody -- while still reporting as "enabled" in fail2ban-client status.
+#
+# Diagnosing that state:
+#   fail2ban-client get <jail> logpath   -> "No file is currently monitored"
+#   fail2ban-client status <jail>        -> shows "Journal matches:" not "File list:"
 
-[asterisk]
+# The effective jail. The asterisk-pjsip filter reads the SECURITY log, which is
+# where modern PJSIP records InvalidAccountID / ChallengeResponseFailed events.
+# Verified with fail2ban-regex: ~7000 of ~9000 lines matched on a live box.
+[asterisk-pjsip]
+backend = polling
 enabled = true
 port = 5060,5061
-protocol = udp,tcp
-filter = asterisk
-logpath = /var/log/asterisk/messages
-maxretry = 5
-bantime = 3600
-findtime = 600
-
-# Aggressive jail for repeat offenders
-[asterisk-aggressive]
-enabled = true
-port = 5060,5061
-protocol = udp,tcp
-filter = asterisk
-logpath = /var/log/asterisk/messages
+protocol = all
+filter = asterisk-pjsip
+logpath = /var/log/asterisk/security
 maxretry = 3
-bantime = 86400
+findtime = 300
+bantime = 7200
+
+# Repeat offenders: same source, longer ban.
+[asterisk-pjsip-aggressive]
+backend = polling
+enabled = true
+port = 5060,5061
+protocol = all
+filter = asterisk-pjsip
+logpath = /var/log/asterisk/security
+maxretry = 10
 findtime = 86400
+bantime = 604800
+
+# NOTE: the stock "asterisk" and "asterisk-messages" filters match 0 lines
+# against current res_pjsip output (they target legacy chan_sip wording), so
+# jails using them are disabled here rather than providing false assurance.
+# Re-enable only after confirming with:
+#   fail2ban-regex /var/log/asterisk/messages /etc/fail2ban/filter.d/asterisk.conf
+[asterisk]
+enabled = false
+
+[asterisk-messages]
+enabled = false

@@ -55,7 +55,13 @@ environment=PYTHONPATH="{{INSTALL_DIR}}/python-services"
 user=www-data
 autostart=true
 autorestart=true
+; stderr caps matter MORE than stdout here: Python's logging module writes to
+; stderr by default, so these .err.log files carry the bulk of app output (INFO
+; included) -- they are not error-only. Uncapped they fall back to supervisord's
+; 50MB x 10 default.
 stderr_logfile=/var/log/rswitch-python-api.err.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=3
 stdout_logfile=/var/log/rswitch-python-api.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=3
@@ -69,6 +75,8 @@ user=www-data
 autostart=true
 autorestart=true
 stderr_logfile=/var/log/rswitch-celery.err.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=3
 stdout_logfile=/var/log/rswitch-celery.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=3
@@ -82,6 +90,8 @@ user=www-data
 autostart=true
 autorestart=true
 stderr_logfile=/var/log/rswitch-celery-beat.err.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=3
 stdout_logfile=/var/log/rswitch-celery-beat.out.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=3

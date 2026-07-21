@@ -1,0 +1,19 @@
+# rSwitch journald limits
+# Append to /etc/systemd/journald.conf (or drop in /etc/systemd/journald.conf.d/rswitch.conf)
+# then: systemctl restart systemd-journald && journalctl --vacuum-size=500M
+#
+# Why this exists: journald ships with NO explicit cap and defaults to 10% of the
+# filesystem. On a 98 GB root that is ~9.8 GB of journal nobody accounts for --
+# it simply drifts upward until something else needs the space. Asterisk and
+# Celery are chatty enough to get there.
+#
+# SystemKeepFree is the important one: it makes journald back off when the disk
+# is under pressure regardless of its own usage, so the journal can never be the
+# thing that takes a box from "tight" to "full".
+
+[Journal]
+Storage=persistent
+SystemMaxUse=500M
+SystemKeepFree=2G
+SystemMaxFileSize=50M
+MaxRetentionSec=14day

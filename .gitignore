@@ -28,3 +28,9 @@ Thumbs.db
 
 # bulk-provision password exports (contain SIP/login secrets)
 cybernest_clients_*.csv
+
+# CDR extracts / billing reconciliation workbooks — contain subscriber numbers,
+# call records and customer billing data. Never commit.
+CDR/
+*.xlsx
+*.tsv
