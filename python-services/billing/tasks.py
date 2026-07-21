@@ -366,6 +366,12 @@ def daily_call_summary() -> dict:
     yesterday = (datetime.now() - timedelta(days=1)).date()
     yesterday_start = datetime.combine(yesterday, datetime.min.time())
     yesterday_end = datetime.combine(yesterday, datetime.max.time())
+    # transactions.created_at is TIMESTAMP with NO fractional-second precision,
+    # so datetime.max.time() (23:59:59.999999) ROUNDS UP into the next day.
+    # That silently dated each summary a day late AND broke the idempotency
+    # guard below (it matches on DATE(created_at) = yesterday, which never hit),
+    # meaning every re-run would have duplicated the whole statement set.
+    summary_stamp = yesterday_end.replace(microsecond=0)
 
     client_summaries = 0
     reseller_summaries = 0
@@ -422,7 +428,7 @@ def daily_call_summary() -> dict:
                 f"Daily calls: {row.call_count} calls, "
                 f"{total_min} min — {yesterday.strftime('%b %d, %Y')}"
             )
-            txn.created_at = datetime.combine(yesterday, datetime.max.time())
+            txn.created_at = summary_stamp
             session.add(txn)
             client_summaries += 1
 
@@ -475,19 +481,76 @@ def daily_call_summary() -> dict:
                 f"Daily reseller costs: {row.call_count} calls, "
                 f"{total_min} min — {yesterday.strftime('%b %d, %Y')}"
             )
-            txn.created_at = datetime.combine(yesterday, datetime.max.time())
+            txn.created_at = summary_stamp
             session.add(txn)
             reseller_summaries += 1
 
-        session.commit()
+        # This commit is the ONLY thing that produces a customer-visible
+        # statement — charge_call() already debited the balance in real time.
+        # If it fails, money keeps moving and the audit trail silently stops,
+        # which is invisible until a customer asks for a statement and disputes
+        # the whole invoice. That is exactly what happened 2026-06-14..2026-07-21:
+        # the transactions.type enum lacked 'daily_call_charge', every nightly run
+        # died on commit, and ~211k charged calls ended up with no statement row.
+        # Never let this fail quietly again.
+        try:
+            session.commit()
+        except Exception as exc:
+            session.rollback()
+            logger.error(
+                "daily_call_summary FAILED writing the audit trail for %s — "
+                "%d client + %d reseller summaries LOST. Balances were still "
+                "debited, so customers now have charges they cannot verify. "
+                "Error: %s",
+                yesterday, client_summaries, reseller_summaries, exc,
+            )
+            raise
+
+        # A successful commit is not proof the rows landed. Verify, because the
+        # dangerous failure mode is a silent no-op, not a loud crash.
+        written = session.execute(
+            text("""
+                SELECT COUNT(*) FROM transactions
+                WHERE type IN ('daily_call_charge', 'daily_reseller_charge')
+                AND DATE(created_at) = :dt
+            """),
+            {"dt": yesterday},
+        ).scalar() or 0
+
+        expected = client_summaries + reseller_summaries
+        charged_calls = session.execute(
+            text("""
+                SELECT COUNT(*) FROM call_records
+                WHERE status = 'charged'
+                AND call_start >= :start AND call_start <= :end
+            """),
+            {"start": yesterday_start, "end": yesterday_end},
+        ).scalar() or 0
 
     summary = {
         "date": str(yesterday),
         "client_summaries": client_summaries,
         "reseller_summaries": reseller_summaries,
+        "rows_written": written,
+        "charged_calls": charged_calls,
     }
 
-    logger.info(f"daily_call_summary completed: {summary}")
+    # Charged traffic with no statement row is the signature of this bug class.
+    if charged_calls > 0 and written == 0:
+        logger.error(
+            "daily_call_summary wrote NO audit rows for %s despite %d charged "
+            "calls — customers have unverifiable charges. Check the "
+            "transactions.type enum and the task's INSERT. Summary: %s",
+            yesterday, charged_calls, summary,
+        )
+    elif written < expected:
+        logger.error(
+            "daily_call_summary expected %d audit rows for %s but only %d "
+            "landed. Summary: %s", expected, yesterday, written, summary,
+        )
+    else:
+        logger.info(f"daily_call_summary completed: {summary}")
+
     return summary
 
 
