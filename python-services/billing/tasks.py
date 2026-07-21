@@ -578,13 +578,30 @@ def partition_maintenance() -> dict:
     with get_session() as session:
         today = datetime.now().date()
 
-        # ── Step 1: Create partitions for next 7 days ──
+        # ── Step 1: Create partitions for the next 7 days ──
+        #
+        # EVERY `REORGANIZE PARTITION p_future` physically rewrites all rows
+        # currently sitting in p_future, and it blocks writes while it runs
+        # (MySQL does not support LOCK=NONE for partition reorganisation).
+        #
+        # This used to loop day-by-day, issuing a SEPARATE reorganise per missing
+        # day — seven full rewrites of the same partition per run. While p_future
+        # stayed empty that was free, so the flaw was invisible. The moment it
+        # fell behind it became a death spiral: each run had more rows to move,
+        # took longer, was more likely to fail, and left even more behind. On
+        # pacevoice it stopped succeeding on 2026-06-11 and silently accumulated
+        # 812k rows in p_future over six weeks, which stalled the whole 30-day
+        # archive/drop lifecycle too.
+        #
+        # Now: work out every missing partition first, then create them ALL in a
+        # SINGLE reorganise — one rewrite, one lock window, regardless of how far
+        # behind we are. Recovery from a backlog costs the same as a normal day.
+        missing = []
         for i in range(1, 8):
             future_date = today + timedelta(days=i)
             partition_name = f"p{future_date.strftime('%Y_%m_%d')}"
             boundary = (future_date + timedelta(days=1)).strftime('%Y-%m-%d')
 
-            # Check if partition already exists
             exists = session.execute(
                 text("""
                     SELECT 1 FROM INFORMATION_SCHEMA.PARTITIONS
@@ -596,20 +613,37 @@ def partition_maintenance() -> dict:
             ).first()
 
             if not exists:
-                try:
-                    # Reorganize p_future to add new partition before it
-                    session.execute(text(f"""
-                        ALTER TABLE call_records REORGANIZE PARTITION p_future INTO (
-                            PARTITION {partition_name} VALUES LESS THAN (TO_DAYS('{boundary}')),
-                            PARTITION p_future VALUES LESS THAN MAXVALUE
-                        )
-                    """))
-                    session.commit()
-                    created += 1
-                    logger.info(f"partition_maintenance: created {partition_name}")
-                except Exception as e:
-                    session.rollback()
-                    logger.error(f"partition_maintenance: failed to create {partition_name}: {e}")
+                missing.append((partition_name, boundary))
+
+        if missing:
+            # Boundaries must be ascending, with p_future (MAXVALUE) last.
+            missing.sort(key=lambda pair: pair[1])
+            parts = ",\n                ".join(
+                f"PARTITION {name} VALUES LESS THAN (TO_DAYS('{boundary}'))"
+                for name, boundary in missing
+            )
+            try:
+                session.execute(text(f"""
+                    ALTER TABLE call_records REORGANIZE PARTITION p_future INTO (
+                        {parts},
+                        PARTITION p_future VALUES LESS THAN MAXVALUE
+                    )
+                """))
+                session.commit()
+                created = len(missing)
+                logger.info(
+                    "partition_maintenance: created %d partition(s) in one "
+                    "reorganise: %s", created, ", ".join(n for n, _ in missing)
+                )
+            except Exception as e:
+                session.rollback()
+                # Loud: if this keeps failing, p_future grows without bound and
+                # the archive/drop lifecycle stalls with it.
+                logger.error(
+                    "partition_maintenance: FAILED to create %d partition(s) "
+                    "(%s): %s — p_future will keep growing until this succeeds",
+                    len(missing), ", ".join(n for n, _ in missing), e,
+                )
 
         # ── Step 2: Find and archive old partitions (> 30 days) ──
         cutoff_date = today - timedelta(days=30)
