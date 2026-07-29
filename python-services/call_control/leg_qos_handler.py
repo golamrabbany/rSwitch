@@ -38,6 +38,13 @@ class LegQosHandler:
 
         trunk = await read_rtp_qos(agi, "TRUNK")
 
+        # call_records is PARTITION BY RANGE (TO_DAYS(call_start)) with ~125 daily
+        # partitions and growing (DROP is deliberately revoked from this DB user,
+        # so they accumulate). WHERE uuid alone can't prune and probes every
+        # partition; bound by call_start so MySQL only scans recent ones. This
+        # handler runs at hangup, so the row is always well within the last day --
+        # worst case a stats write is skipped for a call somehow older than that,
+        # which cannot happen here.
         session.execute(
             text("""
                 UPDATE call_records SET
@@ -47,7 +54,7 @@ class LegQosHandler:
                     rtp_trunk_tx_loss = :trunk_tx_loss,
                     rtp_trunk_rx_jitter = :trunk_rx_jitter,
                     rtp_trunk_rtt = :trunk_rtt
-                WHERE uuid = :uuid
+                WHERE uuid = :uuid AND call_start >= NOW() - INTERVAL 1 DAY
             """),
             {
                 "uuid": cdr_uuid,

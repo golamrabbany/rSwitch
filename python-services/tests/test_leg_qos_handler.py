@@ -25,6 +25,15 @@ def test_updates_only_trunk_columns():
         assert forbidden not in stmt, f"leg_qos must never write {forbidden}"
 
 
+def test_update_is_bounded_by_call_start_for_partition_pruning():
+    """call_records is partitioned by RANGE(TO_DAYS(call_start)) with ~125+ daily
+    partitions and growing (DROP is revoked). WHERE uuid alone can't prune and
+    probes every partition -- the WHERE clause must also bound call_start."""
+    source = open(leg_qos_handler.__file__).read()
+    where_clause = re.search(r"WHERE uuid = :uuid(.*?)\"\"\"", source, re.S).group(1)
+    assert "call_start" in where_clause, "UPDATE must bound call_start so MySQL can prune partitions"
+
+
 class _FakeAgi:
     def __init__(self, values):
         self.values = values
