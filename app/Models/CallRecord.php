@@ -21,6 +21,10 @@ class CallRecord extends Model
         'total_cost', 'reseller_cost',
         'disposition', 'hangup_cause', 'status',
         'ast_channel', 'ast_dstchannel', 'ast_context', 'rated_at',
+        'rtp_cust_rx_count', 'rtp_cust_tx_count', 'rtp_cust_rx_loss',
+        'rtp_cust_tx_loss', 'rtp_cust_rx_jitter', 'rtp_cust_rtt',
+        'rtp_trunk_rx_count', 'rtp_trunk_tx_count', 'rtp_trunk_rx_loss',
+        'rtp_trunk_tx_loss', 'rtp_trunk_rx_jitter', 'rtp_trunk_rtt',
     ];
 
     protected function casts(): array
