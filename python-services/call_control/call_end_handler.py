@@ -21,6 +21,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from call_control.agi_protocol import AgiConnection
+from call_control.rtp_qos import read_rtp_qos
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +145,11 @@ class CallEndHandler:
             if cdr.call_flow != "sip_to_sip":
                 status = "in_progress"
 
+        # Customer-leg RTP quality. Captured by [hangup-handler] into RTP_CUST_*
+        # before it called us, so it rides along on this UPDATE rather than
+        # costing a second AGI round-trip.
+        cust = await read_rtp_qos(agi, "CUST")
+
         # 5. Update CDR
         session.execute(
             text("""
@@ -153,7 +159,13 @@ class CallEndHandler:
                     billsec = :billsec,
                     disposition = :disposition,
                     hangup_cause = :hangup_cause,
-                    status = :status
+                    status = :status,
+                    rtp_cust_rx_count = :cust_rx_count,
+                    rtp_cust_tx_count = :cust_tx_count,
+                    rtp_cust_rx_loss = :cust_rx_loss,
+                    rtp_cust_tx_loss = :cust_tx_loss,
+                    rtp_cust_rx_jitter = :cust_rx_jitter,
+                    rtp_cust_rtt = :cust_rtt
                 WHERE uuid = :uuid
             """),
             {
@@ -163,6 +175,12 @@ class CallEndHandler:
                 "disposition": disposition,
                 "hangup_cause": hangup_cause,
                 "status": status,
+                "cust_rx_count": cust["rx_count"],
+                "cust_tx_count": cust["tx_count"],
+                "cust_rx_loss": cust["rx_loss"],
+                "cust_tx_loss": cust["tx_loss"],
+                "cust_rx_jitter": cust["rx_jitter"],
+                "cust_rtt": cust["rtt"],
             },
         )
         session.commit()
