@@ -9,6 +9,7 @@ Scripts:
 - route_inbound  → InboundCallHandler
 - call_end       → CallEndHandler
 - broadcast_call → BroadcastCallHandler
+- leg_qos        → LegQosHandler
 """
 
 import asyncio
@@ -21,6 +22,7 @@ from call_control.inbound_handler import InboundCallHandler
 from call_control.call_end_handler import CallEndHandler
 from call_control.broadcast_handler import BroadcastCallHandler
 from call_control.forward_handler import ForwardCallHandler
+from call_control.leg_qos_handler import LegQosHandler
 from monitoring.metrics import agi_request_timer
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,7 @@ _inbound = InboundCallHandler()
 _call_end = CallEndHandler()
 _broadcast = BroadcastCallHandler()
 _forward = ForwardCallHandler()
+_leg_qos = LegQosHandler()
 
 
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -67,6 +70,8 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
                     await _broadcast.handle(conn, session)
                 elif script == "forward_call":
                     await _forward.handle(conn, session)
+                elif script == "leg_qos":
+                    await _leg_qos.handle(conn, session)
                 else:
                     timer.outcome = "unknown_script"
                     logger.warning(f"Unknown AGI script: {script}")
