@@ -694,7 +694,14 @@ class AMIListener:
             return
 
         dead_clients = set()
-        for ws in self._ws_clients:
+        # Iterate a snapshot: the await below yields control, letting a client
+        # connect (_ws_clients.add) or disconnect (_ws_clients.discard) mid-loop.
+        # Mutating the set while iterating it raises RuntimeError, which kills
+        # the calling task outright -- an _on_new_channel that dies here never
+        # registers its call, so the row silently goes missing from Active Calls.
+        # A client that connects mid-broadcast just misses this one message and
+        # picks up the next periodic snapshot.
+        for ws in list(self._ws_clients):
             try:
                 await ws.send_json(message)
             except Exception:
