@@ -7,7 +7,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Per-leg RTP quality, captured at hangup from CHANNEL(rtpqos,audio,...).
+     * Per-leg RTP quality, captured at hangup from CHANNEL(rtcp,all,audio). NOT
+     * CHANNEL(rtpqos,...): that returns empty inside a hangup handler because the
+     * RTP instance is already torn down by the time hangup handlers run; rtcp
+     * survives. See python-services/call_control/rtp_qos.py for the parsing.
      *
      * All columns are nullable on purpose: NULL means "not captured" (rows from
      * before this migration, or a leg that never came up), while 0 means "no

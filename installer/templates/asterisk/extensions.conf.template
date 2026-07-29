@@ -132,8 +132,9 @@ exten => 602,1,NoOp(DTMF Test)
 ; Runs on the callee (trunk) leg via Dial(...,b(set-jb^s^1)) before the carrier is called.
 ; Adaptive jitter buffer + PLC on the carrier (trunk) leg to smooth choppy audio the customer hears
 exten => s,1,Set(JITTERBUFFER(adaptive)=default)
-; Capture this leg's RTP quality when it hangs up. CHANNEL(rtpqos,...) is only
-; readable while the channel exists, so it has to happen in a hangup handler.
+; Capture this leg's RTP quality when it hangs up, via [leg-qos] pushed below.
+; Must be rtcp, not rtpqos: rtpqos returns empty in a hangup handler because the
+; RTP instance is already torn down by then, whereas rtcp survives.
  same => n,Set(CHANNEL(hangup_handler_push)=leg-qos,s,1)
  same => n,Return()
 

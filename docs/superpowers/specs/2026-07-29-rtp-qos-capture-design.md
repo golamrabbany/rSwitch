@@ -50,9 +50,13 @@ feature provides.
 
 ### 3.1 Where the numbers come from
 
-`CHANNEL(rtpqos,audio,<field>)` — readable **only while the channel exists**, so
-capture must happen in a hangup handler on each leg. Fields used: `rxcount`,
-`txcount`, `rxploss`, `txploss`, `rxjitter`, `rtt`.
+`CHANNEL(rtpqos,audio,<field>)` is **empty inside a hangup handler** — the RTP
+instance is already torn down by the time hangup handlers run (confirmed on
+live production calls: `all=[] lc=[] rc=[]`). `CHANNEL(rtcp,all,audio)` **does**
+work there, so capture uses that instead: one variable per leg
+(`RTP_{prefix}_ALL`) holding a semicolon-delimited `key=value` summary
+(`ssrc=...;rxcount=...;txcount=...;rlp=...;rxjitter=...;rtt=...`), parsed by
+the engine. See `python-services/call_control/rtp_qos.py`.
 
 ### 3.2 Existing hooks being reused
 
@@ -68,13 +72,13 @@ Both hooks exist; neither currently captures QoS.
 
 ```
 customer leg hangs up
-  -> [hangup-handler]  Set(RTP_CUST_* = CHANNEL(rtpqos,...))
+  -> [hangup-handler]  Set(RTP_CUST_ALL = CHANNEL(rtcp,all,audio))
   -> AGI /call_end     (existing)  -- writes disposition, duration, billsec
                                       AND the cust_* columns in the same UPDATE
 
 trunk leg hangs up
   -> [set-jb] pushed   [leg-qos] handler at pre-dial time
-  -> [leg-qos]         Set(RTP_TRUNK_* = CHANNEL(rtpqos,...))
+  -> [leg-qos]         Set(RTP_TRUNK_ALL = CHANNEL(rtcp,all,audio))
   -> AGI /leg_qos      (NEW)      -- writes ONLY the trunk_* columns
 ```
 
@@ -169,7 +173,7 @@ option and `__CDR_UUID` line if DIDs are enabled later.
 | Risk | Mitigation |
 |---|---|
 | +1 AGI round-trip per call (~29k/day, ~1.2/s peak) | Engine runs at ~2% of capacity (62 of 3000 calls). Measure AGI latency after deploy; the handler is a single keyed `UPDATE`. |
-| AGI unreachable at hangup | Handler runs after the call has ended — losing a stats row must be silent for the caller and logged at `warning` (never `debug`, per the `last_registered_at` lesson). |
+| AGI unreachable at hangup | Losing a stats row must be silent for the caller and logged at `warning` (never `debug`, per the `last_registered_at` lesson). True for the **customer leg**: `call_end` runs after the call has ended. **Not** true for the **trunk leg**: the trunk channel is torn down by `app_dial`'s `hanguptree()` on the caller's PBX thread, so `[leg-qos]`'s AGI runs *synchronously inside* `Dial()` and sits on the failover path of a call the customer is still holding — a slow/unreachable AGI there delays connecting to the failover trunk, not just the stats write. |
 | Trunk write path corrupting billing | `leg_qos` updates only the six `rtp_trunk_*` columns. It never touches disposition/duration/billsec/cost, and is a separate handler from `call_end`. |
 | `ALTER TABLE` on a partitioned multi-million-row table | Additive `ADD COLUMN` only; same operation already performed for `origin_sip_account_id`. Run off-peak (02:00–05:00 is ~0.09 calls/s). |
 | Requires an `rswitch-api` restart | Measured twice on 2026-07-29: ~1–2s, established calls unaffected, 0 orphaned CDRs. Only new call attempts inside the window fail. |
