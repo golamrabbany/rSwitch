@@ -39,6 +39,25 @@ def test_parse_seconds_keeps_missing_as_none():
     assert parse_seconds("nan") is None   # Asterisk emits nan for unqualified peers
 
 
+def test_parse_seconds_rejects_nan_variants():
+    """Regression: NaN comparison can raise InvalidOperation."""
+    assert parse_seconds("-nan") is None  # signed NaN (glibc %f renders this way)
+    assert parse_seconds("sNaN") is None  # signaling NaN
+    assert parse_seconds("NaN123") is None  # uppercase variant with suffix
+
+
+def test_parse_seconds_rejects_infinity():
+    """Regression: infinity comparison can raise InvalidOperation."""
+    assert parse_seconds("Infinity") is None
+    assert parse_seconds("-Infinity") is None
+    assert parse_seconds("inf") is None
+
+
+def test_parse_count_rejects_unicode_digits():
+    """Regression: isdigit() accepts Unicode digits that int() rejects."""
+    assert parse_count("²") is None  # superscript 2 passes isdigit() but int() raises
+
+
 class _FakeAgi:
     def __init__(self, values):
         self.values = values
@@ -47,6 +66,13 @@ class _FakeAgi:
     async def get_variable(self, name):
         self.asked.append(name)
         return self.values.get(name)
+
+
+class _FakeAgiRaises:
+    """Fake AGI that raises when get_variable is called."""
+
+    async def get_variable(self, name):
+        raise RuntimeError(f"AGI connection lost while reading {name}")
 
 
 @pytest.mark.asyncio
@@ -74,5 +100,14 @@ async def test_read_rtp_qos_maps_all_six_fields():
 @pytest.mark.asyncio
 async def test_read_rtp_qos_returns_none_for_absent_variables():
     result = await read_rtp_qos(_FakeAgi({}), "CUST")
+    assert set(result) == set(RTP_COLUMN_SUFFIXES)
+    assert all(v is None for v in result.values())
+
+
+@pytest.mark.asyncio
+async def test_read_rtp_qos_survives_agi_exceptions():
+    """Regression: agi.get_variable raising must not break call teardown."""
+    result = await read_rtp_qos(_FakeAgiRaises(), "CUST")
+    # Should return complete dict with all None, not raise
     assert set(result) == set(RTP_COLUMN_SUFFIXES)
     assert all(v is None for v in result.values())

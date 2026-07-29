@@ -43,7 +43,7 @@ def _clean(raw):
 def parse_count(raw):
     """Packet/loss counter -> int, or None when absent or unusable."""
     value = _clean(raw)
-    if value is None or not value.isdigit():
+    if value is None or not value.isdecimal():
         return None
     return int(value)
 
@@ -55,9 +55,15 @@ def parse_seconds(raw):
         return None
     try:
         parsed = Decimal(value)
+        # Reject NaN (including signed NaN) and infinity
+        if parsed.is_nan() or parsed.is_infinite():
+            return None
+        # Reject negative values
+        if parsed < 0:
+            return None
     except (InvalidOperation, ValueError):
         return None
-    return None if parsed < 0 else parsed
+    return parsed
 
 
 async def read_rtp_qos(agi, prefix: str) -> dict:
