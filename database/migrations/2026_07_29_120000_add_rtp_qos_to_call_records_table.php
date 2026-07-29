@@ -22,6 +22,13 @@ return new class extends Migration
         Schema::table('call_records', function (Blueprint $table) {
             // Customer leg: Asterisk <-> the client's phone
             $table->unsignedInteger('rtp_cust_rx_count')->nullable()->after('trunk_cost');
+            // KNOWN UNRELIABLE (live sample, 2026-07-29): averaged 213.5 packets/sec
+            // against an expected ~50, with 4 of 26 rows implausible (e.g. 19,083
+            // packets on a 7-second call). Suspected cause: on devices running many
+            // concurrent channels, the RTCP tx counter aggregates across channels
+            // instead of reporting this one. All eleven other columns measured clean.
+            // Kept (not dropped) because the raw data is still wanted -- just don't
+            // trust it standalone. See the one_way filter below for the mitigation.
             $table->unsignedInteger('rtp_cust_tx_count')->nullable()->after('rtp_cust_rx_count');
             $table->unsignedInteger('rtp_cust_rx_loss')->nullable()->after('rtp_cust_tx_count');
             $table->unsignedInteger('rtp_cust_tx_loss')->nullable()->after('rtp_cust_rx_loss');

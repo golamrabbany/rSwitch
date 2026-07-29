@@ -500,6 +500,11 @@ class OperationalReportController extends Controller
                                                ->where('rtp_trunk_tx_count', '>', 0))
                           ->orWhere(fn ($w) => $w->where('rtp_trunk_tx_count', 0)
                                                  ->where('rtp_trunk_rx_count', '>', 0))
+                          // rtp_cust_tx_count is KNOWN UNRELIABLE (live sample: avg 213.5
+                          // pkt/s vs an expected ~50, 4/26 rows implausible) -- likely the
+                          // originating device aggregating its RTCP tx counter across
+                          // concurrent channels. Kept because the raw data is still wanted,
+                          // but treat any one_way result driven by this clause with caution.
                           ->orWhere(fn ($w) => $w->where('rtp_cust_rx_count', 0)
                                                  ->where('rtp_cust_tx_count', '>', 0))
                           ->orWhere(fn ($w) => $w->where('rtp_cust_tx_count', 0)
