@@ -1038,3 +1038,51 @@ Each task is independently reversible:
 - **Task 1 (migration)** — `php artisan migrate:rollback --step=1`. Additive columns; dropping them loses only captured stats.
 
 Stopping after Task 6 leaves a fully working feature — the data is captured and queryable by SQL, just without the report UI.
+
+---
+
+## AMENDMENT (2026-07-30) — capture via CHANNEL(rtcp,all,audio), not CHANNEL(rtpqos,...)
+
+Tasks 2 and 5 as originally written do not work on this Asterisk. Proved on live
+calls during Task 6 verification:
+
+- `CHANNEL(rtpqos,audio,all)` returns **empty inside a hangup handler** —
+  `all=[] lc=[] rc=[]`. The RTP instance is destroyed before hangup handlers run,
+  so `rtpqos` can never be read there, whatever the parameter names.
+- The plan's parameter names were also wrong: `rxcount`/`txcount`/`rxploss`/
+  `txploss`/`rxjitter` are **chan_sip** names. Asterisk 20.6.0 with PJSIP
+  documents `local_count`/`remote_count`/`local_lostpackets`/
+  `remote_lostpackets`/`local_jitter`. Correcting them did not help, per above.
+- `CHANNEL(rtcp,all,audio)` **does** work in the hangup handler. Live sample:
+  `ssrc=…;themssrc=…;lp=1;rxjitter=0.012000;rxcount=1516;txjitter=0.000125;txcount=1514;rlp=0;rtt=0.129104;rxmes=83.194000;txmes=82.967221`
+- Individual `rtcp` statistics work for `rxcount`/`txcount`/`rxjitter`/`rtt`, but
+  `lp` and `rlp` return empty — loss exists only inside the `all` summary. So the
+  capture must be one variable plus parsing, not six separate reads.
+
+**Revised capture.** One dialplan `Set` per leg instead of six:
+
+```
+ same => n,Set(RTP_TRUNK_ALL=${CHANNEL(rtcp,all,audio)})
+ same => n,Set(RTP_CUST_ALL=${CHANNEL(rtcp,all,audio)})
+```
+
+`read_rtp_qos(agi, prefix)` now reads `RTP_{prefix}_ALL` and parses the
+semicolon-delimited `key=value` list, mapping:
+
+| rtcp key | dict key / column suffix |
+|---|---|
+| `rxcount` | `rx_count` |
+| `txcount` | `tx_count` |
+| `lp` | `rx_loss` |
+| `rlp` | `tx_loss` |
+| `rxjitter` | `rx_jitter` |
+| `rtt` | `rtt` |
+
+Unchanged: all 12 columns (Task 1), both handlers (Tasks 3 and 4), the public
+signature `read_rtp_qos(agi, prefix) -> dict` keyed by `RTP_COLUMN_SUFFIXES`,
+`parse_count`, `parse_seconds`, and the NULL-vs-zero rule. Only the source of
+the raw values changes.
+
+`rxmes`/`txmes` (Media Experience Score, 0-100) are also present in the summary
+and would be a direct audio-quality metric. Deliberately not captured now — that
+would need a second ALTER on the partitioned table. Noted as a follow-up.
