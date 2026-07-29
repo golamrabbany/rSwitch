@@ -26,15 +26,16 @@ class ProvisionCyberNestClients extends Command
         {--rate-group=2 : rate_group_id to assign (Client Tariff)}
         {--channels=2 : max_channels for client and SIP}
         {--codec=ulaw,alaw,g729 : ps_endpoints.allow override for the new endpoints}
+        {--ranges= : Comma-separated inclusive number ranges, e.g. 09603519000-09603519999,09603521000-09603521999 (default = original CyberNest blocks)}
         {--limit=0 : only process the first N numbers (0 = all)}
         {--dry-run : build the CSV + report counts without writing any records}';
 
-    protected $description = 'Bulk-create CyberNest clients + SIP accounts (BD numbers)';
+    protected $description = 'Bulk-create clients + SIP accounts for blocks of BD numbers under a reseller';
 
-    /** Inclusive integer ranges (leading 0 prefixed back on) */
-    private array $ranges = [
-        [9603125000, 9603125999],
-        [9603128000, 9603128999],
+    /** Default inclusive ranges, as zero-padded number strings */
+    private array $defaultRanges = [
+        ['09603125000', '09603125999'],
+        ['09603128000', '09603128999'],
     ];
 
     public function handle(SipProvisioningService $prov): int
@@ -52,10 +53,19 @@ class ProvisionCyberNestClients extends Command
             return self::FAILURE;
         }
 
+        try {
+            $ranges = $this->parseRanges((string) $this->option('ranges'));
+        } catch (\InvalidArgumentException $e) {
+            $this->error($e->getMessage());
+            return self::FAILURE;
+        }
+
         $numbers = [];
-        foreach ($this->ranges as [$start, $end]) {
-            for ($n = $start; $n <= $end; $n++) {
-                $numbers[] = '0' . $n; // 9603125000 -> 09603125000
+        foreach ($ranges as [$start, $end]) {
+            $width = strlen($start);
+            for ($n = (int) $start; $n <= (int) $end; $n++) {
+                // keep the leading zero(s): 9603125000 -> 09603125000
+                $numbers[] = str_pad((string) $n, $width, '0', STR_PAD_LEFT);
             }
         }
         if ($limit > 0) {
@@ -63,8 +73,10 @@ class ProvisionCyberNestClients extends Command
         }
 
         $this->info(sprintf(
-            '%d numbers | reseller=%s (#%d) | rate_group=%d | channels=%d | codec=%s | %s',
-            count($numbers), $reseller->name, $reseller->id, $rateGroupId, $channels, $codec,
+            '%d numbers | %s | reseller=%s (#%d) | rate_group=%d | channels=%d | codec=%s | %s',
+            count($numbers),
+            implode(', ', array_map(fn ($r) => "{$r[0]}-{$r[1]}", $ranges)),
+            $reseller->name, $reseller->id, $rateGroupId, $channels, $codec,
             $dry ? 'DRY-RUN' : 'LIVE'
         ));
 
@@ -92,7 +104,7 @@ class ProvisionCyberNestClients extends Command
                     }
 
                     $client = User::create([
-                        'name'            => "CyberNest {$num}",
+                        'name'            => "{$reseller->name} {$num}",
                         'username'        => $num,
                         'email'           => null,
                         'password'        => Hash::make($clientPw),
@@ -144,5 +156,52 @@ class ProvisionCyberNestClients extends Command
 
         $this->info("Done. created={$created} skipped={$skipped} csv={$csvPath}");
         return self::SUCCESS;
+    }
+
+    /**
+     * Parse --ranges into a list of [start, end] zero-padded number strings.
+     * Empty input falls back to the original CyberNest blocks.
+     *
+     * @return array<int, array{0: string, 1: string}>
+     * @throws \InvalidArgumentException
+     */
+    private function parseRanges(string $raw): array
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return $this->defaultRanges;
+        }
+
+        $ranges = [];
+        foreach (explode(',', $raw) as $part) {
+            $part = trim($part);
+            if ($part === '') {
+                continue;
+            }
+
+            $bounds = explode('-', $part);
+            if (count($bounds) !== 2) {
+                throw new \InvalidArgumentException("Bad range '{$part}': expected START-END.");
+            }
+
+            [$start, $end] = array_map('trim', $bounds);
+            if (! ctype_digit($start) || ! ctype_digit($end)) {
+                throw new \InvalidArgumentException("Bad range '{$part}': both bounds must be digits only.");
+            }
+            if (strlen($start) !== strlen($end)) {
+                throw new \InvalidArgumentException("Bad range '{$part}': bounds must have the same number of digits.");
+            }
+            if ((int) $start > (int) $end) {
+                throw new \InvalidArgumentException("Bad range '{$part}': START is greater than END.");
+            }
+
+            $ranges[] = [$start, $end];
+        }
+
+        if (! $ranges) {
+            throw new \InvalidArgumentException('--ranges was given but contained no usable range.');
+        }
+
+        return $ranges;
     }
 }
