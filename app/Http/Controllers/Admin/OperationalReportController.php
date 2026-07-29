@@ -10,6 +10,8 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -124,49 +126,58 @@ class OperationalReportController extends Controller
             $query->where('call_flow', $request->call_flow);
         }
 
-        // Filter by call state
-        if ($request->filled('call_state')) {
-            if ($request->call_state === 'answered') {
-                $query->where('disposition', 'ANSWERED');
-            } elseif ($request->call_state === 'ringing') {
-                $query->whereNull('disposition');
-            }
-        }
+        // Live answered/ringing state comes from the engine, not the DB — see
+        // liveCallStates(). The call_state filter is therefore applied to the
+        // collection below rather than to the query.
+        $live = $this->liveCallStates();
 
         // Paginate with 100 per page for large lists
         $calls = $query->orderBy('call_start', 'desc')->paginate(100);
 
         // Add call_state attribute to each call
-        $calls->getCollection()->transform(function ($call) {
-            // Determine call state based on disposition and duration
-            if ($call->disposition === 'ANSWERED') {
-                $call->call_state = 'answered';
-            } elseif ($call->billsec > 0) {
-                $call->call_state = 'answered';
+        $calls->getCollection()->transform(function ($call) use ($live) {
+            if ($live['available']) {
+                $call->call_state = $live['map'][$call->caller . '|' . $call->callee] ?? 'processing';
             } else {
-                // Check how long the call has been ringing
-                $ringTime = now()->diffInSeconds($call->call_start);
-                if ($ringTime < 5) {
-                    $call->call_state = 'processing';
-                } else {
-                    $call->call_state = 'ringing';
-                }
+                // Engine unreachable — fall back to the stored disposition. It is
+                // a placeholder on in-progress rows, so this over-reports
+                // "answered", but it keeps the page no worse than before.
+                $call->call_state = $call->disposition === 'ANSWERED' || $call->billsec > 0
+                    ? 'answered'
+                    : 'ringing';
             }
             return $call;
         });
 
-        // Stats
-        $totalActive = CallRecord::where('status', 'in_progress')->count();
-        $inboundActive = CallRecord::where('status', 'in_progress')
-            ->where('call_flow', 'trunk_to_sip')->count();
-        $outboundActive = CallRecord::where('status', 'in_progress')
-            ->where('call_flow', 'sip_to_trunk')->count();
+        // Filter by call state. In-progress calls run in the tens and the page
+        // size is 100, so they occupy a single page and filtering the collection
+        // does not lose rows.
+        if ($request->filled('call_state')) {
+            $wanted = $request->call_state;
+            $calls->setCollection(
+                $calls->getCollection()->filter(fn ($call) => $call->call_state === $wanted)->values()
+            );
+        }
 
-        // Call state stats
-        $answeredCount = CallRecord::where('status', 'in_progress')
-            ->where('disposition', 'ANSWERED')->count();
-        $ringingCount = CallRecord::where('status', 'in_progress')
-            ->whereNull('disposition')->count();
+        // Stats. Take the whole header from the engine when it is reachable so
+        // the counters agree with each other: a ringing call often has no
+        // call_records row yet, so mixing DB totals with engine state would
+        // leave total < answered + ringing.
+        if ($live['available']) {
+            $totalActive = $live['total'];
+            $inboundActive = $live['inbound'];
+            $outboundActive = $live['outbound'];
+            $answeredCount = $live['answered'];
+            $ringingCount = $live['ringing'];
+        } else {
+            $totalActive = CallRecord::where('status', 'in_progress')->count();
+            $inboundActive = CallRecord::where('status', 'in_progress')
+                ->where('call_flow', 'trunk_to_sip')->count();
+            $outboundActive = CallRecord::where('status', 'in_progress')
+                ->where('call_flow', 'sip_to_trunk')->count();
+            $answeredCount = $totalActive;
+            $ringingCount = 0;
+        }
 
         return view('admin.operational-reports.active-calls', compact(
             'calls',
@@ -176,6 +187,68 @@ class OperationalReportController extends Controller
             'answeredCount',
             'ringingCount'
         ));
+    }
+
+    /**
+     * Live answered/ringing state for in-progress calls, from the Python engine.
+     *
+     * call_records cannot answer this. Rows are inserted at call setup with a
+     * hardcoded placeholder disposition='ANSWERED' (see outbound_handler.py),
+     * and duration/billsec both stay 0 until hangup, so "ringing" is simply not
+     * derivable from the table -- counting `disposition IS NULL` always returned
+     * zero. The AMI listener holds the only live channel state, and it is
+     * already what this page's /ws/live-calls feed streams, so sourcing the
+     * initial render from it also stops the page contradicting itself a second
+     * after load.
+     *
+     * @return array{map: array<string, string>, answered: int, ringing: int, available: bool}
+     */
+    private function liveCallStates(): array
+    {
+        $unavailable = ['map' => [], 'answered' => 0, 'ringing' => 0, 'available' => false];
+
+        try {
+            $response = Http::timeout(3)->get(
+                rtrim(config('services.python_api.url', 'http://127.0.0.1:8001'), '/') . '/api/active-calls'
+            );
+
+            if (! $response->successful()) {
+                Log::warning('Active calls: engine returned HTTP ' . $response->status());
+                return $unavailable;
+            }
+
+            $liveCalls = $response->json('calls') ?? [];
+        } catch (\Throwable $e) {
+            Log::warning('Active calls: could not reach engine for live state: ' . $e->getMessage());
+            return $unavailable;
+        }
+
+        $map = [];
+        $answered = 0;
+        $ringing = 0;
+        $inbound = 0;
+        $outbound = 0;
+
+        foreach ($liveCalls as $liveCall) {
+            $state = ($liveCall['state'] ?? '') === 'answered' ? 'answered' : 'ringing';
+            $state === 'answered' ? $answered++ : $ringing++;
+
+            ($liveCall['call_flow'] ?? '') === 'inbound' ? $inbound++ : $outbound++;
+
+            // caller|callee pairs the engine's view to the CDR row. Both legs of
+            // one conversation share a state, so a collision is harmless.
+            $map[($liveCall['caller'] ?? '') . '|' . ($liveCall['callee'] ?? '')] = $state;
+        }
+
+        return [
+            'map' => $map,
+            'answered' => $answered,
+            'ringing' => $ringing,
+            'inbound' => $inbound,
+            'outbound' => $outbound,
+            'total' => count($liveCalls),
+            'available' => true,
+        ];
     }
 
     /**
