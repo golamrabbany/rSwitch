@@ -36,6 +36,24 @@ class CallRecord extends Model
             'total_cost' => 'decimal:4',
             'reseller_cost' => 'decimal:4',
             'rate_per_minute' => 'decimal:6',
+            // Per-leg RTP QoS (nullable: NULL = "not captured", 0 = "no packets
+            // arrived" -- these must stay distinct). Without explicit casts,
+            // Eloquent's runtime PHP type for these columns depends on the PDO
+            // driver's fetch mode and is not guaranteed to be int, which would
+            // silently break strict (=== 0) comparisons used to detect no-audio
+            // calls. Casting pins the type regardless of driver behavior.
+            'rtp_cust_rx_count' => 'integer',
+            'rtp_cust_tx_count' => 'integer',
+            'rtp_cust_rx_loss' => 'integer',
+            'rtp_cust_tx_loss' => 'integer',
+            'rtp_cust_rx_jitter' => 'decimal:3',
+            'rtp_cust_rtt' => 'decimal:3',
+            'rtp_trunk_rx_count' => 'integer',
+            'rtp_trunk_tx_count' => 'integer',
+            'rtp_trunk_rx_loss' => 'integer',
+            'rtp_trunk_tx_loss' => 'integer',
+            'rtp_trunk_rx_jitter' => 'decimal:3',
+            'rtp_trunk_rtt' => 'decimal:3',
         ];
     }
 

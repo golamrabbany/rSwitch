@@ -485,6 +485,36 @@ class OperationalReportController extends Controller
             $query->where('caller', 'like', $request->caller_id . '%');
         }
 
+        // Audio-health filter. Thresholds live here rather than in the schema so
+        // they can change without a migration. NULL means "not captured" and is
+        // excluded everywhere -- only 0 means "no packets arrived".
+        if ($request->filled('audio')) {
+            match ($request->audio) {
+                // Answered, but the carrier never sent a single packet.
+                'no_audio' => $query->where('billsec', '>', 0)
+                    ->where('rtp_trunk_rx_count', 0),
+                // Audio in one direction only, on either leg.
+                'one_way' => $query->where('billsec', '>', 0)
+                    ->where(function ($q) {
+                        $q->where(fn ($w) => $w->where('rtp_trunk_rx_count', 0)
+                                               ->where('rtp_trunk_tx_count', '>', 0))
+                          ->orWhere(fn ($w) => $w->where('rtp_trunk_tx_count', 0)
+                                                 ->where('rtp_trunk_rx_count', '>', 0))
+                          ->orWhere(fn ($w) => $w->where('rtp_cust_rx_count', 0)
+                                                 ->where('rtp_cust_tx_count', '>', 0))
+                          ->orWhere(fn ($w) => $w->where('rtp_cust_tx_count', 0)
+                                                 ->where('rtp_cust_rx_count', '>', 0));
+                    }),
+                // More than 5% inbound loss on either leg.
+                'high_loss' => $query->where('billsec', '>', 0)
+                    ->where(function ($q) {
+                        $q->whereRaw('rtp_trunk_rx_loss > 0.05 * NULLIF(rtp_trunk_rx_count, 0)')
+                          ->orWhereRaw('rtp_cust_rx_loss > 0.05 * NULLIF(rtp_cust_rx_count, 0)');
+                    }),
+                default => null,
+            };
+        }
+
         $calls = $query->orderBy('call_start', 'desc')->paginate(50);
 
         // Stats for the filtered period

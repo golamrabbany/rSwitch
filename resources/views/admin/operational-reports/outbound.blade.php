@@ -154,9 +154,17 @@
                 {{-- Caller ID --}}
                 <input type="text" name="caller_id" value="{{ request('caller_id') }}" placeholder="Caller ID" class="filter-input flex-1">
 
+                {{-- Audio Health --}}
+                <select name="audio" class="filter-input" style="width:auto;">
+                    <option value="">All audio</option>
+                    <option value="no_audio" {{ request('audio') === 'no_audio' ? 'selected' : '' }}>No audio</option>
+                    <option value="one_way" {{ request('audio') === 'one_way' ? 'selected' : '' }}>One-way</option>
+                    <option value="high_loss" {{ request('audio') === 'high_loss' ? 'selected' : '' }}>High loss</option>
+                </select>
+
                 {{-- Buttons --}}
                 <button type="submit" class="btn-search-admin flex-shrink-0">Search</button>
-                @if(request()->hasAny(['search', 'disposition', 'trunk_id', 'date_to', 'reseller_id', 'user_id', 'source_ip', 'caller_id']))
+                @if(request()->hasAny(['search', 'disposition', 'trunk_id', 'date_to', 'reseller_id', 'user_id', 'source_ip', 'caller_id', 'audio']))
                     <a href="{{ route('admin.operational-reports.outbound') }}" class="btn-clear flex-shrink-0">Clear</a>
                 @endif
             </div>
@@ -236,6 +244,7 @@
                             <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Bill Dur.</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Trunk</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Audio</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -330,6 +339,17 @@
                                         @default
                                             <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>{{ $call->disposition ?? 'Unknown' }}</span>
                                     @endswitch
+                                    @endif
+                                </td>
+
+                                {{-- Audio --}}
+                                <td class="px-3 py-2 text-xs">
+                                    @if($call->rtp_trunk_rx_count === null)
+                                        <span class="text-gray-300">—</span>
+                                    @elseif($call->billsec > 0 && $call->rtp_trunk_rx_count === 0)
+                                        <span class="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>No audio</span>
+                                    @else
+                                        <span class="text-gray-600 tabular-nums">{{ number_format($call->rtp_trunk_rx_count) }}</span>
                                     @endif
                                 </td>
                             </tr>
