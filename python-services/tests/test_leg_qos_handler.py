@@ -61,8 +61,11 @@ async def test_no_cdr_uuid_is_a_noop():
 async def test_writes_parsed_values_for_the_trunk_leg():
     agi = _FakeAgi({
         "CDR_UUID": "abc-123",
-        "RTP_TRUNK_RXCOUNT": "0",
-        "RTP_TRUNK_TXCOUNT": "1502",
+        # Single CHANNEL(rtcp,all,audio) summary (task 2b). `lp` is
+        # deliberately omitted -- not set to 0 -- so trunk_rx_loss below
+        # exercises "absent from the summary", not "explicit zero".
+        "RTP_TRUNK_ALL": "ssrc=1;themssrc=2;rxjitter=0.01;rxcount=0;"
+                          "txjitter=0.01;txcount=1502;rlp=0;rtt=0.05",
     })
     session = _FakeSession()
 
