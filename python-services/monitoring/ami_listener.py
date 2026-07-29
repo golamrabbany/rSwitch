@@ -195,18 +195,17 @@ class AMIListener:
                         call.state = "answered"
                         call.answered_at = time.time()
                     # Direction + sip account + client (mirror _on_new_channel logic)
-                    if "trunk" in channel.lower() or channel.startswith("PJSIP/trunk"):
-                        call.call_flow = "inbound"
-                        call.trunk = channel.split("/")[1].split("-")[0] if "/" in channel else ""
-                    elif "/" in channel:
-                        call.call_flow = "outbound"
-                        call.sip_account = channel.split("/")[1].split("-")[0]
-                        call.client = self._lookup_client(call.sip_account)
+                    self._classify_direction(call, channel, uid, linked_id)
                     # Only add if it looks like a real channel
                     if call.caller or call.callee or 'PJSIP' in channel:
                         self._active_calls[uid] = call
-                        # First leg per linked_id owns the UI row.
-                        self._displayed_uid.setdefault(call.linked_id, uid)
+                        # The originating leg (uniqueid == linkedid) owns the UI
+                        # row. CoreShowChannels returns a call's legs in
+                        # arbitrary order, so first-seen-wins can hand the row
+                        # to a dialed trunk leg and render the call as a phantom
+                        # inbound after a restart repopulates state mid-call.
+                        if uid == call.linked_id or call.linked_id not in self._displayed_uid:
+                            self._displayed_uid[call.linked_id] = uid
 
             count = len(self._active_calls)
             if count > 0:
@@ -291,6 +290,33 @@ class AMIListener:
         appear in Active Calls or call stats."""
         return channel.startswith("AudioSocket/") or caller_id == "livelisten"
 
+    def _classify_direction(self, call, channel: str, uid: str, linked_id: str):
+        """Set call_flow (+ trunk / sip_account / client) from the channel.
+
+        A trunk channel is only genuinely INBOUND when it is the call's
+        originating channel. Asterisk gives the originator uniqueid == linkedid,
+        while a leg created by Dial() inherits the originator's linkedid, so the
+        two are distinguishable without tracking DialBegin.
+
+        Matching on the channel name alone -- as this used to -- labels every
+        outbound call's dialed leg (PJSIP/trunk-...) "inbound". That is normally
+        hidden because the originating leg owns the UI row, but any time the
+        trunk leg becomes the displayed leg the call surfaces as a phantom
+        inbound. Note the context does NOT disambiguate: the dialed leg also
+        runs in from-trunk.
+        """
+        is_trunk = "trunk" in channel.lower() or channel.startswith("PJSIP/trunk")
+        name = channel.split("/")[1].split("-")[0] if "/" in channel else ""
+
+        if is_trunk:
+            call.trunk = name
+            call.call_flow = "inbound" if uid == linked_id else "outbound"
+        else:
+            call.call_flow = "outbound"
+            if name:
+                call.sip_account = name
+                call.client = self._lookup_client(call.sip_account)
+
     async def _on_new_channel(self, manager, event):
         """New channel created — a call is starting."""
         uid = event.get("Uniqueid", "")
@@ -310,14 +336,7 @@ class AMIListener:
         call.callee = event.get("Exten", "")
         call.state = "ringing"
 
-        # Detect direction from channel name
-        if "trunk" in channel.lower() or channel.startswith("PJSIP/trunk"):
-            call.call_flow = "inbound"
-            call.trunk = channel.split("/")[1].split("-")[0] if "/" in channel else ""
-        else:
-            call.call_flow = "outbound"
-            call.sip_account = channel.split("/")[1].split("-")[0] if "/" in channel else ""
-            call.client = self._lookup_client(call.sip_account)
+        self._classify_direction(call, channel, uid, linked_id)
 
         # Asterisk creates 2 channels per call (caller leg + dialed leg)
         # sharing one Linkedid. The first leg owns the UI row; subsequent
