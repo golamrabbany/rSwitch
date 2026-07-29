@@ -537,6 +537,12 @@ class AMIListener:
             })
 
             # Update DB: last_registered_at
+            # NOTE: this needs an explicit column grant --
+            #   GRANT UPDATE (last_registered_at, last_registered_ip)
+            #     ON rswitch.sip_accounts TO 'python_svc'@'localhost';
+            # Without it MySQL raises 1142 and every registration is silently
+            # dropped, leaving the column NULL forever. Log at warning, not
+            # debug, so a missing grant is visible instead of invisible.
             try:
                 from shared.database import get_sync_engine
                 from sqlalchemy import text
@@ -551,7 +557,7 @@ class AMIListener:
                     )
                     conn.commit()
             except Exception as e:
-                logger.debug(f"Could not update registration in DB: {e}")
+                logger.warning(f"Could not update registration in DB for {aor}: {e}")
 
         elif status in ("Removed", "Unreachable"):
             self._registered_contacts.pop(aor, None)

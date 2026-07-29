@@ -240,6 +240,19 @@ update_application() {
             mysql -u root -e "$GRANT_SQL" 2>/dev/null && \
                 log_success "Granted python_svc INSERT on audit_logs" || true
         fi
+
+        # Ensure the AMI listener can record SIP registrations. Without this the
+        # UPDATE in monitoring/ami_listener.py fails with MySQL 1142 on every
+        # registration and last_registered_at/_ip stay NULL forever, so the
+        # "is this phone alive" indicator is dead across every portal.
+        REG_GRANT_SQL="GRANT UPDATE (last_registered_at, last_registered_ip) ON \`${DB_NAME_U}\`.sip_accounts TO 'python_svc'@'localhost'; FLUSH PRIVILEGES;"
+        if [[ -f /etc/mysql/debian.cnf ]]; then
+            mysql --defaults-file=/etc/mysql/debian.cnf -e "$REG_GRANT_SQL" 2>/dev/null && \
+                log_success "Granted python_svc UPDATE on sip_accounts registration columns" || true
+        else
+            mysql -u root -e "$REG_GRANT_SQL" 2>/dev/null && \
+                log_success "Granted python_svc UPDATE on sip_accounts registration columns" || true
+        fi
     fi
 
     # Ensure ffmpeg is installed (needed for voice file conversion)
