@@ -556,6 +556,116 @@ class OperationalReportController extends Controller
         ));
     }
 
+    /**
+     * Call Quality — per-leg RTP analysis.
+     *
+     * Reads call_records directly rather than cdr_summary_hourly, which has no
+     * QoS columns. Every query is bounded by call_start so the daily partitions
+     * prune, and the range is capped at 31 days for the same reason.
+     *
+     * rtp_cust_tx_count is deliberately absent: it is known-unreliable (19,083
+     * packets on a 7-second call) and this page is where someone would most
+     * likely trust it.
+     */
+    public function qualityReport(Request $request)
+    {
+        $authUser = auth()->user();
+
+        $dateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->date_from)->startOfDay()
+            : Carbon::today()->startOfDay();
+        $dateTo = $request->filled('date_to')
+            ? Carbon::parse($request->date_to)->endOfDay()
+            : Carbon::today()->endOfDay();
+
+        if ($dateFrom->gt($dateTo)) {
+            $dateFrom = $dateTo->copy()->startOfDay();
+        }
+        if ($dateFrom->diffInDays($dateTo) > 31) {
+            $dateTo = $dateFrom->copy()->addDays(31)->endOfDay();
+        }
+
+        $scope = function ($query) use ($authUser, $dateFrom, $dateTo) {
+            $query->where('call_flow', 'sip_to_trunk')
+                  ->whereBetween('call_start', [$dateFrom, $dateTo]);
+            if (! $authUser->isSuperAdmin()) {
+                $query->whereIn('user_id', $authUser->descendantIds());
+            }
+            return $query;
+        };
+
+        // Summary. AVG() ignores NULLs by definition, so uncaptured rows never
+        // drag an average toward zero -- but the caller still needs to know how
+        // thin the sample is, hence the captured/answered coverage pair.
+        $stats = $scope(CallRecord::query())->selectRaw('
+            COUNT(*) as total_calls,
+            SUM(billsec > 0) as answered,
+            SUM(rtp_trunk_rx_count IS NOT NULL) as captured,
+            AVG(rtp_trunk_rx_mes) as trunk_mes,
+            AVG(rtp_cust_rx_mes) as cust_mes,
+            AVG(rtp_trunk_rx_jitter) * 1000 as trunk_jitter_ms,
+            AVG(rtp_cust_rx_jitter) * 1000 as cust_jitter_ms,
+            AVG(rtp_trunk_rtt) * 1000 as trunk_rtt_ms,
+            100 * SUM(rtp_trunk_rx_loss) / NULLIF(SUM(rtp_trunk_rx_count), 0) as trunk_loss_pct,
+            100 * SUM(rtp_cust_rx_loss) / NULLIF(SUM(rtp_cust_rx_count), 0) as cust_loss_pct,
+            SUM(billsec > 0 AND rtp_trunk_rx_count = 0) as no_audio,
+            SUM(billsec > 0 AND rtp_trunk_rx_count > 0 AND rtp_trunk_tx_count = 0) as one_way
+        ')->first();
+
+        $coverage = $stats->answered > 0
+            ? round(100 * $stats->captured / $stats->answered, 1)
+            : 0.0;
+
+        // Hourly trend — carrier vs customer jitter.
+        $hourly = $scope(CallRecord::query())
+            ->whereNotNull('rtp_trunk_rx_jitter')
+            ->selectRaw("
+                DATE_FORMAT(call_start, '%Y-%m-%d %H:00') as bucket,
+                AVG(rtp_trunk_rx_jitter) * 1000 as trunk_jitter_ms,
+                AVG(rtp_cust_rx_jitter) * 1000 as cust_jitter_ms,
+                COUNT(*) as calls
+            ")
+            ->groupBy('bucket')
+            ->orderBy('bucket')
+            ->get();
+
+        // Breakdown, pivotable. Worst carrier MES first; NULLs last.
+        $groupBy = in_array($request->group_by, ['client', 'trunk', 'prefix'], true)
+            ? $request->group_by
+            : 'client';
+
+        $breakdown = $scope(CallRecord::query())->whereNotNull('rtp_trunk_rx_count');
+
+        $breakdown = match ($groupBy) {
+            'trunk' => $breakdown
+                ->leftJoin('trunks', 'trunks.id', '=', 'call_records.outgoing_trunk_id')
+                ->selectRaw('COALESCE(trunks.name, "(none)") as label'),
+            'prefix' => $breakdown
+                ->selectRaw('LEFT(call_records.callee, 3) as label'),
+            default => $breakdown
+                ->leftJoin('users', 'users.id', '=', 'call_records.user_id')
+                ->selectRaw('COALESCE(users.name, "(unknown)") as label'),
+        };
+
+        $breakdown = $breakdown->selectRaw('
+                COUNT(*) as calls,
+                SUM(call_records.billsec > 0) as answered,
+                AVG(call_records.rtp_trunk_rx_mes) as trunk_mes,
+                AVG(call_records.rtp_trunk_rx_jitter) * 1000 as trunk_jitter_ms,
+                AVG(call_records.rtp_trunk_rtt) * 1000 as trunk_rtt_ms,
+                100 * SUM(call_records.rtp_trunk_rx_loss) / NULLIF(SUM(call_records.rtp_trunk_rx_count), 0) as trunk_loss_pct,
+                SUM(call_records.billsec > 0 AND call_records.rtp_trunk_rx_count = 0) as no_audio
+            ')
+            ->groupBy('label')
+            ->orderByRaw('AVG(call_records.rtp_trunk_rx_mes) IS NULL, AVG(call_records.rtp_trunk_rx_mes) ASC')
+            ->limit(50)
+            ->get();
+
+        return view('admin.operational-reports.quality', compact(
+            'stats', 'coverage', 'hourly', 'breakdown', 'groupBy', 'dateFrom', 'dateTo'
+        ));
+    }
+
     public function exportOutboundCalls(Request $request)
     {
         $query = CallRecord::with(['user', 'sipAccount', 'outgoingTrunk'])

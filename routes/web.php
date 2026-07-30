@@ -154,6 +154,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin', 'domai
     Route::get('operational-reports/inbound/export', [Admin\OperationalReportController::class, 'exportInboundCalls'])->name('operational-reports.inbound.export');
     Route::get('operational-reports/outbound', [Admin\OperationalReportController::class, 'outboundCalls'])->name('operational-reports.outbound');
     Route::get('operational-reports/outbound/export', [Admin\OperationalReportController::class, 'exportOutboundCalls'])->name('operational-reports.outbound.export');
+    Route::get('operational-reports/quality', [Admin\OperationalReportController::class, 'qualityReport'])->name('operational-reports.quality');
     Route::get('operational-reports/transit', [Admin\OperationalReportController::class, 'transitCalls'])->name('operational-reports.transit');
     Route::get('operational-reports/p2p', [Admin\OperationalReportController::class, 'p2pCalls'])->name('operational-reports.p2p');
     Route::get('operational-reports/summary', [Admin\OperationalReportController::class, 'summaryCalls'])->name('operational-reports.summary');
