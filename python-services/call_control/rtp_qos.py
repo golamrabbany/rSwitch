@@ -36,6 +36,9 @@ _FIELD_MAP = (
     ("tx_loss", "rlp"),
     ("rx_jitter", "rxjitter"),
     ("rtt", "rtt"),
+    # Asterisk's Media Experience Score for the audio we RECEIVED on this leg,
+    # 0-100 (not the 1-5 MOS scale). Already present in every rtcp summary.
+    ("rx_mes", "rxmes"),
 )
 
 RTP_COLUMN_SUFFIXES = tuple(suffix for suffix, _ in _FIELD_MAP)
@@ -62,7 +65,14 @@ def parse_count(raw):
 
 
 def parse_seconds(raw):
-    """Jitter/RTT in seconds -> Decimal, or None when absent or unusable."""
+    """Non-negative decimal -> Decimal, or None when absent or unusable.
+
+    Used for jitter and RTT (seconds) and for the Media Experience Score (0-100).
+    The name is historical; what it really guarantees is "a finite, non-negative
+    decimal, or None". The NaN/infinity guards below exist because a signed NaN
+    from Asterisk once crashed call teardown -- do not remove them, and do not
+    write a second parser that lacks them.
+    """
     value = _clean(raw)
     if value is None:
         return None

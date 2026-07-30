@@ -214,3 +214,32 @@ async def test_read_rtp_qos_survives_agi_exceptions():
     # Should return complete dict with all None, not raise
     assert set(result) == set(RTP_COLUMN_SUFFIXES)
     assert all(v is None for v in result.values())
+
+
+REAL_SUMMARY_WITH_MES = (
+    "ssrc=810533921;themssrc=3758489602;lp=1;rxjitter=0.012000;rxcount=1516;"
+    "txjitter=0.000125;txcount=1514;rlp=0;rtt=0.129104;rxmes=83.194000;txmes=82.967221"
+)
+
+
+@pytest.mark.asyncio
+async def test_reads_media_experience_score():
+    result = await read_rtp_qos(_FakeAgi({"RTP_TRUNK_ALL": REAL_SUMMARY_WITH_MES}), "TRUNK")
+    assert result["rx_mes"] == Decimal("83.194000")
+
+
+@pytest.mark.asyncio
+async def test_mes_absent_from_summary_is_none():
+    """A summary without rxmes must yield None, not 0 -- 0 means measured-and-terrible."""
+    result = await read_rtp_qos(_FakeAgi({"RTP_TRUNK_ALL": "rxcount=100;txcount=100"}), "TRUNK")
+    assert result["rx_mes"] is None
+
+
+@pytest.mark.asyncio
+async def test_mes_zero_is_kept_distinct_from_absent():
+    result = await read_rtp_qos(_FakeAgi({"RTP_TRUNK_ALL": "rxcount=100;rxmes=0"}), "TRUNK")
+    assert result["rx_mes"] == Decimal("0")
+
+
+def test_rx_mes_is_a_known_suffix():
+    assert "rx_mes" in RTP_COLUMN_SUFFIXES
