@@ -53,7 +53,8 @@ class LegQosHandler:
                     rtp_trunk_rx_loss = :trunk_rx_loss,
                     rtp_trunk_tx_loss = :trunk_tx_loss,
                     rtp_trunk_rx_jitter = :trunk_rx_jitter,
-                    rtp_trunk_rtt = :trunk_rtt
+                    rtp_trunk_rtt = :trunk_rtt,
+                    rtp_trunk_rx_mes = :trunk_rx_mes
                 WHERE uuid = :uuid AND call_start >= NOW() - INTERVAL 1 DAY
             """),
             {
@@ -64,6 +65,7 @@ class LegQosHandler:
                 "trunk_tx_loss": trunk["tx_loss"],
                 "trunk_rx_jitter": trunk["rx_jitter"],
                 "trunk_rtt": trunk["rtt"],
+                "trunk_rx_mes": trunk["rx_mes"],
             },
         )
         session.commit()

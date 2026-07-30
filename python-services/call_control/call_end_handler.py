@@ -165,7 +165,8 @@ class CallEndHandler:
                     rtp_cust_rx_loss = :cust_rx_loss,
                     rtp_cust_tx_loss = :cust_tx_loss,
                     rtp_cust_rx_jitter = :cust_rx_jitter,
-                    rtp_cust_rtt = :cust_rtt
+                    rtp_cust_rtt = :cust_rtt,
+                    rtp_cust_rx_mes = :cust_rx_mes
                 WHERE uuid = :uuid
             """),
             {
@@ -181,6 +182,7 @@ class CallEndHandler:
                 "cust_tx_loss": cust["tx_loss"],
                 "cust_rx_jitter": cust["rx_jitter"],
                 "cust_rtt": cust["rtt"],
+                "cust_rx_mes": cust["rx_mes"],
             },
         )
         session.commit()

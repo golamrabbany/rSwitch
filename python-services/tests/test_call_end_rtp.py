@@ -70,3 +70,9 @@ def test_cust_parameters_have_no_coercion():
         assert "int(" not in binding_line, f'Coercion int() found in {param_name} binding: {binding_line!r}'
         assert "float(" not in binding_line, f'Coercion float() found in {param_name} binding: {binding_line!r}'
         assert "?:" not in binding_line, f'Ternary ?: found in {param_name} binding: {binding_line!r}'
+
+
+def test_update_includes_the_cust_mes_column():
+    source = open(call_end_handler.__file__).read()
+    stmt = re.search(r"UPDATE call_records SET(.+?)WHERE uuid", source, re.S).group(1)
+    assert "rtp_cust_rx_mes" in stmt

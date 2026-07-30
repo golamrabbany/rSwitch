@@ -96,3 +96,12 @@ async def test_database_error_is_swallowed_not_raised():
             raise RuntimeError("db gone")
 
     await LegQosHandler().handle(_FakeAgi({"CDR_UUID": "abc-123"}), _Boom())
+
+
+def test_update_includes_the_trunk_mes_column():
+    source = open(leg_qos_handler.__file__).read()
+    stmt = re.search(r"UPDATE call_records SET(.+?)WHERE uuid", source, re.S).group(1)
+    assert "rtp_trunk_rx_mes" in stmt
+    # still no billing column
+    for forbidden in ("disposition", "duration", "billsec", "status", "total_cost"):
+        assert forbidden not in stmt
