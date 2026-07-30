@@ -600,7 +600,10 @@ class OperationalReportController extends Controller
         $stats = $scope(CallRecord::query())->selectRaw('
             COUNT(*) as total_calls,
             SUM(billsec > 0) as answered,
-            SUM(rtp_trunk_rx_count IS NOT NULL) as captured,
+            -- Coverage is only meaningful against ANSWERED calls. Unanswered calls
+            -- still produce an rtcp summary (rxcount=0), so counting every row with
+            -- data against the answered total gave a nonsensical >100% figure.
+            SUM(billsec > 0 AND rtp_trunk_rx_count IS NOT NULL) as captured,
             AVG(rtp_trunk_rx_mes) as trunk_mes,
             AVG(rtp_cust_rx_mes) as cust_mes,
             AVG(rtp_trunk_rx_jitter) * 1000 as trunk_jitter_ms,
