@@ -25,6 +25,7 @@ class CallRecord extends Model
         'rtp_cust_tx_loss', 'rtp_cust_rx_jitter', 'rtp_cust_rtt',
         'rtp_trunk_rx_count', 'rtp_trunk_tx_count', 'rtp_trunk_rx_loss',
         'rtp_trunk_tx_loss', 'rtp_trunk_rx_jitter', 'rtp_trunk_rtt',
+        'rtp_cust_rx_mes', 'rtp_trunk_rx_mes',
     ];
 
     protected function casts(): array
@@ -54,6 +55,8 @@ class CallRecord extends Model
             'rtp_trunk_tx_loss' => 'integer',
             'rtp_trunk_rx_jitter' => 'decimal:3',
             'rtp_trunk_rtt' => 'decimal:3',
+            'rtp_cust_rx_mes' => 'decimal:2',
+            'rtp_trunk_rx_mes' => 'decimal:2',
         ];
     }
 
